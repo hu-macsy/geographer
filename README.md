@@ -22,14 +22,6 @@ On a recent Ubuntu (&gt;= 16.04), most of the dependencies can be installed with
 
 	sudo apt install cmake g++ git libatlas-base-dev mpi-default-dev
 
-### Optional
-
-- For number parsing issues on some platforms: [Boost](https://www.boost.org/) (&gt;= 1.61.0)
-- For the unit tests: [Google Test](https://github.com/google/googletest)
-
-On Ubuntu (&gt;= 16.04), install them using:
-
-	sudo apt install libboost-dev libgtest-dev
 
 ## Installation
 

@@ -17,12 +17,6 @@
 #include <scai/lama/storage/MatrixStorage.hpp>
 #include <scai/tracing.hpp>
 
-#ifdef USE_BOOST
-#include <boost/algorithm/string.hpp>
-#include <boost/tokenizer.hpp>
-#include <boost/lexical_cast.hpp>
-#endif
-
 #include <assert.h>
 #include <cmath>
 #include <set>
@@ -692,9 +686,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
         if( !read) PRINT(*comm << ": " <<  i << " __ " << line << " || " << file.tellg() );
         //remove leading and trailing whitespace, since these can confuse the string splitter
-#ifdef USE_BOOST
-        boost::algorithm::trim(line);
-#endif
+        trim(line);
         assert(read);//if we have read past the end of the file, the node count was incorrect
         std::stringstream ss( line );
         std::string item;
@@ -1391,11 +1383,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoords( co
                 throw std::runtime_error("Unexpected end of line " + line +". Was the number of dimensions correct?");
             }
             // WARNING: in supermuc (with the gcc/5) the std::stod returns the int part !!
-#ifdef USE_BOOST
-            ValueType coord = boost::lexical_cast<ValueType>(item);
-#else
             ValueType coord = std::stod(item);
-#endif
             coords[dim][i] = coord;
             dim++;
         }
@@ -1488,10 +1476,10 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
             //std::cout << "Process " << thisPE << " reading from " << beginLocalCoords << " to " << endLocalCoords << ", in total, localNumCoords= " << localTotalNumOfCoords << " coordinates and " << (localTotalNumOfCoords)*sizeof(ValueType) << " bytes." << std::endl;
 
             SCAI_REGION_START("FileIO.readCoordsBinary.fileRead" );
-            const UINT startPos = beginLocalCoords*sizeof(ValueType);
-            ValueType* localPartOfCoords = new ValueType[localTotalNumOfCoords];
+            const UINT startPos = beginLocalCoords*sizeof(double);
+            double* localPartOfCoords = new double[localTotalNumOfCoords];
             file.seekg(startPos);
-            file.read( (char *)(localPartOfCoords), (localTotalNumOfCoords)*sizeof(ValueType) );
+            file.read( (char *)(localPartOfCoords), (localTotalNumOfCoords)*sizeof(double) );
             SCAI_REGION_END("FileIO.readCoordsBinary.fileRead" );
 
             for(IndexType i=0; i<localN; i++) {
@@ -1502,9 +1490,9 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
 
             if( thisPE==numPEs-1) {
                 //SCAI_ASSERT_EQ_ERROR( file.tellg(), globalN*maxDimension*sizeof(ValueType) , "While reading coordinates in binary: Position in file " << filename << " is not correct for process " << thisPE );
-                SCAI_ASSERT_EQ_ERROR( file.tellg()/(maxDimension*sizeof(ValueType)), globalN, "While reading coordinates in binary: Position in file " << filename << " is not correct for process " << thisPE );
+                SCAI_ASSERT_EQ_ERROR( file.tellg()/(maxDimension*sizeof(double)), globalN, "While reading coordinates in binary: Position in file " << filename << " is not correct for process " << thisPE );
             } else {
-                SCAI_ASSERT_EQ_ERROR( file.tellg()/( maxDimension*sizeof(ValueType)*(thisPE+1) ), localN, "While reading coordinates in binary: Position in file " << filename << " is not correct for process " << thisPE );
+                SCAI_ASSERT_EQ_ERROR( file.tellg()/( maxDimension*sizeof(double)*(thisPE+1) ), localN, "While reading coordinates in binary: Position in file " << filename << " is not correct for process " << thisPE );
             }
 
             delete[] localPartOfCoords;
@@ -1672,11 +1660,7 @@ void  FileIO<IndexType, ValueType>::readOFFTriangularCentral( scai::lama::CSRSpa
                 throw std::runtime_error("Unexpected end of line " + line +". Was the number of dimensions correct?");
             }
             // WARNING: in supermuc (with the gcc/5) the std::stod returns the int part !!
-#ifdef USE_BOOST
-            ValueType coord = boost::lexical_cast<ValueType>(item);
-#else
             ValueType coord = std::stod(item);
-#endif
             coordsLA[dim][i] = coord;
             dim++;
         }
@@ -2384,7 +2368,37 @@ bool FileIO<IndexType, ValueType>::fileExists(const std::string& filename) {
     }
     return false;
 }
-//------------------------------------------------------------------------------
+//
+
+// functions to trim a string of whitespaces
+// taken from 
+//https://stackoverflow.com/questions/216823/whats-the-best-way-to-trim-stdstring
+
+// trim from start (in place)
+template<typename IndexType, typename ValueType>
+void FileIO<IndexType, ValueType>::ltrim(std::string &s) {
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](int ch) {
+        return !std::isspace(ch);
+    }));
+}
+
+// trim from end (in place)
+template<typename IndexType, typename ValueType>
+void FileIO<IndexType, ValueType>::rtrim(std::string &s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](int ch) {
+        return !std::isspace(ch);
+    }).base(), s.end());
+}
+
+// trim from both ends (in place)
+template<typename IndexType, typename ValueType>
+void FileIO<IndexType, ValueType>::trim(std::string &s) {
+    ltrim(s);
+    rtrim(s);
+}
+
+
+//---------------------------------------------------------------------------
 
 template class FileIO<IndexType, ValueType>;
 

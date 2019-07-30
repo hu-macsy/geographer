@@ -1,0 +1,87 @@
+dist: xenial
+language: cpp
+compiler: gcc
+
+matrix:
+  include:
+    - name: GCC5, ValueType double
+      os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-5
+      env:
+         - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5 && ValueType=double"
+
+    - name: GCC6, ValueType double
+      os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-6
+      env:
+        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6 && ValueType=double"
+
+    - name: GCC7, ValueType double
+      os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-7
+      env:
+        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7 && ValueType=double"
+
+    - name: GCC5, ValueType float
+      os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-5
+      env:
+         - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5 && ValueType=float"
+
+    - name: GCC6, ValueType float
+      os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-6
+      env:
+        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6 && ValueType=float"
+
+    - name: GCC7, ValueType float
+      os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-7
+      env:
+        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7 && ValueType=float"
+
+addons:
+  apt:
+    update: true
+
+before_install:
+  - eval "${MATRIX_EVAL}"
+  - sudo apt-get install -y cmake mpi-default-dev mpi-default-bin libatlas-base-dev libboost-filesystem-dev
+
+install:
+  - git clone --branch fix-compiler-warnings https://github.com/kit-parco/lama.git
+  - pushd lama && mkdir build && cd build && cmake ../scai && make -j4 && sudo make install && popd
+
+script:
+  - mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install -DGeographer_VALUE_TYPE=${ValueType} .. && make -j4 && sudo make install && cd ..
+  - mpirun -np 4 install/bin/GeographerTest

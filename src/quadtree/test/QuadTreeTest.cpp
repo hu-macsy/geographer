@@ -23,8 +23,6 @@
 #include "../QuadTreePolarEuclid.h"
 #include "../KDTreeEuclidean.h"
 
-#include <boost/filesystem.hpp>
-
 namespace ITI {
 
 TEST_F(QuadTreeTest, testGetGraphFromForestRandom_2D) {
@@ -627,7 +625,12 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 
     // write coords in files for visualization purposes
     std::string destPath = "./partResults/fromQuadTree/blocks_"+std::to_string(k)+"/";
-    boost::filesystem::create_directories( destPath );
+    std::string command = "mkdir -p " + destPath;
+    const int dir_err = system( command.c_str() );
+    if (-1 == dir_err){
+        std::cout << "Error creating directory " << destPath << std::endl;
+        std::exit(1);
+    }    
 
     const ValueType epsilon = 0.05;
     struct Settings settings;
@@ -635,6 +638,12 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
     settings.epsilon = epsilon;
     settings.dimensions = dimension;
     settings.useGeometricTieBreaking = 1;
+	settings.initialPartition = ITI::Tool::geoSFC;
+	settings.noRefinement = true;
+	
+	struct Metrics metrics(settings);
+	
+	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, DenseVector<ValueType>(graph.getRowDistributionPtr(), 1));
 
     ValueType cut, maxCut= N;
     ValueType imbalance;
@@ -645,7 +654,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 
     for(int detail= 0; detail<np; detail++) {
         settings.pixeledSideLen= std::pow( 2, detail + np );
-        sfcPartition = ITI::ParcoRepart<IndexType, ValueType>::hilbertPartition(coordsDV, settings);
+        sfcPartition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( coordsDV, nodeWeights, settings, metrics );
         scai::dmemo::DistributionPtr newDist = sfcPartition.getDistributionPtr();
         sfcPartition.redistribute(newDist);
         graph.redistribute(newDist, noDist);
@@ -672,7 +681,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
         coordsDV[d].redistribute(dist);
     }
 
-    scai::lama::DenseVector<IndexType> hilbertPartition = ITI::ParcoRepart<IndexType, ValueType>::hilbertPartition(coordsDV, settings);
+    scai::lama::DenseVector<IndexType> hilbertPartition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( coordsDV, nodeWeights, settings, metrics );
     scai::dmemo::DistributionPtr newDist = hilbertPartition.getDistributionPtr();
     graph.redistribute(newDist, noDist);
     hilbertPartition.redistribute(newDist);
@@ -724,7 +733,7 @@ TEST_F(QuadTreeTest, testCartesianEuclidQuery) {
         auto edgeProb = [acc](ValueType distance) -> ValueType {return acc;};
         std::vector<index> near;
         quad.getElementsProbabilistically(positions[query], edgeProb, near);
-        EXPECT_NEAR(near.size(), acc*n, std::max(acc*n*0.5, ValueType(10.0)));
+        EXPECT_NEAR(near.size(), acc*n, std::max(ValueType(acc*n*0.5), ValueType(10.0)));
     }
 
     for (index i = 0; i < 200; i++) {
@@ -796,7 +805,7 @@ TEST_F(QuadTreeTest, testPolarEuclidQuery) {
         auto edgeProb = [acc](ValueType distance) -> ValueType {return acc;};
         std::vector<index> near;
         tree.getElementsProbabilistically({angles[query], radii[query]}, edgeProb, near);
-        EXPECT_NEAR(near.size(), acc*n, std::max(acc*n*0.5, ValueType(10.0)));
+        EXPECT_NEAR(near.size(), acc*n, std::max(ValueType(acc*n*0.5), ValueType(10.0)));
     }
 
     //TODO: some test about appropriate subtrees and leaves

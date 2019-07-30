@@ -37,6 +37,7 @@
 
 
 namespace ITI {
+
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     CSRSparseMatrix<ValueType> &input,
@@ -48,7 +49,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     uniformWeights[0] = fill<DenseVector<ValueType>>(input.getRowDistributionPtr(), 1);
     return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
 }
-
+//---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
@@ -60,6 +61,41 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     assert(settings.storeInfo == false); // Cannot return timing information. Better throw an error than silently drop it.
 
     return partitionGraph(input, coordinates, settings, metrics);
+}
+//---------------------------------------------------------------------------------------
+
+// overloaded version without a graph
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
+    std::vector<DenseVector<ValueType>> &coordinates,
+    std::vector<DenseVector<ValueType>> &nodeWeights,
+    struct Settings settings,
+    struct Metrics& metrics) {
+
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    if( settings.initialPartition!=ITI::Tool::geoSFC ) {
+        if( comm->getRank()==0) {
+            std::cout<< "Called ParcoRepart::partitionGraph without the graph as input argument but the tool to partition is "\
+                     << settings.initialPartition << " and it require the graph. Call again by also providing the graph" << std::endl;
+        }
+        throw std::runtime_error("Graph not given but required.");
+    }
+
+    if( not settings.noRefinement ) {
+        if( comm->getRank()==0) {
+            std::cout << "The refinement flag is on but no graph is provided. Call again by also providing the graph" << std::endl;
+        }
+        throw std::runtime_error("Graph not given but required.");
+    }
+
+    const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
+    const IndexType N = dist->getGlobalSize();
+    const scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
+
+    //generate dummy matrix
+    scai::lama::CSRSparseMatrix<ValueType> graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDistPointer);
+
+    return partitionGraph( graph, coordinates, nodeWeights, settings, metrics );
 }
 
 
@@ -82,6 +118,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     return partitionGraph(input, coordinates, nodeWeights, previous, commTree, settings, metrics);
 
 }
+//---------------------------------------------------------------------------------------
 
 //TODO: maybe we do not need that. But how to decide since we do not have
 // the settings.blockSizes anymore?
@@ -217,82 +254,103 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
     std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
 
-    SCAI_REGION_START("ParcoRepart.partitionGraph.inputCheck")
     /*
     * check input arguments for sanity
     */
-    IndexType n = input.getNumRows();
-    for( int d=0; d<dimensions; d++) {
-        if (n != coordinates[d].size()) {
-            throw std::runtime_error("Matrix has " + std::to_string(n) + " rows, but " + std::to_string(coordinates[0].size())
-                                     + " coordinates are given.");
-        }
-    }
-
-    if (n != input.getNumColumns()) {
-        throw std::runtime_error("Matrix must be quadratic.");
-    }
-
-    if (!input.isConsistent()) {
-        throw std::runtime_error("Input matrix inconsistent");
-    }
-
-    if (k > n) {
-        throw std::runtime_error("Creating " + std::to_string(k) + " blocks from " + std::to_string(n) + " elements is impossible.");
-    }
-
-    if (epsilon < 0) {
-        throw std::runtime_error("Epsilon " + std::to_string(epsilon) + " is invalid.");
-    }
-
-    const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
+	
+	assert( (aux<IndexType, ValueType>::checkConsistency(  input, coordinates, nodeWeights, settings)) );
+	
+	// check outside function to avoid dependency of aux in CommTree
+    assert( commTree.checkTree() );
+	
+    const IndexType n = input.getNumRows();
+	const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
     const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
     const IndexType rank = comm->getRank();
 
-    if (!coordDist->isEqual( *inputDist) ) {
-        throw std::runtime_error( "Distributions should be equal.");
-    }
-
-    bool nodesUnweighted = nodeWeights.size() == 1 && (nodeWeights[0].max() == nodeWeights[0].min());
-
-    SCAI_REGION_END("ParcoRepart.partitionGraph.inputCheck")
-    {
-        SCAI_REGION("ParcoRepart.synchronize")
-        comm->synchronize();
-    }
-
-    if (settings.repartition && nodeWeights.size() > 1) {
-        throw std::logic_error("Repartitioning not implemented for multiple node weights.");
-    }
-
-    if (settings.initialPartition == ITI::Tool::geoMS && nodeWeights.size() > 1) {
-        throw std::logic_error("MultiSection not implemented for multiple weights.");
-    }
-
-    // get an initial partition
-    DenseVector<IndexType> result;
-
-    for (IndexType i = 0; i < nodeWeights.size(); i++) {
-        assert(nodeWeights[i].getDistribution().isEqual(*inputDist));
-    }
-
-    //-------------------------
-    //
-    // timing info
-
-    std::chrono::duration<double> kMeansTime = std::chrono::duration<double>(0.0);
-    std::chrono::duration<double> migrationCalculation = std::chrono::duration<double> (0.0);
-    std::chrono::duration<double> migrationTime= std::chrono::duration<double>(0.0);
-    std::chrono::duration<double> secondRedistributionTime = std::chrono::duration<double>(0.0) ;
+	// timing info
     std::chrono::duration<double> partitionTime= std::chrono::duration<double>(0.0);
+	std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
+    
+	/*
+	* get an initial partition
+	*/
+	DenseVector<IndexType> result = initialPartition( input, coordinates, nodeWeights, previous, commTree, comm, settings, metrics);
 
-    std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
+    // if noRefinement then these are the times, if we do refinement they will be overwritten
+    partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
+    metrics.MM["timePreliminary"] = partitionTime.count();
+
+    //-----------------------------------------------------------
+    //
+    // At this point we have the initial, geometric partition.
+    //
+
+	
+    if (comm->getSize() == k) {
+        //WARNING: the result  is not redistributed. must redistribute afterwards
+        if( !settings.noRefinement ) {
+			
+			doLocalRefinement( result,  input, coordinates, nodeWeights, comm, settings, metrics );
+
+        }
+    } else {
+        result.redistribute(inputDist);
+        if (comm->getRank() == 0 && !settings.noRefinement) {
+            std::cout << "Local refinement only implemented for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
+        }
+    }
+
+    std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startTime;
+    metrics.MM["timeTotal"] = elapTime.count();
+
+    //possible mapping at the end
+    if( settings.mappingRenumbering ) {
+        PRINT0("Applying renumbering of blocks based on the SFC index of their centers.");
+        std::chrono::time_point<std::chrono::system_clock> startRnb = std::chrono::system_clock::now();
+
+        if( not result.getDistribution().isEqual(coordinates[0].getDistribution()) ) {
+            PRINT0("WARNING:\nCoordinates and partition do not have the same distribution.\nRedistributing coordinates to match distribution");
+            for( int d=0; d<dimensions; d++) {
+                coordinates[d].redistribute( result.getDistributionPtr() );
+            }
+        }
+        Mapping<IndexType,ValueType>::applySfcRenumber( coordinates, nodeWeights, result, settings );
+
+        std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startRnb;
+        PRINT0("renumbering time " << elapTime.count() );
+    }
+
+    return result;
+} //partitionGraph
+
+//-------------------------------------------------------------------------------------------------
+
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
+    CSRSparseMatrix<ValueType> &input,
+    std::vector<DenseVector<ValueType>> &coordinates,
+    std::vector<DenseVector<ValueType>> &nodeWeights,
+    DenseVector<IndexType>& previous,
+    CommTree<IndexType,ValueType> commTree,
+    scai::dmemo::CommunicatorPtr comm,
+    Settings settings,
+    struct Metrics& metrics){
+    
+	SCAI_REGION( "ParcoRepart.initialPartition" )
+	
+	const IndexType k = settings.numBlocks;
+	std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
+
+    //to be returned
+    DenseVector<IndexType> result;
 
     if( settings.initialPartition==ITI::Tool::geoSFC) {
         PRINT0("Initial partition with SFCs");
-        result= ParcoRepart<IndexType, ValueType>::hilbertPartition(coordinates, settings);
+        result= HilbertCurve<IndexType, ValueType>::computePartition(coordinates, settings);
         std::chrono::duration<double> sfcTime = std::chrono::system_clock::now() - beforeInitPart;
         if ( settings.verbose ) {
             ValueType totSFCTime = ValueType(comm->max(sfcTime.count()) );
@@ -307,8 +365,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
         }
 
         //prepare coordinates for k-means
-        std::vector<DenseVector<ValueType> > coordinateCopy = coordinates;
-        std::vector<DenseVector<ValueType> > nodeWeightCopy = nodeWeights;
+        std::vector<DenseVector<ValueType>> coordinateCopy = coordinates;
+        std::vector<DenseVector<ValueType>> nodeWeightCopy = nodeWeights;
         if (comm->getSize() > 1 && (settings.dimensions == 2 || settings.dimensions == 3)) {
             SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans")
 
@@ -318,7 +376,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
                     throw std::logic_error("KMeans depends on pre-sorting with space filling curves.");
                 }
 
-                HilbertCurve<IndexType,ValueType>::hilbertRedistribution(coordinateCopy, nodeWeightCopy, settings, metrics);
+                HilbertCurve<IndexType,ValueType>::redistribute(coordinateCopy, nodeWeightCopy, settings, metrics);
             }
         }
 
@@ -367,9 +425,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
                                   result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
         }
 
-        kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
-        metrics.MM["timeKmeans"] = kMeansTime.count();
-        //timeForKmeans = ValueType ( comm->max(kMeansTime.count() ));
+        std::chrono::duration<double>  kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
         assert(scai::utilskernel::HArrayUtils::min(result.getLocalValues()) >= 0);
         SCAI_ASSERT_LT_ERROR(scai::utilskernel::HArrayUtils::max(result.getLocalValues()),k, "");
 
@@ -395,7 +451,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
         }
 
         DenseVector<ValueType> convertedWeights(nodeWeights[0]);
-        result = ITI::MultiSection<IndexType, ValueType>::getPartitionNonUniform(input, coordinates, convertedWeights, settings);
+        result = ITI::MultiSection<IndexType, ValueType>::computePartition(input, coordinates, convertedWeights, settings);
         std::chrono::duration<double> msTime = std::chrono::system_clock::now() - beforeInitPart;
 
         if ( settings.verbose ) {
@@ -412,259 +468,66 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
         throw std::runtime_error("Initial Partitioning mode unsupported.");
     }
 
-    //-----------------------------------------------------------
-    //
-    // At this point we have the initial, geometric partition.
-    //
-
-    // if noRefinement then these are the times, if we do refinement they will be overwritten
-    partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
-    metrics.MM["timePreliminary"] = partitionTime.count();
-
-    if (comm->getSize() == k) {
-        //WARNING: the result  is not redistributed. must redistribute afterwards
-        if( !settings.noRefinement ) {
-
-            //uncomment to store the first, geometric partition into a file that then can be visualized using matlab and GPI's code
-            //std::string filename = "geomPart.mtx";
-            //result.writeToFile( filename );
-
-            SCAI_REGION("ParcoRepart.partitionGraph.initialRedistribution");
-            if (nodeWeights.size() > 1) {
-                throw std::logic_error("Local refinement not yet implemented for multiple weights.");
-            }
-            /*
-             * redistribute to prepare for local refinement
-             */
-            bool useRedistributor = true;
-            aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights[0], settings, useRedistributor);
-
-            partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
-            ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( input, result, true);
-            ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights[0]);
-
-
-            //-----------------------------------------------------------
-            //
-            // output: in std and file
-            //
-
-            //now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
-            ValueType timeToCalcInitMigration = migrationCalculation.count();
-            ValueType timeForFirstRedistribution = migrationTime.count();
-            ValueType timeForKmeans = kMeansTime.count();
-            ValueType timeForSecondRedistr = secondRedistributionTime.count();
-            ValueType timeForInitPart = partitionTime.count();
-
-            metrics.MM["timeSecondDistribution"] = timeForSecondRedistr;
-            metrics.MM["timePreliminary"] = timeForInitPart;
-            metrics.MM["preliminaryCut"] = cut;
-            metrics.MM["preliminaryImbalance"] = imbalance;
-
-            if (settings.verbose ) {
-                //TODO: do this comm->max here? otherwise it is just PE 0 times
-                timeToCalcInitMigration = comm->max(migrationCalculation.count()) ;
-                timeForFirstRedistribution = comm->max( migrationTime.count() );
-                timeForKmeans = comm->max( kMeansTime.count() );
-                timeForSecondRedistr = comm->max( secondRedistributionTime.count() );
-                timeForInitPart = comm->max( partitionTime.count() );
-                if(comm->getRank() == 0 ) {
-                    std::cout<< std::endl << "\033[1;32mTiming: migration algo: "<< timeToCalcInitMigration << ", 1st redistr: " << timeForFirstRedistribution << ", only k-means: " << timeForKmeans <<", only 2nd redistr: "<< timeForSecondRedistr <<", total:" << timeForInitPart << std::endl;
-                    std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
-                }
-            }
-
-            SCAI_REGION_START("ParcoRepart.partitionGraph.multiLevelStep")
-            scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
-            ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights[0], coordinates, halo, settings, metrics);
-            SCAI_REGION_END("ParcoRepart.partitionGraph.multiLevelStep")
-        }
-    } else {
-        result.redistribute(inputDist);
-        if (comm->getRank() == 0 && !settings.noRefinement) {
-            std::cout << "Local refinement only implemented for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
-        }
-    }
-
-    std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startTime;
-    metrics.MM["timeTotal"] = elapTime.count();
-
-    //possible mapping at the end
-    if( settings.mappingRenumbering ) {
-        PRINT0("Applying renumbering of blocks based on the SFC index of their centers.");
-        std::chrono::time_point<std::chrono::system_clock> startRnb = std::chrono::system_clock::now();
-
-        if( not result.getDistribution().isEqual(coordinates[0].getDistribution()) ) {
-            PRINT0("WARNING:\nCoordinates and partition do not have the same distribution.\nRedistributing coordinates to match distribution");
-            for( int d=0; d<dimensions; d++) {
-                coordinates[d].redistribute( result.getDistributionPtr() );
-            }
-        }
-        Mapping<IndexType,ValueType>::applySfcRenumber( coordinates, nodeWeights, result, settings );
-
-        std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startRnb;
-        PRINT0("renumbering time " << elapTime.count() );
-    }
-
     return result;
-} //partitionGraph
-//---------------------------------------------------------------------------------------
-
-//TODO: take node weights into account
-template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings) {
-
-    auto uniformWeights = fill<DenseVector<ValueType>>(coordinates[0].getDistributionPtr(), 1);
-    return hilbertPartition( coordinates, settings);
-}
+} //initialPartition
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings) {
-    SCAI_REGION( "ParcoRepart.hilbertPartition" )
+void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
+	DenseVector<IndexType> &result,
+    CSRSparseMatrix<ValueType> &input,
+    std::vector<DenseVector<ValueType>> &coordinates,
+    std::vector<DenseVector<ValueType>> &nodeWeights,
+	scai::dmemo::CommunicatorPtr comm,
+    Settings settings,
+	struct Metrics& metrics){
 
-    std::chrono::time_point<std::chrono::steady_clock> start, afterSFC;
-    start = std::chrono::steady_clock::now();
-
-    const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
-    const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
-
-    IndexType k = settings.numBlocks;
-    const IndexType dimensions = coordinates.size();
-    assert(dimensions == settings.dimensions);
-    const IndexType localN = coordDist->getLocalSize();
-    const IndexType globalN = coordDist->getGlobalSize();
-
-    if (k != comm->getSize() && comm->getRank() == 0) {
-        throw std::logic_error("Hilbert curve partition only implemented for same number of blocks and processes.");
-    }
-
-    if (comm->getSize() == 1) {
-        return scai::lama::DenseVector<IndexType>(globalN, 0);
-    }
-
-    //
-    // vector of size k, each element represents the size of each block
-    //
-	//TODO: either adapt hilbert partition to consider node weights and block
-	// sizes or add checks when used with nodeweights outside the function
-
-    /*
-        std::vector<ValueType> blockSizes;
-    	//TODO: for now assume uniform nodeweights
-        IndexType weightSum = globalN;// = nodeWeights.sum();
-        if( settings.blockSizes.empty() ){
-            blockSizes.assign( settings.numBlocks, weightSum/settings.numBlocks );
-        }else{
-        	if (settings.blockSizes.size() > 1) {
-        		throw std::logic_error("Hilbert partition not implemented for node weights or multiple block sizes.");
-        	}
-            blockSizes = settings.blockSizes[0];
-        }
-        SCAI_ASSERT( blockSizes.size()==settings.numBlocks , "Wrong size of blockSizes vector: " << blockSizes.size() );
-
-    */
-
-    /*
-     * Several possibilities exist for choosing the recursion depth.
-     * Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
-     */
-    const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
-
-    /*
-     *	create space filling curve indices.
-     */
-
-    scai::lama::DenseVector<ValueType> hilbertIndices(coordDist, 0);
-    std::vector<ValueType> localHilberIndices = HilbertCurve<IndexType,ValueType>::getHilbertIndexVector(coordinates, recursionDepth, dimensions);
-    hilbertIndices.assign( scai::hmemo::HArray<ValueType>( localHilberIndices.size(), localHilberIndices.data()), coordDist);
-
-    //TODO: use the blockSizes vector
-    //TODO: take into account node weights: just sorting will create imbalanced blocks, not so much in number of node but in the total weight of each block
-
-    /*
-     * now sort the global indices by where they are on the space-filling curve.
-     */
-
-    std::vector<IndexType> newLocalIndices;
-
-    {
-        SCAI_REGION( "ParcoRepart.hilbertPartition.sorting" );
-        //TODO: maybe call getSortedHilbertIndices here?
-        int typesize;
-        MPI_Type_size(MPI_DOUBLE_INT, &typesize);
-        //assert(typesize == sizeof(sort_pair)); //not valid for int_double, presumably due to padding
-
-        std::vector<sort_pair> localPairs(localN);
-
-        //fill with local values
-        long indexSum = 0;//for sanity checks
-        scai::hmemo::ReadAccess<ValueType> localIndices(hilbertIndices.getLocalValues());//Segfault happening here, likely due to stack overflow. TODO: fix
-        for (IndexType i = 0; i < localN; i++) {
-            localPairs[i].value = localIndices[i];
-            localPairs[i].index = coordDist->local2Global(i);
-            indexSum += localPairs[i].index;
-        }
-
-        //create checksum
-        const long checkSum = comm->sum(indexSum);
-        //TODO: int overflow?
-        SCAI_ASSERT_EQ_ERROR(checkSum, (long(globalN)*(long(globalN)-1))/2, "Sorting checksum is wrong (possible IndexType overflow?).");
-
-        //call distributed sort
-        //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
-        MPI_Comm mpi_comm = MPI_COMM_WORLD;
-        JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
-
-        //copy indices into array
-        const IndexType newLocalN = localPairs.size();
-        newLocalIndices.resize(newLocalN);
-
-        for (IndexType i = 0; i < newLocalN; i++) {
-            newLocalIndices[i] = localPairs[i].index;
-        }
-
-        //sort local indices for general distribution
-        std::sort(newLocalIndices.begin(), newLocalIndices.end());
-
-        //check size and sanity
-        SCAI_ASSERT_LT_ERROR( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()), globalN, "Too large index (possible IndexType overflow?).");
-        SCAI_ASSERT_EQ_ERROR( comm->sum(newLocalIndices.size()), globalN, "distribution mismatch");
-
-        //more expensive checks
-        if( settings.debugMode ) {
-            SCAI_ASSERT_EQ_ERROR( comm->sum(newLocalIndices.size()), globalN, "distribution mismatch");
-
-            //check checksum
-            long indexSumAfter = 0;
-            for (IndexType i = 0; i < newLocalN; i++) {
-                indexSumAfter += newLocalIndices[i];
-            }
-
-            const long newCheckSum = comm->sum(indexSumAfter);
-            SCAI_ASSERT( newCheckSum == checkSum, "Old checksum: " << checkSum << ", new checksum: " << newCheckSum );
-        }
-
-        //possible optimization: remove dummy values during first copy, then directly copy into HArray and sort with pointers. Would save one copy.
-    }
-
-    DenseVector<IndexType> result;
-
-    {
-        assert(!coordDist->isReplicated() && comm->getSize() == k);
-        SCAI_REGION( "ParcoRepart.hilbertPartition.createDistribution" );
-
-        scai::hmemo::HArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
-        assert(comm->sum(indexTransport.size()) == globalN);
-        scai::dmemo::DistributionPtr newDistribution( new scai::dmemo::GeneralDistribution ( globalN, std::move(indexTransport), true) );
-
-        if (comm->getRank() == 0) std::cout << "Created distribution." << std::endl;
-        result = fill<DenseVector<IndexType>>(newDistribution, comm->getRank());
-        if (comm->getRank() == 0) std::cout << "Created initial partition." << std::endl;
-    }
-
-    return result;
-}
+	SCAI_REGION("ParcoRepart.doLocalRefinement");		
+	std::chrono::time_point<std::chrono::system_clock> start =  std::chrono::system_clock::now();
+	
+	//uncomment to store the first, geometric partition into a file that then can be visualized using matlab and GPI's code
+	//std::string filename = "geomPart.mtx";
+	//result.writeToFile( filename );
+	
+	if (nodeWeights.size() > 1) {
+		throw std::logic_error("Local refinement not yet implemented for multiple weights.");
+	}
+	
+	/*
+	 * redistribute to prepare for local refinement
+	 */
+	bool useRedistributor = true;
+	aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights[0], settings, useRedistributor);
+	
+	std::chrono::duration<double> redistTime =  std::chrono::system_clock::now() - start;
+	
+	const IndexType k = settings.numBlocks;
+	
+	ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( input, result, true);
+	ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights[0]);
+	
+	//now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
+	metrics.MM["timeSecondDistribution"] = redistTime.count();
+	metrics.MM["preliminaryCut"] = cut;
+	metrics.MM["preliminaryImbalance"] = imbalance;
+	
+	//
+	// output: in std and file
+	//	
+	if (settings.verbose ) {
+		ValueType timeForSecondRedistr = comm->max( redistTime.count() );
+		if(comm->getRank() == 0 ) {
+			std::cout<< std::endl << "\033[1;32mTiming: 2nd redist before local refinement: "<< timeForSecondRedistr << std::endl;
+			std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
+		}
+	}
+	
+	SCAI_REGION_START("ParcoRepart.doLocalRefinement.multiLevelStep")
+	scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
+	ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights[0], coordinates, halo, settings, metrics);
+	SCAI_REGION_END("ParcoRepart.doLocalRefinement.multiLevelStep")
+			
+}//doLocalRefinement
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>

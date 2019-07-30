@@ -36,6 +36,7 @@ public:
     /**
      * Partitions the given input graph
      * If the number of blocks is equal to the number of processes, graph, coordinates and weights are redistributed according to the partition.
+     * \overload
      *
      * @param[in,out] input Adjacency matrix of the input graph with n vertices. numRows=numColumns=n
      * @param[in,out] coordinates Coordinates of input points, coordinates.size()=n
@@ -51,6 +52,27 @@ public:
         std::vector<DenseVector<ValueType>> &nodeWeights,
         struct Settings settings,
         struct Metrics& metrics);
+
+    /** Version to partition a point set, without using the graph.
+     * \overload
+    */
+    static DenseVector<IndexType> partitionGraph(
+        std::vector<DenseVector<ValueType>> &coordinates,
+        std::vector<DenseVector<ValueType>> &nodeWeights,
+        struct Settings settings,
+        struct Metrics& metrics);
+
+    /**
+     * Wrapper without metrics.
+     * \overload
+     */
+    static DenseVector<IndexType> partitionGraph(
+        std::vector<DenseVector<ValueType>> &coordinates,
+        std::vector<DenseVector<ValueType>> &nodeWeights,
+        struct Settings settings) {
+        Metrics metrics(settings);
+        return partitionGraph( coordinates, nodeWeights, settings, metrics );
+    }
 
     /**
      * Repartitions the given input graph, starting from a given previous partition
@@ -77,21 +99,29 @@ public:
 
     /**
      * Wrapper without node weights.
+     * \overload
      */
     static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings, struct Metrics& metrics);
 
     /**
      * Wrapper without node weights and no metrics
+     * \overload
      */
     static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings);
 
     /**
      * Wrapper without metrics.
+     * \overload
      */
-    static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights, struct Settings settings);
+
+    static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights, struct Settings settings) {
+        Metrics metrics(settings);
+        return partitionGraph( input, coordinates, nodeWeights, settings, metrics);
+    }
 
     /**
     *	Wrapper with block sizes.
+    * \overload
 
     @param[in] blockSizes \p blockSizes[i][j] is the wanted target weight of the i-th weight for the j-th block.
     blockSizes.size() = number of weights (remember: vertices can have multiple weights),
@@ -138,26 +168,6 @@ public:
         Settings  settings, Metrics& metrics);
 
     /**
-     * @brief Partition a point set using the Hilbert curve, only implemented for equal number of blocks and processes.
-     *
-     * @param coordinates Coordinates of the input points
-     * @param settings Settings struct
-     *
-     * @return partition DenseVector, redistributed according to the partition
-     */
-    static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
-
-    /** \overload
-    @param[in] nodeWeights Weights for the points
-    */
-    /*
-    * Get an initial partition using the Hilbert curve.
-    * TODO: This currently does nothing and isn't used. Remove?
-    */
-    static DenseVector<IndexType> hilbertPartition(const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings);
-
-
-    /**
      * Get an initial partition using the morton curve and measuring density per square.
      */
     static DenseVector<IndexType> pixelPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
@@ -185,5 +195,35 @@ public:
     */
     static std::vector<IndexType> neighbourPixels(const IndexType thisPixel,const IndexType sideLen, const IndexType dimensions);
 
+
+private:
+
+    /** The initial (geometric) partition of a graph. 
+
+    Attention, for metis, and methods using the multilevel approach, the term 'initial partition' usually refers to the first
+    partition in the coarsest level of the multilevel cycle. Here, we obtain an initial partition without coarsening, by
+    using the coordinates of the graph.
+    */
+    static DenseVector<IndexType> initialPartition(
+        CSRSparseMatrix<ValueType> &input,
+        std::vector<DenseVector<ValueType>> &coordinates,
+        std::vector<DenseVector<ValueType>> &nodeWeights,
+        DenseVector<IndexType>& previous,
+        CommTree<IndexType,ValueType> commTree,
+        scai::dmemo::CommunicatorPtr comm,
+        struct Settings settings,
+        struct Metrics& metrics); 
+	
+	/** Wrapper function to do local refinement on a partitioned graph. 
+	 */
+	static void doLocalRefinement(
+		DenseVector<IndexType> &result,
+		CSRSparseMatrix<ValueType> &input,
+		std::vector<DenseVector<ValueType>> &coordinates,
+		std::vector<DenseVector<ValueType>> &nodeWeights,
+		scai::dmemo::CommunicatorPtr comm,
+		Settings settings,
+		struct Metrics& metrics);
+	
 };
 } //namespace ITI

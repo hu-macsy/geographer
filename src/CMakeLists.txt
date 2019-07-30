@@ -20,7 +20,6 @@ set(FILES_HEADER ParcoRepart.h MultiLevel.h LocalRefinement.h HilbertCurve.h Mes
 set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp Diffusion.cpp GraphUtils.cpp MultiSection.cpp MultiSection_iter.cpp  KMeans.cpp CommTree.cpp AuxiliaryFunctions.cpp HaloPlanFns.cpp Metrics.cpp Mapping.cpp Settings.cpp)
 set(FILES_TEST test_main.cpp auxTest.cpp CommTreeTest.cpp DiffusionTest.cpp FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MappingTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp quadtree/test/QuadTreeTest.cpp )
 
-
 ###
 ### Check if external libraries metis, parmetis and zoltan2 are found. If they are found,
 ### create the allCompetitors executable and also, later, link them with libgeographer
@@ -68,7 +67,7 @@ if( Zoltan2_FOUND AND METIS_BASE AND PARMETIS_BASE )
 	set( EXTRA_LIBRARIES ${METIS_LIB} ${PARMETIS_LIB} ${ZOLTAN2_LIB} ${Zoltan2_LIBRARIES}  PARENT_SCOPE )
 
 	add_executable( allCompetitors allCompetitorsPart.cpp parseArgs.cpp)
-	target_include_directories( allCompetitors PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} )
+	target_include_directories( allCompetitors PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} )
 	# include parmetis and metis ###
 	target_include_directories( allCompetitors PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" ${CXXOPTS_DIR})
 	target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
@@ -88,10 +87,6 @@ endif()
 add_library(geographer SHARED ${FILES_COMMON})
 target_compile_options(geographer PRIVATE -fPIC)
 target_link_libraries(geographer ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
-if (USE_BOOST)
-	target_include_directories(geographer PUBLIC ${Boost_INCLUDE_DIRS})
-	target_link_libraries(geographer ${Boost_LIBRARIES})
-endif(USE_BOOST)
 
 add_executable(GeographerStandalone main.cpp parseArgs.cpp)
 target_include_directories(GeographerStandalone PUBLIC ${CXXOPTS_DIR})
@@ -103,15 +98,18 @@ if (USE_NETWORKIT)
 endif (USE_NETWORKIT)
 
 ### define unit test target if GTest was found ###
-if (GTEST_FOUND AND Boost_FOUND)
+if (GTEST_FOUND)
 	add_executable(GeographerTest ${FILES_TEST})
-	target_include_directories(GeographerTest PUBLIC ${Boost_INCLUDE_DIRS})
-	target_link_libraries(GeographerTest geographer ${SCAI_LIBRARIES} ${Boost_LIBRARIES} ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
+	#target_include_directories(GeographerTest PUBLIC ${Boost_INCLUDE_DIRS})
+	target_compile_options(GeographerTest PRIVATE -fprofile-arcs -ftest-coverage)
+	target_link_libraries(GeographerTest -fprofile-arcs -ftest-coverage)
+	target_link_libraries(GeographerTest geographer ${SCAI_LIBRARIES} ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
 	target_link_libraries(GeographerTest -pthread)
 	add_test(NAME GeographerTest COMMAND GeographerTest WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 	install(TARGETS GeographerTest DESTINATION "${BIN_DEST}") # test executable
-endif (GTEST_FOUND AND Boost_FOUND)
+endif (GTEST_FOUND)
 
+### install library, header files and standalone executable ####
 install(TARGETS geographer EXPORT geographer DESTINATION "${LIB_DEST}") # library
 install(FILES ${FILES_HEADER} DESTINATION "${HEADER_DEST}")
 install(TARGETS GeographerStandalone DESTINATION "${BIN_DEST}") # executable

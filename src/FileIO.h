@@ -342,6 +342,12 @@ private:
     template<typename T>
     static void writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename);
 
-};
+    static void ltrim(std::string &s);
+
+    static void rtrim(std::string &s);
+
+    static void trim(std::string &s);
+
+};//class FileIO
 
 } /* namespace ITI */

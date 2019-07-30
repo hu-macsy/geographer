@@ -402,7 +402,7 @@ TEST_F(HilbertCurveTest, testHilbertRedistribution) {
         coordSum[d] = coords[d].sum();
     }
 
-    HilbertCurve<IndexType, ValueType>::hilbertRedistribution(coords, nodeWeightsContainer, settings, metrics);
+    HilbertCurve<IndexType, ValueType>::redistribute(coords, nodeWeightsContainer, settings, metrics);
     nodeWeights = nodeWeightsContainer[0];
 
     //redistribute also graph
@@ -498,7 +498,7 @@ TEST_F(HilbertCurveTest, testGetSortedHilbertIndices_Distributed) {
 
     std::vector<int> dims = { 2, 3 };
 
-    for(int i=0; i<fileNames.size(); i++) {
+    for(int i=0; i<fileNames.size()-1; i++) {
         std::string fileName = fileNames[i];
         int dimensions = dims[i];
 
@@ -543,27 +543,26 @@ TEST_F(HilbertCurveTest, testGetSortedHilbertIndices_Distributed) {
 
         scai::hmemo::HArray<IndexType> indexTransport(newLocalIndices.size(), newLocalIndices.data());
         assert(comm->sum(indexTransport.size()) == globalN);
-        //scai::dmemo::DistributionPtr newDistribution(new scai::dmemo::GeneralDistribution(globalN, indexTransport, comm));
         scai::dmemo::DistributionPtr newDistribution = scai::dmemo::generalDistributionUnchecked(globalN, indexTransport, comm);
 
 //TODO: convert those prints into a meaningfull check
-// if( comm->getRank()==1 ){
-//   for( int i=0; i<coords[0].getLocalValues().size(); i++){
-//     std::cout << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl;
-//   }
-// }
+        if( comm->getRank()==1 ) {
+            for( int i=0; i<coords[0].getLocalValues().size(); i++) {
+                std::cout << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl;
+            }
+        }
         for(int d=0; d<dimensions; d++) {
             coords[d].redistribute(newDistribution);
         }
         // *** till here
 
 //TODO: and that one
-// std::cout<<"------ redistribute coords"<< std::endl;
-// if( comm->getRank()==1 ){
-//   for( int i=0; i<coords[0].getLocalValues().size(); i++){
-//     std::cout << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl;
-//   }
-// }
+        std::cout<<"------ redistribute coords"<< std::endl;
+        if( comm->getRank()==1 ) {
+            for( int i=0; i<coords[0].getLocalValues().size(); i++) {
+                std::cout << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl;
+            }
+        }
 
         //take local hilbert indices and verify that they are sorted
         std::vector<ValueType> localHilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coords, settings.sfcResolution+1, settings.dimensions);

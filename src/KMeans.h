@@ -51,7 +51,7 @@ using point = std::vector<ValueType>;
  * @param[in] centers initial k-means centers
  * @param[in] settings Settings struct
  *
- * @return partition
+ * @return Distributed DenseVector of length n, partition[i] contains the block ID of node i
  */
 
 //core implementation
