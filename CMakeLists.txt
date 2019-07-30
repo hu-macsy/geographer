@@ -47,17 +47,6 @@ set(GTEST_LIBRARIES gtest)
 enable_testing()
 set(GTEST_FOUND TRUE)
 
-option(USE_BOOST "Use boost library for number parsing" OFF)
-
-### find Boost ###
-if (USE_BOOST)
-  find_package(Boost REQUIRED COMPONENTS filesystem system)
-  include_directories(${Boost_INCLUDE_DIRS})
-  add_definitions(-DUSE_BOOST)
-else(USE_BOOST)
-  find_package(Boost COMPONENTS filesystem system)
-endif(USE_BOOST)
-
 ### find SCAI ###
 set ( SCAI_PATH_HINTS "${SCAI_DIR}" "${SCAI_HOME}" "$ENV{SCAI_HOME}" )
 
@@ -141,6 +130,32 @@ write_basic_package_version_file(
   ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfigVersion.cmake
   VERSION 0.9
   COMPATIBILITY ExactVersion )
+  
+  
+### documentation using doxygen
+option(BUILD_DOC "Build documentation, default=ON" ON)
+
+# check if Doxygen is installed
+find_package(Doxygen)
+
+if (DOXYGEN_FOUND)
+	# set input and output files
+    set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/doc/doxConfigFile)
+    set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/doc/Doxyfile)
+    
+    # request to configure the file
+    configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+    message("Doxygen build started, documentation to be written in " ${CMAKE_CURRENT_BINARY_DIR}/doc)
+    
+	# note the option ALL which allows to build the docs together with the application
+    add_custom_target( doc_doxygen ALL
+        COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc
+        COMMENT "Generating API documentation with Doxygen"
+        VERBATIM )
+else (DOXYGEN_FOUND)
+	message("Doxygen need to be installed to generate the doxygen documentation")
+endif (DOXYGEN_FOUND)
 
 ### install files ###
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/GeographerConfigVersion.cmake
