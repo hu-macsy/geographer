@@ -149,7 +149,7 @@ if (DOXYGEN_FOUND AND BUILD_DOC)
     message("Disable using BUILD_DOC=OFF")
     
 	# note the option ALL which allows to build the docs together with the application
-    add_custom_target( doc_doxygen ALL
+    add_custom_target( doxygendoc ALL
         COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc
         COMMENT "Generating API documentation with Doxygen"
@@ -159,7 +159,7 @@ else (DOXYGEN_FOUND AND BUILD_DOC)
 		message("Doxygen need to be installed to generate the doxygen documentation")
 	endif()
 	if(NOT BUILD_DOC)
-		message("Building the documentation is deactivated, use BUILD_DOC=ON to activate it")
+		message("Building the documentation is deactivated, use BUILD_DOC=ON to activate it, or make doxygendoc to build only the documentation")
 	endif()
 endif (DOXYGEN_FOUND AND BUILD_DOC)
 
