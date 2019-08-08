@@ -23,8 +23,6 @@
 #include "../QuadTreePolarEuclid.h"
 #include "../KDTreeEuclidean.h"
 
-#include <boost/filesystem.hpp>
-
 namespace ITI {
 
 TEST_F(QuadTreeTest, testGetGraphFromForestRandom_2D) {
@@ -627,7 +625,12 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 
     // write coords in files for visualization purposes
     std::string destPath = "./partResults/fromQuadTree/blocks_"+std::to_string(k)+"/";
-    boost::filesystem::create_directories( destPath );
+    std::string command = "mkdir -p " + destPath;
+    const int dir_err = system( command.c_str() );
+    if (-1 == dir_err){
+        std::cout << "Error creating directory " << destPath << std::endl;
+        std::exit(1);
+    }    
 
     const ValueType epsilon = 0.05;
     struct Settings settings;

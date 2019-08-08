@@ -30,10 +30,6 @@
 
 #include "gtest/gtest.h"
 
-#include <boost/filesystem.hpp>
-
-
-
 using namespace scai;
 
 namespace ITI {
@@ -62,12 +58,12 @@ TEST_F (auxTest, testInitialPartitions) {
     //
 
     std::string destPath = "./partResults/"+fileName+"/blocks_"+std::to_string(k)+"/";
-    boost::filesystem::create_directories( destPath );
-    /*
-    if( !boost::filesystem::create_directory( destPath ) ){
-        throw std::runtime_error("Directory "+ destPath + " could not be created");
+    std::string command = "mkdir -p " + destPath;
+    const int dir_err = system( command.c_str() );
+    if (-1 == dir_err){
+        std::cout << "Error creating directory " << destPath << std::endl;
+        std::exit(1);
     }
-    */
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
