@@ -1120,7 +1120,7 @@ DenseVector<IndexType> computePartition(
     std::vector<ValueType> nodeWeightSum(nodeWeights.size());
     std::vector<std::vector<ValueType>> convertedNodeWeights(nodeWeights.size());
 
-    for (IndexType i = 0; i < numNodeWeights; i++) {
+    for (IndexType i=0; i<numNodeWeights; i++) {
         nodeWeightSum[i] = nodeWeights[i].sum();
 
         scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[i].getLocalValues());
@@ -1131,7 +1131,7 @@ DenseVector<IndexType> computePartition(
             for (ValueType blockSize : targetBlockWeights[i]) {
                 PRINT0(std::to_string(blockSize) + " ");
             }
-            throw std::invalid_argument("Block weight sum " + std::to_string(blockWeightSum) + " too small for node weight sum " + std::to_string(nodeWeightSum[i]) + ". Myabe you should try calling CommTree::adaptWeights().");
+            throw std::invalid_argument("Block weight sum " + std::to_string(blockWeightSum) + " too small for node weight sum " + std::to_string(nodeWeightSum[i]) + ". Maybe you should try calling CommTree::adaptWeights().");
         }
     }
 

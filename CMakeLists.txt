@@ -133,7 +133,7 @@ write_basic_package_version_file(
   
   
 ### documentation using doxygen
-option(BUILD_DOC "Build documentation, default=ON" ON)
+option(BUILD_DOC "Build documentation, default=OFF" OFF)
 
 # check if Doxygen is installed
 find_package(Doxygen)
