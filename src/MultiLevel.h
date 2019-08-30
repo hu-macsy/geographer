@@ -17,6 +17,7 @@
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/tracing.hpp>
 
+#include "AuxiliaryFunctions.h"
 #include "LocalRefinement.h"
 #include "Settings.h"
 #include "Metrics.h" //needed for profiling, remove is not used
@@ -73,7 +74,7 @@ public:
      * @param[out] fineToCoarse DenseVector with as many entries as uncoarsened nodes. For each uncoarsened node, contains the corresponding coarsened node.
      * @param[in] iterations Number of contraction iterations
      */
-    static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, const DenseVector<ValueType> &nodeWeights, const HaloExchangePlan& halo, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations = 1);
+    static void coarsen(const CSRSparseMatrix<ValueType>& inputGraph, const DenseVector<ValueType> &nodeWeights, const HaloExchangePlan& halo, const std::vector<DenseVector<ValueType>>& coordinates, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, Settings settings, IndexType iterations = 1);
 
     /**
      * @brief Perform a local maximum matching
@@ -83,7 +84,7 @@ public:
      *
      * @return vector of edges in maximum matching. ret[i].first is a vertex that is matched to ret[i].second
      */
-    static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& graph, const DenseVector<ValueType> &nodeWeights);
+    static std::vector<std::pair<IndexType,IndexType>> maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& graph, const DenseVector<ValueType> &nodeWeights, const std::vector<DenseVector<ValueType>>& coordinates, bool nnCoarsening=false );
 
     /**
      * @brief Project a fine DenseVector to a coarse DenseVector. Values are interpolated linearly.
@@ -138,6 +139,12 @@ public:
      * @return The adjacency matrix of the coarsened/pixeled graph. This has side length 2^detailLevel and the whole size is dimension^sideLength.
      */
     static scai::lama::CSRSparseMatrix<ValueType> pixeledCoarsen (const CSRSparseMatrix<ValueType>& adjM, const std::vector<DenseVector<ValueType>> &coordinates, DenseVector<ValueType> &nodeWeights, Settings settings);
+
+private:
+
+    static IndexType edgeRatingPartner( const IndexType localNode, const scai::hmemo::ReadAccess<IndexType>& ia, const scai::hmemo::ReadAccess<ValueType>& values, const scai::hmemo::ReadAccess<IndexType>& ja, const scai::hmemo::ReadAccess<ValueType>& localNodeWeights, const scai::dmemo::DistributionPtr distPtr, const std::vector<bool>& matched);
+
+    static IndexType nnPartner( const IndexType localNode, const scai::hmemo::ReadAccess<IndexType>& ia, const scai::hmemo::ReadAccess<ValueType>& values, const scai::hmemo::ReadAccess<IndexType>& ja, const scai::hmemo::ReadAccess<ValueType>& localNodeWeights, const std::vector<DenseVector<ValueType>>& coordinates, const scai::dmemo::DistributionPtr distPtr, const std::vector<bool>& matched);    
 
 }; // class MultiLevel
 } // namespace ITI

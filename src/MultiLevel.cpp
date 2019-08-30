@@ -55,7 +55,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         if (comm->getRank() == 0) {
             std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
         }
-        MultiLevel<IndexType, ValueType>::coarsen(input, nodeWeights, halo, coarseGraph, fineToCoarseMap, settings.coarseningStepsBetweenRefinement);
+        MultiLevel<IndexType, ValueType>::coarsen(input, nodeWeights, halo, coordinates, coarseGraph, fineToCoarseMap, settings,  settings.coarseningStepsBetweenRefinement);
 
         scai::dmemo::DistributionPtr oldCoarseDist = input.getRowDistributionPtr();
         if (comm->getRank() == 0) {
@@ -278,7 +278,7 @@ DenseVector<IndexType> MultiLevel<IndexType, ValueType>::getFineTargets(const De
 }
 
 template<typename IndexType, typename ValueType>
-void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType> &nodeWeights,  const HaloExchangePlan& halo, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, IndexType iterations) {
+void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType> &nodeWeights,  const HaloExchangePlan& halo, const std::vector<DenseVector<ValueType>>& coordinates, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, Settings settings, IndexType iterations) {
     SCAI_REGION("MultiLevel.coarsen");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
@@ -315,7 +315,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
         assert(ia.size()-1 == localN );
 
         //get a matching, the returned indices are from 0 to localN
-        std::vector<std::pair<IndexType,IndexType>> matching = MultiLevel<IndexType, ValueType>::maxLocalMatching( graph, localWeightCopy );
+        std::vector<std::pair<IndexType,IndexType>> matching = MultiLevel<IndexType, ValueType>::maxLocalMatching( graph, localWeightCopy, coordinates, settings.nnCoarsening );
 
         std::vector<IndexType> localMatchingPartner(localN, -1);
 
@@ -680,11 +680,11 @@ DenseVector<ValueType> MultiLevel<IndexType, ValueType>::sumToCoarse(const Dense
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType> &nodeWeights) {
+std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType>& nodeWeights, const std::vector<DenseVector<ValueType>>& coordinates, bool nnCoarsening) {
     SCAI_REGION("MultiLevel.maxLocalMatching");
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-
+PRINT("nnCoarsening= "<< nnCoarsening);
     // get local data of the adjacency matrix
     const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
     scai::hmemo::ReadAccess<IndexType> ia( localStorage.getIA() );
@@ -710,6 +710,7 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
     // get local part of node weights
     scai::hmemo::ReadAccess<ValueType> rLocalNodeWeights( nodeWeights.getLocalValues() );
 
+
     // localNode is the local index of a node
     for(IndexType localNode=0; localNode<localN; localNode++) {
         // if the node is already matched go to the next one;
@@ -717,14 +718,45 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
             continue;
         }
 
+        IndexType bestTarget=-1;
+
+        if( nnCoarsening ){
+            bestTarget = nnPartner( localNode, ia, values, ja, rLocalNodeWeights, coordinates, distPtr, matched);
+        }
+        else{
+            bestTarget = edgeRatingPartner( localNode, ia, values, ja, rLocalNodeWeights,  distPtr, matched);   
+        }
+
+/*
         IndexType bestTarget = -1;
         ValueType maxEdgeRating = -1;
+
+IndexType nn = -1;
+ValueType nnDist = -1;
+std::vector<ValueType> thisPoint(dim);
+for(int i=0; i<dim; i++){
+    thisPoint[i] = coordinates[i].getLocalValues()[localNode];
+}
+
         const IndexType endCols = ia[localNode+1];
         for (IndexType j = ia[localNode]; j < endCols; j++) {
             IndexType localNeighbor = distPtr->global2Local(ja[j]);
+//PRINT0(j << " && " << localNeighbor << " ^^ " << ja[j] );
             if (localNeighbor != scai::invalidIndex && localNeighbor != localNode && !matched[localNeighbor]) {
                 //neighbor is local and unmatched, possible partner
                 ValueType thisEdgeRating = values[j]*values[j]/(rLocalNodeWeights[localNode]*rLocalNodeWeights[localNeighbor]);
+
+std::vector<ValueType> ngbrPoint(dim);
+for(int i=0; i<dim; i++){
+    ngbrPoint[i] = coordinates[i].getLocalValues()[localNeighbor];
+}
+ValueType thisDist = aux<IndexType,ValueType>::pointDistanceL2(thisPoint, ngbrPoint);
+//PRINT0(localNode <<" - " << localNeighbor << ", dist= " << thisDist );
+if( nn<0 || thisDist<nnDist ){
+    //either we haven't found any target yet, or the current one is closer
+    nn = j;
+    nnDist = thisDist;    
+}
                 if (bestTarget < 0 ||  thisEdgeRating > maxEdgeRating) {
                     //either we haven't found any target yet, or the current one is better
                     bestTarget = j;
@@ -732,6 +764,12 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
                 }
             }
         }
+
+//if enabled, pick target according to min distance
+if( nnCoarsening ){
+    bestTarget = nn;
+}
+*/
 
         if (bestTarget > 0) {
             IndexType globalNgbr = ja[bestTarget];
@@ -747,12 +785,76 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
             // mark nodes as matched
             matched[localNode]= true;
             matched[localNgbr]= true;
+//PRINT0("matched "<< localNode << " with " << localNgbr );
         }
     }
 
     assert(ia[ia.size()-1] >= totalNbrs);
 
     return matching;
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+IndexType MultiLevel<IndexType, ValueType>::edgeRatingPartner(  const IndexType localNode, const scai::hmemo::ReadAccess<IndexType>& ia, const scai::hmemo::ReadAccess<ValueType>& values, const scai::hmemo::ReadAccess<IndexType>& ja, const scai::hmemo::ReadAccess<ValueType>& localNodeWeights, const scai::dmemo::DistributionPtr distPtr, const std::vector<bool>& matched){
+
+    IndexType bestTarget = -1;
+    ValueType maxEdgeRating = -1;
+
+    const IndexType endCols = ia[localNode+1];
+    for (IndexType j = ia[localNode]; j < endCols; j++) {
+        IndexType localNeighbor = distPtr->global2Local(ja[j]);
+    
+        if (localNeighbor != scai::invalidIndex && localNeighbor != localNode && !matched[localNeighbor]) {
+            //neighbor is local and unmatched, possible partner
+            ValueType thisEdgeRating = values[j]*values[j]/(localNodeWeights[localNode]*localNodeWeights[localNeighbor]);
+
+            if (bestTarget < 0 ||  thisEdgeRating > maxEdgeRating) {
+                //either we haven't found any target yet, or the current one is better
+                bestTarget = j;
+                maxEdgeRating = thisEdgeRating;
+            }
+        }
+    }
+    return bestTarget;
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+IndexType MultiLevel<IndexType, ValueType>::nnPartner(  const IndexType localNode, const scai::hmemo::ReadAccess<IndexType>& ia, const scai::hmemo::ReadAccess<ValueType>& values, const scai::hmemo::ReadAccess<IndexType>& ja, const scai::hmemo::ReadAccess<ValueType>& localNodeWeights, const std::vector<DenseVector<ValueType>>& coordinates, const scai::dmemo::DistributionPtr distPtr, const std::vector<bool>& matched){
+
+    const IndexType dim = coordinates.size();
+
+    IndexType nn = -1;
+    ValueType nnDist = -1;
+    std::vector<ValueType> thisPoint(dim);
+    for(int i=0; i<dim; i++){
+        thisPoint[i] = coordinates[i].getLocalValues()[localNode];
+    }
+
+    const IndexType endCols = ia[localNode+1];
+    for (IndexType j = ia[localNode]; j < endCols; j++) {
+        IndexType localNeighbor = distPtr->global2Local(ja[j]);
+
+        if (localNeighbor != scai::invalidIndex && localNeighbor != localNode && !matched[localNeighbor]) {
+            //neighbor is local and unmatched, possible partner
+            
+            std::vector<ValueType> ngbrPoint(dim);
+            for(int i=0; i<dim; i++){
+                ngbrPoint[i] = coordinates[i].getLocalValues()[localNeighbor];
+            }
+
+            ValueType thisDist = aux<IndexType,ValueType>::pointDistanceL2(thisPoint, ngbrPoint);
+
+            if( nn<0 || thisDist<nnDist ){
+                //either we haven't found any target yet, or the current one is closer
+                nn = j;
+                nnDist = thisDist;    
+            }
+        }
+    }
+
+    return nn;
 }
 //---------------------------------------------------------------------------------------
 
