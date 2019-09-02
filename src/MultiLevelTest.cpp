@@ -275,8 +275,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     settings.dimensions= 2;
     settings.minGainForNextRound = 100;
     settings.minBorderNodes=100;
-    settings.nnCoarsening = true;
-    settings.verbose = true;
+    settings.nnCoarsening = false;
     Metrics metrics(settings);
 
     scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);

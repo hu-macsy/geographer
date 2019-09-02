@@ -47,7 +47,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
     auto origin = scai::lama::fill<DenseVector<IndexType>>(input.getRowDistributionPtr(), comm->getRank());//to track node movements through the hierarchies
 
     if (settings.multiLevelRounds > 0) {
-        SCAI_REGION_START( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
+//SCAI_REGION_START( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
         CSRSparseMatrix<ValueType> coarseGraph;
         DenseVector<IndexType> fineToCoarseMap;
         std::chrono::time_point<std::chrono::system_clock> beforeCoarse =  std::chrono::system_clock::now();
@@ -64,7 +64,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
         //project coordinates and partition
         std::vector<DenseVector<ValueType> > coarseCoords(settings.dimensions);
-        if (settings.useGeometricTieBreaking) {
+        if (settings.useGeometricTieBreaking or settings.nnCoarsening) {
             for (IndexType i = 0; i < settings.dimensions; i++) {
                 coarseCoords[i] = projectToCoarse(coordinates[i], fineToCoarseMap);
             }
@@ -88,7 +88,8 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
         Settings settingscopy(settings);
         settingscopy.multiLevelRounds -= settings.coarseningStepsBetweenRefinement;
-        SCAI_REGION_END( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
+//SCAI_REGION_END( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
+
         // recursive call
         DenseVector<IndexType> coarseOrigin = multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, coarseHalo, settingscopy, metrics);
         SCAI_ASSERT_DEBUG(coarseOrigin.getDistribution().isEqual(coarseGraph.getRowDistribution()), "Distributions inconsistent.");
@@ -682,20 +683,25 @@ DenseVector<ValueType> MultiLevel<IndexType, ValueType>::sumToCoarse(const Dense
 template<typename IndexType, typename ValueType>
 std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType>& nodeWeights, const std::vector<DenseVector<ValueType>>& coordinates, bool nnCoarsening) {
     SCAI_REGION("MultiLevel.maxLocalMatching");
+
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-PRINT("nnCoarsening= "<< nnCoarsening);
+PRINT0("nnCoarsening= "<< nnCoarsening);
     // get local data of the adjacency matrix
     const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
     scai::hmemo::ReadAccess<IndexType> ia( localStorage.getIA() );
     scai::hmemo::ReadAccess<IndexType> ja( localStorage.getJA() );
     scai::hmemo::ReadAccess<ValueType> values( localStorage.getValues() );
+    
+    // get local part of node weights
+    scai::hmemo::ReadAccess<ValueType> rLocalNodeWeights( nodeWeights.getLocalValues() );
 
     // localN= number of local nodes
     const IndexType localN= adjM.getLocalNumRows();
 
     // ia must have size localN+1
     assert(ia.size()-1 == localN );
+    SCAI_ASSERT_EQ_ERROR( rLocalNodeWeights.size(), localN, "Size mismatch" );
 
     //mainly for debugging reasons
     IndexType totalNbrs= 0;
@@ -706,9 +712,6 @@ PRINT("nnCoarsening= "<< nnCoarsening);
 
     // keep track of which nodes are already matched
     std::vector<bool> matched(localN, false);
-
-    // get local part of node weights
-    scai::hmemo::ReadAccess<ValueType> rLocalNodeWeights( nodeWeights.getLocalValues() );
 
 
     // localNode is the local index of a node
@@ -721,10 +724,12 @@ PRINT("nnCoarsening= "<< nnCoarsening);
         IndexType bestTarget=-1;
 
         if( nnCoarsening ){
+            SCAI_ASSERT_LT_ERROR( localNode, coordinates[0].getLocalValues().size(), "Index out of bounds" );
+
             bestTarget = nnPartner( localNode, ia, values, ja, rLocalNodeWeights, coordinates, distPtr, matched);
         }
         else{
-            bestTarget = edgeRatingPartner( localNode, ia, values, ja, rLocalNodeWeights,  distPtr, matched);   
+            bestTarget = edgeRatingPartner( localNode, ia, values, ja, rLocalNodeWeights, distPtr, matched);   
         }
 
         if (bestTarget > 0) {
@@ -753,6 +758,7 @@ PRINT("nnCoarsening= "<< nnCoarsening);
 
 template<typename IndexType, typename ValueType>
 IndexType MultiLevel<IndexType, ValueType>::edgeRatingPartner(  const IndexType localNode, const scai::hmemo::ReadAccess<IndexType>& ia, const scai::hmemo::ReadAccess<ValueType>& values, const scai::hmemo::ReadAccess<IndexType>& ja, const scai::hmemo::ReadAccess<ValueType>& localNodeWeights, const scai::dmemo::DistributionPtr distPtr, const std::vector<bool>& matched){
+    SCAI_REGION("MultiLevel.edgeRatingPartner");
 
     IndexType bestTarget = -1;
     ValueType maxEdgeRating = -1;
@@ -778,14 +784,17 @@ IndexType MultiLevel<IndexType, ValueType>::edgeRatingPartner(  const IndexType 
 
 template<typename IndexType, typename ValueType>
 IndexType MultiLevel<IndexType, ValueType>::nnPartner(  const IndexType localNode, const scai::hmemo::ReadAccess<IndexType>& ia, const scai::hmemo::ReadAccess<ValueType>& values, const scai::hmemo::ReadAccess<IndexType>& ja, const scai::hmemo::ReadAccess<ValueType>& localNodeWeights, const std::vector<DenseVector<ValueType>>& coordinates, const scai::dmemo::DistributionPtr distPtr, const std::vector<bool>& matched){
+    SCAI_REGION("MultiLevel.nnPartner");
 
     const IndexType dim = coordinates.size();
 
     IndexType nn = -1;
     ValueType nnDist = -1;
     std::vector<ValueType> thisPoint(dim);
+    //TODO: this gets a readAccess every time... And below.
     for(int i=0; i<dim; i++){
-        thisPoint[i] = coordinates[i].getLocalValues()[localNode];
+        scai::hmemo::ReadAccess<ValueType> rCoords( coordinates[i].getLocalValues() );
+        thisPoint[i] = rCoords[localNode];
     }
 
     const IndexType endCols = ia[localNode+1];
