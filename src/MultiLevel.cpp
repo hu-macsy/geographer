@@ -727,50 +727,6 @@ PRINT("nnCoarsening= "<< nnCoarsening);
             bestTarget = edgeRatingPartner( localNode, ia, values, ja, rLocalNodeWeights,  distPtr, matched);   
         }
 
-/*
-        IndexType bestTarget = -1;
-        ValueType maxEdgeRating = -1;
-
-IndexType nn = -1;
-ValueType nnDist = -1;
-std::vector<ValueType> thisPoint(dim);
-for(int i=0; i<dim; i++){
-    thisPoint[i] = coordinates[i].getLocalValues()[localNode];
-}
-
-        const IndexType endCols = ia[localNode+1];
-        for (IndexType j = ia[localNode]; j < endCols; j++) {
-            IndexType localNeighbor = distPtr->global2Local(ja[j]);
-//PRINT0(j << " && " << localNeighbor << " ^^ " << ja[j] );
-            if (localNeighbor != scai::invalidIndex && localNeighbor != localNode && !matched[localNeighbor]) {
-                //neighbor is local and unmatched, possible partner
-                ValueType thisEdgeRating = values[j]*values[j]/(rLocalNodeWeights[localNode]*rLocalNodeWeights[localNeighbor]);
-
-std::vector<ValueType> ngbrPoint(dim);
-for(int i=0; i<dim; i++){
-    ngbrPoint[i] = coordinates[i].getLocalValues()[localNeighbor];
-}
-ValueType thisDist = aux<IndexType,ValueType>::pointDistanceL2(thisPoint, ngbrPoint);
-//PRINT0(localNode <<" - " << localNeighbor << ", dist= " << thisDist );
-if( nn<0 || thisDist<nnDist ){
-    //either we haven't found any target yet, or the current one is closer
-    nn = j;
-    nnDist = thisDist;    
-}
-                if (bestTarget < 0 ||  thisEdgeRating > maxEdgeRating) {
-                    //either we haven't found any target yet, or the current one is better
-                    bestTarget = j;
-                    maxEdgeRating = thisEdgeRating;
-                }
-            }
-        }
-
-//if enabled, pick target according to min distance
-if( nnCoarsening ){
-    bestTarget = nn;
-}
-*/
-
         if (bestTarget > 0) {
             IndexType globalNgbr = ja[bestTarget];
 
