@@ -33,6 +33,7 @@
 #include "MultiSection.h"
 #include "GraphUtils.h"
 #include "Mapping.h"
+#include "MyAlgo.h"
 
 
 
@@ -463,8 +464,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         //no need to explicitly check for repartitioning mode or not.
         assert(comm->getSize() == settings.numBlocks);
         result = DenseVector<IndexType>(input.getRowDistributionPtr(), comm->getRank());
-    }
-    else {
+    }else if( settings.initialPartition==ITI::Tool::myAlgo ){
+		result = ITI::MyAlgo<IndexType, ValueType>::partitionGraph( input, coordinates, nodeWeights, settings, metrics);
+	}else {
         throw std::runtime_error("Initial Partitioning mode unsupported.");
     }
 
@@ -999,5 +1001,6 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 
 //to force instantiation
 template class ParcoRepart<IndexType, ValueType>;
+
 
 } //namespace ITI

@@ -14,7 +14,7 @@ Options populateOptions() {
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     Settings settings;
 
-    options.add_options()
+	options.add_options()
     ("help", "display options")
     ("version", "show version")
     //main arguments for daily use
@@ -81,6 +81,7 @@ Options populateOptions() {
     // exotic test cases
     ("quadTreeFile", "read QuadTree from file", value<std::string>())
     ("useDiffusionCoordinates", "Use coordinates based from diffusive systems instead of loading from file", value<bool>())
+	//("myAlgoParam", "help message", value<int>())
     ;
 
     return options;
