@@ -266,7 +266,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     }
 
     settings.epsilon = 0.2;
-    settings.multiLevelRounds= 2;
+    settings.multiLevelRounds= 5;
     settings.coarseningStepsBetweenRefinement = 1;
     settings.useGeometricTieBreaking = true;
     settings.dimensions= 2;

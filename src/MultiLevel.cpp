@@ -724,8 +724,9 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
             IndexType localNeighbor = distPtr->global2Local(ja[j]);
             if (localNeighbor != scai::invalidIndex && localNeighbor != localNode && !matched[localNeighbor]) {
                 //neighbor is local and unmatched, possible partner
+SCAI_ASSERT_LT_ERROR(j, values.size(), "index too large");
                 ValueType thisEdgeRating = values[j]*values[j]/(rLocalNodeWeights[localNode]*rLocalNodeWeights[localNeighbor]);
-                if (bestTarget < 0 ||  thisEdgeRating > maxEdgeRating) {
+                if (bestTarget<0 || thisEdgeRating>maxEdgeRating) {
                     //either we haven't found any target yet, or the current one is better
                     bestTarget = j;
                     maxEdgeRating = thisEdgeRating;
