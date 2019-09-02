@@ -362,8 +362,8 @@ TEST_P(auxTest, testRedistributeFromPartition) {
     const scai::dmemo::DistributionPtr inputDist  = graph.getRowDistributionPtr();
     const IndexType localN = inputDist->getLocalSize();
 
-    DenseVector<ValueType> nodeWeights( inputDist, 1 ); //unit weights
-
+    //unit weights
+    std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, DenseVector<ValueType>(inputDist, 1));
     EXPECT_TRUE( coordinates[0].getDistributionPtr()->isEqual( *inputDist ) );
 
     srand( comm->getRank() ); //so not all PEs claim the same IDs
@@ -401,7 +401,7 @@ TEST_P(auxTest, testRedistributeFromPartition) {
     //checks
 
     const scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
-    EXPECT_TRUE( nodeWeights.getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
+    EXPECT_TRUE( nodeWeights[0].getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
     SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*newDist), "Distribution mismatch" );
     SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*newDist), "Distribution mismatch" );
     SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*distFromPart), "Distribution mismatch" );
@@ -471,7 +471,8 @@ TEST_P(auxTest, benchmarkRedistributeFromPartition) {
     const IndexType localN = inputDist->getLocalSize();
     PRINT( comm->getRank() << ": localN= " << localN);
 
-    DenseVector<ValueType> nodeWeights( inputDist, 1 ); //unit weights
+    //unit weights
+    std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, DenseVector<ValueType>(graph.getRowDistributionPtr(), 1));
 
     EXPECT_TRUE( coordinates[0].getDistributionPtr()->isEqual( *inputDist ) );
 
@@ -513,7 +514,7 @@ TEST_P(auxTest, benchmarkRedistributeFromPartition) {
         //checks
 
         const scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
-        EXPECT_TRUE( nodeWeights.getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
+        EXPECT_TRUE( nodeWeights[0].getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
         SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*newDist), "Distribution mismatch" );
         SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*newDist), "Distribution mismatch" );
         SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*distFromPart), "Distribution mismatch" );

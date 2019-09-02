@@ -44,12 +44,14 @@ scai::lama::DenseVector<IndexType> GraphUtils<IndexType,ValueType>::reindex(scai
 
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = inputDist->getGlobalSize();
-    //const IndexType p = comm->getSize();
 
+    //get the global IDs of all the local indices
     scai::dmemo::DistributionPtr blockDist = scai::dmemo::genBlockDistributionBySize(globalN, localN, comm);
     DenseVector<IndexType> result(blockDist,0);
     blockDist->getOwnedIndexes(result.getLocalValues());
-
+for(int i=0; i<localN; i++){
+    PRINT( *comm << ": i=" << i << ", glob i= " <<  result.getLocalValues()[i] );
+}
     SCAI_ASSERT_EQUAL_ERROR(result.sum(), globalN*(globalN-1)/2);
 
     scai::dmemo::HaloExchangePlan partHalo = buildNeighborHalo(graph);
