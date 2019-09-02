@@ -62,9 +62,10 @@ TEST_F (MultiLevelTest, testCoarseningGrid_2D) {
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size(), coords[1].getLocalValues().size() );
 
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.nnCoarsening = false;
 
     //check distributions
     //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
@@ -75,7 +76,7 @@ TEST_F (MultiLevelTest, testCoarseningGrid_2D) {
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
     scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
 
-    MultiLevel<IndexType, ValueType>::coarsen(graph, uniformWeights, halo, coarseGraph, fineToCoarseMap);
+    MultiLevel<IndexType, ValueType>::coarsen(graph, uniformWeights, halo, coords, coarseGraph, fineToCoarseMap, settings);
 
     EXPECT_TRUE(coarseGraph.isConsistent());
     EXPECT_TRUE(coarseGraph.checkSymmetry());
@@ -91,8 +92,9 @@ TEST_F (MultiLevelTest, testCoarseningGrid_2D) {
 //---------------------------------------------------------------------------------------
 
 TEST_F (MultiLevelTest, testGetMatchingGrid_2D) {
-    //std::string file = "Grid8x8";                         // the easy case
+    //std::string file = graphPath+ "Grid8x8";                         // the easy case
     std::string file = graphPath+ "rotation-00000.graph";     // a harder instance
+    //std::string file = graphPath+ "353off.graph";
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
@@ -118,15 +120,16 @@ TEST_F (MultiLevelTest, testGetMatchingGrid_2D) {
     EXPECT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
     EXPECT_EQ(coords[0].getLocalValues().size(), coords[1].getLocalValues().size() );
 
-    struct Settings Settings;
-    Settings.numBlocks= k;
-    Settings.epsilon = 0.2;
+    struct Settings settings;
+    settings.numBlocks= k;
+    settings.epsilon = 0.2;
+    settings.nnCoarsening = true;
 
     //check distributions
     //assert( partition.getDistribution().isEqual( graph.getRowDistribution()) );
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1.0);
 
-    std::vector<std::pair<IndexType,IndexType>> matching = MultiLevel<IndexType, ValueType>::maxLocalMatching( graph, uniformWeights );
+    std::vector<std::pair<IndexType,IndexType>> matching = MultiLevel<IndexType, ValueType>::maxLocalMatching( graph, uniformWeights, coords, settings.nnCoarsening);
     //assert( matching[0].size() == matching[1].size() );
 
     // check matching to see if a node appears twice somewhere
@@ -266,12 +269,13 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     }
 
     settings.epsilon = 0.2;
-    settings.multiLevelRounds= 2;
+    settings.multiLevelRounds= 4;
     settings.coarseningStepsBetweenRefinement = 1;
-    settings.useGeometricTieBreaking = true;
+    settings.useGeometricTieBreaking = false;
     settings.dimensions= 2;
     settings.minGainForNextRound = 100;
     settings.minBorderNodes=100;
+    settings.nnCoarsening = false;
     Metrics metrics(settings);
 
     scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);

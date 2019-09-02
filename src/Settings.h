@@ -236,6 +236,7 @@ struct Settings {
     bool noRefinement = false;				///< if we will do local refinement or not
     IndexType multiLevelRounds = 0;			///< number of multilevel rounds
     IndexType coarseningStepsBetweenRefinement = 3; ///< number of rounds every which we do coarsening
+    bool nnCoarsening = false;              ///< when matching vertices, use the nearest neighbor to match (and contract with)
     //@}
 
     /** @name Debug and profiling parameters
