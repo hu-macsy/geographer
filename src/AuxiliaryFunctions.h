@@ -341,6 +341,14 @@ public:
      */
     static void checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input);
 
+	static bool checkConsistency(
+		const CSRSparseMatrix<ValueType> &input,
+		const std::vector<DenseVector<ValueType>> &coordinates,
+		const std::vector<DenseVector<ValueType>> &nodeWeights,
+		const Settings settings);
+	
+	
+	
 private:
 
 //------------------------------------------------------------------------------

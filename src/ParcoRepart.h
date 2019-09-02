@@ -195,5 +195,35 @@ public:
     */
     static std::vector<IndexType> neighbourPixels(const IndexType thisPixel,const IndexType sideLen, const IndexType dimensions);
 
+
+private:
+
+    /** The initial (geometric) partition of a graph. 
+
+    Attention, for metis, and methods using the multilevel approach, the term 'initial partition' usually refers to the first
+    partition in the coarsest level of the multilevel cycle. Here, we obtain an initial partition without coarsening, by
+    using the coordinates of the graph.
+    */
+    static DenseVector<IndexType> initialPartition(
+        CSRSparseMatrix<ValueType> &input,
+        std::vector<DenseVector<ValueType>> &coordinates,
+        std::vector<DenseVector<ValueType>> &nodeWeights,
+        DenseVector<IndexType>& previous,
+        CommTree<IndexType,ValueType> commTree,
+        scai::dmemo::CommunicatorPtr comm,
+        struct Settings settings,
+        struct Metrics& metrics); 
+	
+	/** Wrapper function to do local refinement on a partitioned graph. 
+	 */
+	static void doLocalRefinement(
+		DenseVector<IndexType> &result,
+		CSRSparseMatrix<ValueType> &input,
+		std::vector<DenseVector<ValueType>> &coordinates,
+		std::vector<DenseVector<ValueType>> &nodeWeights,
+		scai::dmemo::CommunicatorPtr comm,
+		Settings settings,
+		struct Metrics& metrics);
+	
 };
 } //namespace ITI
