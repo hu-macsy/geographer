@@ -249,7 +249,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 
 template<typename IndexType, typename ValueType>
 void ITI::aux<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input) {
-    SCAI_REGION( "ParcoRepart.checkLocalDegreeSymmetry" )
+    SCAI_REGION( "aux.checkLocalDegreeSymmetry" )
 
     const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
     const IndexType localN = inputDist->getLocalSize();
@@ -299,6 +299,82 @@ void ITI::aux<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRSparseMat
         }
     }
 }//checkLocalDegreeSymmetry
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+bool ITI::aux<IndexType, ValueType>::checkConsistency(
+	const CSRSparseMatrix<ValueType> &input,
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const Settings settings){
+	
+	SCAI_REGION( "aux.checkConsistency" )
+
+    const IndexType k = settings.numBlocks;
+    const ValueType epsilon = settings.epsilon;
+    const IndexType dimensions = coordinates.size();
+	const IndexType n = input.getNumRows();
+
+    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+
+    /*
+    * check input arguments for sanity
+    */
+
+    for( int d=0; d<dimensions; d++) {
+        if (n != coordinates[d].size()) {
+            throw std::runtime_error("Matrix has " + std::to_string(n) + " rows, but " + std::to_string(coordinates[0].size())
+                                     + " coordinates are given.");
+        }
+    }
+
+    if (n != input.getNumColumns()) {
+        throw std::runtime_error("Matrix must be quadratic.");
+    }
+
+    if (!input.isConsistent()) {
+        throw std::runtime_error("Input matrix inconsistent");
+    }
+
+    if (k > n) {
+        throw std::runtime_error("Creating " + std::to_string(k) + " blocks from " + std::to_string(n) + " elements is impossible.");
+    }
+
+    if (epsilon < 0) {
+        throw std::runtime_error("Epsilon " + std::to_string(epsilon) + " is invalid.");
+    }
+
+    const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
+    const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
+    const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
+    const IndexType rank = comm->getRank();
+
+    if (!coordDist->isEqual( *inputDist) ) {
+        throw std::runtime_error( "Distributions should be equal.");
+    }
+
+    bool nodesUnweighted = nodeWeights.size() == 1 && (nodeWeights[0].max() == nodeWeights[0].min());
+
+    if (settings.repartition && nodeWeights.size() > 1) {
+        throw std::logic_error("Repartitioning not implemented for multiple node weights.");
+    }
+
+    if (settings.initialPartition == ITI::Tool::geoMS && nodeWeights.size() > 1) {
+        throw std::logic_error("MultiSection not implemented for multiple weights.");
+    }
+
+    for (IndexType i = 0; i < nodeWeights.size(); i++) {
+        assert(nodeWeights[i].getDistribution().isEqual(*inputDist));
+    }
+    
+    {
+        SCAI_REGION("aux.checkConsistency.synchronize")
+        comm->synchronize();
+    }
+
+	return true;
+}
 
 template class aux<IndexType, ValueType>;
 

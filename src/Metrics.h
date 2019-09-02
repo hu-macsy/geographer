@@ -31,7 +31,7 @@ struct Metrics {
     //MM, metrics map
     std::map<std::string,ValueType> MM = {
         {"timeMigrationAlgo",-1.0}, {"timeFirstDistribution",-1.0}, {"timeTotal",-1.0}, {"timeSpMV",-1.0}, {"timeComm",-1.0}, {"reportTime",-1.0},
-        {"inputTime",-1.0}, {"timeFinalPartition",-1.0}, {"timeKmeans",-1.0}, {"timeSecondDistribution",-1.0}, {"timePreliminary",-1.0},
+        {"inputTime",-1.0}, {"timeFinalPartition",-1.0}, {"timeSecondDistribution",-1.0}, {"timePreliminary",-1.0},
         {"preliminaryCut",-1.0}, {"preliminaryImbalance",-1.0}, {"finalCut",-1.0}, {"finalImbalance",-1.0}, {"maxBlockGraphDegree",-1.0},
         {"totalBlockGraphEdges",-1.0}, {"maxCommVolume",-1.0}, {"totalCommVolume",-1.0}, {"maxBoundaryNodes",-1.0}, {"totalBoundaryNodes",-1.0},
         {"maxBorderNodesPercent",-1.0}, {"avgBorderNodesPercent",-1.0},
@@ -186,8 +186,6 @@ inline struct Metrics aggregateVectorMetrics( const std::vector<struct Metrics>&
         aggregateMetrics.MM["timeMigrationAlgo"] /= numRuns;
         aggregateMetrics.MM["timeFirstDistribution"] +=  comm->max( thisMetric.MM["timeFirstDistribution"] );
         aggregateMetrics.MM["timeFirstDistribution"] /= numRuns;
-        aggregateMetrics.MM["timeKmeans"] += comm->max( thisMetric.MM["timeKmeans"] );
-        aggregateMetrics.MM["timeKmeans"] /= numRuns;
         aggregateMetrics.MM["timeSecondDistribution"] += comm->max( thisMetric.MM["timeSecondDistribution"] );
         aggregateMetrics.MM["timeSecondDistribution"] /= numRuns;
         aggregateMetrics.MM["timePreliminary"] += comm->max( thisMetric.MM["timePreliminary"] );
