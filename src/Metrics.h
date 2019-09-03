@@ -30,14 +30,17 @@ struct Metrics {
 
     //MM, metrics map
     std::map<std::string,ValueType> MM = {
-        {"timeMigrationAlgo",-1.0}, {"timeFirstDistribution",-1.0}, {"timeTotal",-1.0}, {"timeSpMV",-1.0}, {"timeComm",-1.0}, {"reportTime",-1.0},
-        {"inputTime",-1.0}, {"timeFinalPartition",-1.0}, {"timeSecondDistribution",-1.0}, {"timePreliminary",-1.0},
+        {"inputTime",-1.0},
+        {"timeMigrationAlgo",-1.0}, {"timeFirstDistribution",-1.0}, {"timeLRorRedist",-1.0}, 
+        {"timeFinalPartition",-1.0}, {"timeSecondDistribution",-1.0}, {"timeInitialPart",-1.0},
+        {"timeMapping", -1.0}, {"reportTime",-1.0},
         {"preliminaryCut",-1.0}, {"preliminaryImbalance",-1.0}, {"finalCut",-1.0}, {"finalImbalance",-1.0}, {"maxBlockGraphDegree",-1.0},
         {"totalBlockGraphEdges",-1.0}, {"maxCommVolume",-1.0}, {"totalCommVolume",-1.0}, {"maxBoundaryNodes",-1.0}, {"totalBoundaryNodes",-1.0},
         {"maxBorderNodesPercent",-1.0}, {"avgBorderNodesPercent",-1.0},
         {"maxBlockDiameter",-1.0}, {"harmMeanDiam",-1.0}, {"numDisconBlocks",-1.0},
         {"maxRedistVol",-1.0}, {"totRedistVol",-1.0},	 //redistribution metrics
-        {"maxCongestion",-1.0}, {"maxDilation",-1.0}, {"avgDilation",0.0}		//mapping metrics
+        {"maxCongestion",-1.0}, {"maxDilation",-1.0}, {"avgDilation",0.0},	//mapping metrics
+        {"timeSpMV",-1.0}, {"timeComm",-1.0} //SpMV based metrics
     };
 
     //constructors

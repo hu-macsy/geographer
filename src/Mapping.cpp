@@ -375,6 +375,8 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::getSfcRenumber(
     const scai::lama::DenseVector<IndexType>& partition,
     const Settings settings) {
 
+    SCAI_REGION("Mapping.getSfcRenumber");
+
     const IndexType localN = coordinates[0].getLocalValues().size();
     const IndexType k = settings.numBlocks;
     const IndexType dim = settings.dimensions;
@@ -445,6 +447,8 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::applySfcRenumber(
     const std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights, //TODO,check: are these needed?
     scai::lama::DenseVector<IndexType>& partition,
     const Settings settings) {
+
+    SCAI_REGION("Mapping.applySfcRenumber");
 
     //get the renumbering
     std::vector<IndexType> R = Mapping<IndexType,ValueType>::getSfcRenumber( coordinates, nodeWeights, partition, settings );

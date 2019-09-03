@@ -254,9 +254,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
     std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
 
-    /*
-    * check input arguments for sanity
-    */
+    //-----------------------------------------------------------
+    //
+    // check input arguments for sanity
+    //
 	
 	assert( (aux<IndexType, ValueType>::checkConsistency(  input, coordinates, nodeWeights, settings)) );
 	
@@ -274,21 +275,37 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     std::chrono::duration<double> partitionTime= std::chrono::duration<double>(0.0);
 	std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
     
-	/*
-	* get an initial partition
-	*/
+	//
+	// get an initial partition
+	//
 	DenseVector<IndexType> result = initialPartition( input, coordinates, nodeWeights, previous, commTree, comm, settings, metrics);
 
     // if noRefinement then these are the times, if we do refinement they will be overwritten
     partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
-    metrics.MM["timePreliminary"] = partitionTime.count();
+    metrics.MM["timeInitialPart"] = partitionTime.count();
 
     //-----------------------------------------------------------
     //
     // At this point we have the initial, geometric partition.
     //
 
-	
+    //get some intermediate metrics 
+    
+    if( settings.metricsDetail!="no"){
+        const IndexType k = settings.numBlocks;
+        ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( input, result, true);
+        ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights[0]);
+        metrics.MM["preliminaryCut"] = cut;
+        metrics.MM["preliminaryImbalance"] = imbalance;
+    }
+
+    //-----------------------------------------------------------
+    //
+    // Possible (if also k=p) local refinement.
+    //
+
+	std::chrono::time_point<std::chrono::system_clock> beforeLR =  std::chrono::system_clock::now();
+
     if (comm->getSize() == k) {
         //WARNING: the result  is not redistributed. must redistribute afterwards
         if( !settings.noRefinement ) {
@@ -303,10 +320,16 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
         }
     }
 
-    std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startTime;
-    metrics.MM["timeTotal"] = elapTime.count();
+    std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - beforeLR;
+    metrics.MM["timeLRorRedist"] = elapTime.count();
 
-    //possible mapping at the end
+    std::chrono::time_point<std::chrono::system_clock> beforeMapping =  std::chrono::system_clock::now();
+
+    //-----------------------------------------------------------
+    //
+    // Possible mapping at the end
+    //
+
     if( settings.mappingRenumbering ) {
         PRINT0("Applying renumbering of blocks based on the SFC index of their centers.");
         std::chrono::time_point<std::chrono::system_clock> startRnb = std::chrono::system_clock::now();
@@ -322,6 +345,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
         std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startRnb;
         PRINT0("renumbering time " << elapTime.count() );
     }
+
+    elapTime = std::chrono::system_clock::now() - beforeMapping;
+    metrics.MM["timeMapping"] = elapTime.count();
 
     return result;
 } //partitionGraph
@@ -493,23 +519,16 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 		throw std::logic_error("Local refinement not yet implemented for multiple weights.");
 	}
 	
-	/*
-	 * redistribute to prepare for local refinement
-	 */
+	//
+	// redistribute to prepare for local refinement
+	//
 	bool useRedistributor = true;
 	aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights[0], settings, useRedistributor);
 	
 	std::chrono::duration<double> redistTime =  std::chrono::system_clock::now() - start;
 	
-	const IndexType k = settings.numBlocks;
-	
-	ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( input, result, true);
-	ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights[0]);
-	
 	//now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
 	metrics.MM["timeSecondDistribution"] = redistTime.count();
-	metrics.MM["preliminaryCut"] = cut;
-	metrics.MM["preliminaryImbalance"] = imbalance;
 	
 	//
 	// output: in std and file
@@ -534,7 +553,7 @@ template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const std::vector<DenseVector<ValueType>> &coordinates, Settings settings) {
     SCAI_REGION( "ParcoRepart.pixelPartition" )
 
-    SCAI_REGION_START("ParcoRepart.pixelPartition.initialise")
+    SCAI_REGION_START("ParcoRepart.pixelPartition.initialize")
     std::chrono::time_point<std::chrono::steady_clock> start, round;
     start = std::chrono::steady_clock::now();
 
