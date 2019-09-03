@@ -297,6 +297,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
         ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights[0]);
         metrics.MM["preliminaryCut"] = cut;
         metrics.MM["preliminaryImbalance"] = imbalance;
+        if( settings.verbose and comm->getRank() == 0 ) {
+            std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
+        }
     }
 
     //-----------------------------------------------------------
@@ -537,7 +540,6 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 		ValueType timeForSecondRedistr = comm->max( redistTime.count() );
 		if(comm->getRank() == 0 ) {
 			std::cout<< std::endl << "\033[1;32mTiming: 2nd redist before local refinement: "<< timeForSecondRedistr << std::endl;
-			std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
 		}
 	}
 	
