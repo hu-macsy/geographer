@@ -177,32 +177,22 @@ inline struct Metrics aggregateVectorMetrics( const std::vector<struct Metrics>&
     Metrics aggregateMetrics( metricsVec[0] );
     //aggregateMetrics  = metricsVec[0] ?
 
-    for(IndexType run=0; run<numRuns; run++) {
+    for(IndexType run=1; run<numRuns; run++) {
         //this is copied because the compiler complains about the const-ness if we use a reference
         Metrics thisMetric = metricsVec[ run ];
-
-        // for these time we have one measurement per PE and must make a max
-        aggregateMetrics.MM["timeMigrationAlgo"] += comm->max( thisMetric.MM["timeMigrationAlgo"] );
-        aggregateMetrics.MM["timeMigrationAlgo"] /= numRuns;
-        aggregateMetrics.MM["timeFirstDistribution"] +=  comm->max( thisMetric.MM["timeFirstDistribution"] );
-        aggregateMetrics.MM["timeFirstDistribution"] /= numRuns;
-        aggregateMetrics.MM["timeSecondDistribution"] += comm->max( thisMetric.MM["timeSecondDistribution"] );
-        aggregateMetrics.MM["timeSecondDistribution"] /= numRuns;
-        aggregateMetrics.MM["timePreliminary"] += comm->max( thisMetric.MM["timePreliminary"] );
-        aggregateMetrics.MM["timePreliminary"] /= numRuns;
-
-        // these times are global, no need to max, TODO: make them local and max here for consistency?
-        aggregateMetrics.MM["timeFinalPartition"] += thisMetric.MM["timeFinalPartition"];
-        aggregateMetrics.MM["timeFinalPartition"] /= numRuns;
-
-        aggregateMetrics.MM["timeSpMV"] += thisMetric.MM["timeSpMV"];
-        aggregateMetrics.MM["timeSpMV"] /= numRuns;
-        aggregateMetrics.MM["timeComm"] += thisMetric.MM["timeComm"];
-        aggregateMetrics.MM["timeComm"] /= numRuns;
-
-        //TODO: is this too much? maybe add a shorter print?
-        //thisMetric.print( out );
+		
+		for( auto metIt = aggregateMetrics.MM.begin(); metIt!=aggregateMetrics.MM.end(); metIt++){
+			std::string metString = metIt->first;
+			//some of the metrics are already maxed but doing it again does not affect it. It is just slower
+			metIt->second += comm->max( thisMetric.MM[metString] );
+		}
     }
+    
+    for( auto metIt = aggregateMetrics.MM.begin(); metIt!=aggregateMetrics.MM.end(); metIt++){
+		metIt->second /= numRuns;
+	}
+    
+    
 
     return aggregateMetrics;
 }

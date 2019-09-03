@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
     //ITI::Format coordFormat;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    if (comm->getType() != scai::dmemo::Communicator::CommunicatorKind::MPI) {
+    if (comm->getType() != scai::dmemo::CommunicatorType::MPI) {
         std::cout << "The linked lama version was compiled without MPI. Only sequential partitioning is supported." << std::endl;
     }
 
@@ -551,6 +551,7 @@ int main(int argc, char** argv) {
 
     if (repeatTimes > 1) {
         if (comm->getRank() == 0) {
+			std::cout<< "\n Average metrics for all runs:" << std::endl;
             std::cout<<  "\033[1;36m";
             aggrMetrics.print( std::cout );
             std::cout << " \033[0m";
