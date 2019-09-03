@@ -52,7 +52,7 @@ int main(int argc, char** argv) {
     //ITI::Format coordFormat;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    if (comm->getType() != scai::dmemo::Communicator::CommunicatorKind::MPI) {
+    if (comm->getType() != scai::dmemo::CommunicatorType::MPI) {
         std::cout << "The linked lama version was compiled without MPI. Only sequential partitioning is supported." << std::endl;
     }
 
