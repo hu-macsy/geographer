@@ -857,7 +857,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     /*
      * fill sort pair
      */
-PRINT(*comm);
+
     scai::hmemo::HArray<IndexType> myGlobalIndices(localN, IndexType(0) );
     inputDist->getOwnedIndexes(myGlobalIndices);
     std::vector<sort_pair> localPairs(localN);
