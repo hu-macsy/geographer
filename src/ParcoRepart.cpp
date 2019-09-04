@@ -289,20 +289,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     // At this point we have the initial, geometric partition.
     //
 
-    //get some intermediate metrics 
-    
-    if( settings.metricsDetail!="no"){
-        const IndexType k = settings.numBlocks;
-        ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( input, result, true);
-        ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights[0]);
-        metrics.MM["preliminaryCut"] = cut;
-        metrics.MM["preliminaryImbalance"] = imbalance;
-        if( settings.verbose and comm->getRank() == 0 ) {
-            std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
-        }
-    }
-
-    //-----------------------------------------------------------
     //
     // Possible (if also k=p) local refinement.
     //
@@ -532,6 +518,19 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 	
 	//now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
 	metrics.MM["timeSecondDistribution"] = redistTime.count();
+
+    //get some intermediate metrics 
+    
+    if( settings.metricsDetail!="no"){
+        const IndexType k = settings.numBlocks;
+        ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( input, result, true);
+        ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights[0]);
+        metrics.MM["preliminaryCut"] = cut;
+        metrics.MM["preliminaryImbalance"] = imbalance;
+        if( settings.verbose and comm->getRank() == 0 ) {
+            std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
+        }
+    }
 	
 	//
 	// output: in std and file
