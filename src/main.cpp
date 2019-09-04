@@ -531,6 +531,7 @@ int main(int argc, char** argv) {
                 std::ofstream outF( fileName, std::ios::out);
                 if(outF.is_open()) {
                     settings.print( outF, comm);
+                    std::cout<< "\nMetrics" << std::endl;
                     metricsVec[r].print( outF );
                 }
             }
@@ -596,7 +597,7 @@ int main(int argc, char** argv) {
     }
 
 
-    if( settings.outFile!="-" ) {
+    if( settings.outFile!="-" and settings.storePartition) {
         std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
         std::string partOutFile = settings.outFile+".part";
         ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );

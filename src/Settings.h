@@ -165,6 +165,7 @@ struct Settings {
     IndexType dimensions= 2;	///< the dimension of the point set
     std::string fileName = "-";	///< the name of the input file to read the graph from
     std::string outFile = "-";	///< name of the file to store metrics (if desired)
+    bool storePartition = false;
     std::string outDir = "-"; 	//this is used by the competitors main
     std::string PEGraphFile = "-"; //TODO: this should not be in settings
     std::string blockSizesFile = "-"; //TODO: this should not be in settings
