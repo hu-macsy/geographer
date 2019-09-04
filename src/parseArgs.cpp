@@ -24,8 +24,8 @@ Options populateOptions() {
     ("numBlocks", "Number of blocks, default is number of processes", value<IndexType>())
     ("epsilon", "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.", value<double>()->default_value(std::to_string(settings.epsilon)))
     // other input specification
-    ("fileFormat", "Format of graph file, available are AUTO, METIS, ADCRIC and MatrixMarket format. See Readme.md for more details.", value<ITI::Format>())
-    ("coordFormat", "format of coordinate file: AUTO, METIS, ADCIRC and MATRIXMARKET", value<ITI::Format>())
+    ("fileFormat", "Format of graph file, available are AUTO, METIS, ADCRIC and MatrixMarket format. See Readme.md and src/Settings.h for more details.", value<ITI::Format>())
+    ("coordFormat", "format of coordinate file: AUTO, METIS, ADCIRC and MATRIXMARKET. See src/Settings.h for more details.", value<ITI::Format>())
     ("numNodeWeights", "Number of node weights to use. If the input graph contains more node weights, only the first ones are used.", value<IndexType>())
     ("seed", "random seed, default is current time", value<double>()->default_value(std::to_string(time(NULL))))
     //mapping
@@ -34,7 +34,7 @@ Options populateOptions() {
     //repartitioning
     ("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
     //multi-level and local refinement
-    ("initialPartition", "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.", value<Tool>())
+    ("initialPartition", "Choose initial partitioning method between space-filling curves (geoSFC), balanced k-means (geoKmeans) or the hierarchical version (geoHierKM) and MultiJagged (geoMS). If parmetis or zoltan are installed, you can also choose to partition with them using for example, parMetisGraph or zoltanMJ. For more information, see src/Settings.h file.", value<Tool>())
     ("noRefinement", "skip local refinement steps")
     ("multiLevelRounds", "Tuning Parameter: How many multi-level rounds with coarsening to perform", value<IndexType>()->default_value(std::to_string(settings.multiLevelRounds)))
     ("minBorderNodes", "Tuning parameter: Minimum number of border nodes used in each refinement step", value<IndexType>())
