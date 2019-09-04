@@ -44,6 +44,7 @@ Options populateOptions() {
     ("useDiffusionTieBreaking", "Tuning Parameter: Use diffusion to break ties in Fiduccia-Mattheyes algorithm", value<bool>())
     ("useGeometricTieBreaking", "Tuning Parameter: Use distances to block center for tie breaking", value<bool>())
     ("skipNoGainColors", "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round", value<bool>())
+    ("nnCoarsening", "When coarsening, pick the nearest neighbor based on the euclidean distance", value<bool>())
     //multisection
     ("bisect", "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached", value<bool>())
     ("cutsPerDim", "If MultiSection is chosen, then provide d values that define the number of cuts per dimension.", value<std::string>())
@@ -165,6 +166,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.useDiffusionTieBreaking = vm.count("useDiffusionTieBreaking");
     settings.useGeometricTieBreaking = vm.count("useGeometricTieBreaking");
     settings.skipNoGainColors = vm.count("skipNoGainColors");
+    settings.nnCoarsening = vm.count("nnCoarsening");
     settings.bisect = vm.count("bisect");
     settings.writeDebugCoordinates = vm.count("writeDebugCoordinates");
 
