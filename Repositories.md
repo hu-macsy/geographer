@@ -1,8 +1,11 @@
 Geographer Development
 ======================
 
+## Update, 04/08/19
+The _geographer-dev_ repository is archived and moved to a private repository in gitlab. It was used for developing but now, development is done directly on _geographer_ repository using feature branches and private forks (see below).
+
 ## Repositories
-Our main repository is called _geographer_ and on Github: [github.com/kit-parco/geographer](https://github.com/kit-parco/geographer)
+Our main repository is called _geographer_ and on Github: [github.com/hu-macsy/geographer](https://github.com/hu-macsy/geographer)
 It is open to the public and continuously tested with Travis at \url{https://travis-ci.org/kit-parco/geographer}.
 
 Currently there is a private repository called _geographer-dev_, which contains the current content of _geographer_ and, in addition, a few branches of unfinished development. The old _ParcoRepart_ repository is incompatible and should not be used any more.
