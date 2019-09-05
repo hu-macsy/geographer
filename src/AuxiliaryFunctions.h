@@ -241,8 +241,10 @@ public:
         return std::pow( ValueType (std::pow(std::abs(col1-col2),2) + std::pow(std::abs(row1-row2),2)), 0.5);
     }
 
-//template<T>
+    //template<T>
     static ValueType pointDistanceL2( std::vector<ValueType> p1, std::vector<ValueType> p2) {
+        SCAI_REGION("aux.pointDistanceL2");
+
         const IndexType dim = p1.size();
         ValueType distance = 0;
 

@@ -50,22 +50,22 @@ TEST_F(FileIOTest, testWriteMetis_Dist_3D) {
     std::vector<ValueType> maxCoord= { 10, 20, 30};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
-PRINT("*****");
+
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
-PRINT("*****");
+
     std::vector<DenseVector<ValueType>> coords(3);
     for(IndexType i=0; i<3; i++) {
         coords[i].allocate(dist);
         coords[i] = static_cast<ValueType>( 0 );
     }
-PRINT("*****");
+
     auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
-PRINT("*****");
+
     // create the adjacency matrix and the coordinates
     MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(adjM, coords, maxCoord, numPoints, 3);
-PRINT("*****");
+
     // write the mesh in p(=number of PEs) files
     FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, graphPath+"dist3D_");
 
@@ -189,7 +189,7 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D) {
     SCAI_REGION_START("testPartitionFromFile_local_2D.readGraphFromFile");
     graph = FileIO<IndexType, ValueType>::readGraph( grFile );
     graph.redistribute( distPtr, noDistPtr);
-    std::cout<< "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges\n";
+    PRINT0( "graph has <"<< nodes<<"> nodes and -"<< edges<<"- edges");
     SCAI_REGION_END("testPartitionFromFile_local_2D.readGraphFromFile");
 
     // N is the number of nodes

@@ -383,7 +383,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         std::vector<DenseVector<ValueType>> coordinateCopy = coordinates;
         std::vector<DenseVector<ValueType>> nodeWeightCopy = nodeWeights;
         if (comm->getSize() > 1 && (settings.dimensions == 2 || settings.dimensions == 3)) {
-            SCAI_REGION("ParcoRepart.partitionGraph.initialPartition.prepareForKMeans")
+            SCAI_REGION("ParcoRepart.initialPartition.prepareForKMeans")
 
             if (!settings.repartition || comm->getSize() != settings.numBlocks) {
 
@@ -613,7 +613,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
     scai::hmemo::HArray<IndexType> density( cubeSize, IndexType(0) );
     scai::hmemo::WriteAccess<IndexType> wDensity(density);
 
-    SCAI_REGION_END("ParcoRepart.pixelPartition.initialise")
+    SCAI_REGION_END("ParcoRepart.pixelPartition.initialize")
 
     if(dimensions==2) {
         SCAI_REGION( "ParcoRepart.pixelPartition.localDensity" )

@@ -159,8 +159,8 @@ private:
         const std::vector<IndexType>& borderRegionIDs,
         const std::vector<ValueType>& nodeWeights,
         std::vector<bool>& assignedToSecondBlock,
-        const std::pair<IndexType, IndexType> blockCapacities,
-        std::pair<IndexType, IndexType>& blockSizes,
+        const std::pair<ValueType, ValueType> blockCapacities,
+        std::pair<ValueType, ValueType>& blockSizes,
         const std::vector<ValueType>& tieBreakingKeys,
         Settings settings
     );

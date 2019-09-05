@@ -74,6 +74,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     //copy into usable data structure with iterators
     std::vector<IndexType> myGlobalIndices(input.getRowDistributionPtr()->getLocalSize());
     {
+        SCAI_REGION( "LocalRefinement.distributedFMStep.copyToVector" )
         const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
         scai::hmemo::HArray<IndexType> ownIndices;
         inputDist->getOwnedIndexes(ownIndices);
@@ -172,11 +173,10 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
             comm->swap(swapField, 5, partner);
             //want to isolate raw array accesses as much as possible, define named variables and only use these from now
             const IndexType otherSize = swapField[0];
-            const IndexType otherSecondRoundMarker = swapField[1];
+            const ValueType otherSecondRoundMarker = swapField[1];
             const IndexType otherLastRoundMarker = swapField[2];
             //const IndexType otherBlockSize = swapField[3];
-//WARNING/TODO: this assumes that node weights (and thus block weights) are integers
-            const IndexType otherBlockWeightSum = swapField[4];
+            const ValueType otherBlockWeightSum = swapField[4];
 
             if (interfaceNodes.size() == 0) {
                 if (otherSize != 0) {
@@ -201,8 +201,12 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
                 }
             }
 
-            //now swap border region
-            comm->swap(swapNodes, swapLength, partner);
+            {
+                SCAI_REGION( "LocalRefinement.distributedFMStep.loop.prepareSets.swapBorders" )
+            
+                //now swap border region
+                comm->swap(swapNodes, swapLength, partner);
+            }
 
             //read interface nodes of partner process from swapped array.
             std::vector<IndexType> requiredHaloIndices(otherSize);
@@ -258,6 +262,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
              */
             std::vector<ValueType> borderNodeWeights = {};
             if (nodesWeighted) {
+                SCAI_REGION( "LocalRefinement.distributedFMStep.loop.prepareSets.nodeWeightExchange" )
                 const HArray<ValueType>& localWeights = nodeWeights.getLocalValues();
                 assert(localWeights.size() == localN);
                 graphHalo.updateHalo( nodeWeightHaloData, localWeights, *comm );
@@ -279,11 +284,9 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
             //origin data, for redistribution in uncoarsening step
             scai::hmemo::HArray<IndexType> originData;
             graphHalo.updateHalo(originData, origin.getLocalValues(), *comm);
-
-//WARNING/TODO: this assumes that node weights (and thus block weights) are integers?
             //block sizes and capacities
-            std::pair<IndexType, IndexType> blockSizes = {blockWeightSum, otherBlockWeightSum};
-            std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
+            std::pair<ValueType, ValueType> blockSizes = {blockWeightSum, otherBlockWeightSum};
+            std::pair<ValueType, ValueType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
 
             //second round markers
             std::pair<IndexType, IndexType> secondRoundMarkers = {secondRoundMarker, otherSecondRoundMarker};
@@ -460,7 +463,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
                 }
             }
         } // if (partner != comm->getRank())
-    }
+    } //for (IndexType color = 0; color < communicationScheme.size();...
 
     comm->synchronize();
 
@@ -495,8 +498,8 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
     const std::vector<IndexType>& borderRegionIDs,
     const std::vector<ValueType>& nodeWeights,
     std::vector<bool>& assignedToSecondBlock,
-    const std::pair<IndexType, IndexType> blockCapacities,
-    std::pair<IndexType, IndexType>& blockSizes,
+    const std::pair<ValueType, ValueType> blockCapacities,
+    std::pair<ValueType, ValueType>& blockSizes,
     const std::vector<ValueType>& tieBreakingKeys,
     Settings settings) {
 

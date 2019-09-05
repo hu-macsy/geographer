@@ -237,9 +237,9 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
     //scai::lama::DenseVector<ValueType> nodeWeights = fixedNodeWeights;
     std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights, unitNodeWeights, constNodeWeights };
 
-    std::cout << "Sum of node weights are: " << std::endl;
+    PRINT0( "Sum of node weights are: " );
     for( unsigned int i=0; i<nodeWeights.size(); i++ ) {
-        std::cout << "weight " << i << ": " << nodeWeights[i].sum() << std::endl;
+        PRINT0( "weight " << i << ": " << nodeWeights[i].sum());
     }
     /*
     std::transform( unitNodeWeights.begin(), unitNodeWeights.end(), unitNodeWeights.begin(), \

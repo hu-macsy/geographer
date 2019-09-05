@@ -340,9 +340,11 @@ public:
      * @param end End of range
      * @param num_random Number of selected elements
      */
-//taken from https://stackoverflow.com/a/9345144/494085
+    //taken from https://stackoverflow.com/a/9345144/494085
     template<class BidiIter >
     static BidiIter FisherYatesShuffle(BidiIter begin, BidiIter end, size_t num_random) {
+        //SCAI_REGION("GraphUtils.FisherYatesShuffle");
+        
         size_t left = std::distance(begin, end);
         for (IndexType i = 0; i < num_random; i++) {
             BidiIter r = begin;

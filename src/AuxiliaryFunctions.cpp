@@ -14,6 +14,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     Settings settings,
     bool useRedistributor,
     bool renumberPEs ) {
+    SCAI_REGION("aux.redistributeFromPartition");
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const IndexType numPEs = comm->getSize();
@@ -34,6 +35,8 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     //
 
     if( renumberPEs ) {
+        SCAI_REGION("aux.redistributeFromPartition.renumberPEs");
+
         scai::hmemo::ReadAccess<IndexType> rPart( partition.getLocalValues() );
         //std::map<IndexType,IndexType> blockSizes;
         //scai::lama::SparseVector<IndexType> blockSizes( numPEs, 0 );
@@ -167,7 +170,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
         //instead of renumber the PEs, renumber the blocks
         std::vector<IndexType> blockRenumbering( numPEs ); //this should be k, but the whole functions works only when k=p
 
-        //if every PE got the same ID as the one laready has
+        //if every PE got the same ID as the one already has
         bool nothingChanged = true;
 
         //reverse the renumbering from PEs to blocks: if PE 3 claimed ID 5, then renumber block 5 to 3
@@ -205,13 +208,13 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     //----------------------------------------------------------------
     // create the new distribution and redistribute data
     //
+    SCAI_REGION_START("aux.redistributeFromPartition.redistribution");
 
     scai::dmemo::DistributionPtr distFromPartition;
 
     if( useRedistributor ) {
         scai::dmemo::RedistributePlan resultRedist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
-        //auto resultRedist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
-
+        
         partition = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
         scai::dmemo::RedistributePlan redistributor = scai::dmemo::redistributePlanByNewDistribution(resultRedist.getTargetDistributionPtr(), graph.getRowDistributionPtr());
 
@@ -236,6 +239,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
             coordinates[d].redistribute( distFromPartition );
         }
     }
+    SCAI_REGION_END("aux.redistributeFromPartition.redistribution");
 
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
     SCAI_ASSERT_ERROR( nodeWeights.getDistribution().isEqual(*inputDist), "Distribution mismatch" );
