@@ -70,7 +70,7 @@ DenseVector<IndexType> HilbertCurve<IndexType, ValueType>::computePartition(cons
      * Several possibilities exist for choosing the recursion depth.
      * Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
      */
-    const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
+    const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(ValueType(std::log2(globalN)), ValueType(21));
 
     /*
      *	create space filling curve indices.
@@ -216,7 +216,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const*
             if (scaledCoord[1] < 0.5) {
                 subSquare = 0;
                 //apply inverse hilbert operator
-                double temp = scaledCoord[0];
+                ValueType temp = scaledCoord[0];
                 scaledCoord[0] = 2*scaledCoord[1];
                 scaledCoord[1] = 2*temp;
             } else {
@@ -229,7 +229,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const*
             if (scaledCoord[1] < 0.5) {
                 subSquare = 3;
                 //apply inverse hilbert operator
-                double temp = scaledCoord[0];
+                ValueType temp = scaledCoord[0];
                 scaledCoord[0] = -2*scaledCoord[1]+1;
                 scaledCoord[1] = -2*temp+2;
             } else {
@@ -243,7 +243,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const*
         integerIndex = (integerIndex << 2) | subSquare;
     }
     unsigned long divisor = size_t(1) << size_t(2*int(recursionDepth));
-    return double(integerIndex) / double(divisor);
+    return ValueType(integerIndex) / ValueType(divisor);
 
 }
 
@@ -345,7 +345,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
         integerIndex = (integerIndex << 3) | subSquare;
     }
     unsigned long long divisor = size_t(1) << size_t(3*int(recursionDepth));
-    double ret = double(integerIndex) / double(divisor);
+    ValueType ret = ValueType(integerIndex) / ValueType(divisor);
     SCAI_ASSERT(ret<1, ret << " , divisor= "<< divisor << " , integerIndex=" << integerIndex <<" , recursionDepth= " << recursionDepth << ", sizeof(unsigned long long)="<< sizeof(unsigned long long));
     return ret;
 
@@ -440,7 +440,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
                     if (scaledPoint[1] < 0.5) {
                         subSquare = 0;
                         //apply inverse hilbert operator
-                        double temp = scaledPoint[0];
+                        ValueType temp = scaledPoint[0];
                         scaledPoint[0] = 2*scaledPoint[1];
                         scaledPoint[1] = 2*temp;
                     } else {
@@ -453,7 +453,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
                     if (scaledPoint[1] < 0.5) {
                         subSquare = 3;
                         //apply inverse hilbert operator
-                        double temp = scaledPoint[0];
+                        ValueType temp = scaledPoint[0];
                         scaledPoint[0] = -2*scaledPoint[1]+1;
                         scaledPoint[1] = -2*temp+2;
                     } else {
@@ -467,7 +467,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
                 integerIndex = (integerIndex << 2) | subSquare;
             }
             unsigned long divisor = size_t(1) << size_t(2*int(recursionDepth));
-            hilbertIndices[i] = double(integerIndex) / double(divisor);
+            hilbertIndices[i] = ValueType(integerIndex) / ValueType(divisor);
         }
     }
 
@@ -598,7 +598,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
                 integerIndex = (integerIndex << 3) | subSquare;
             }
             unsigned long long divisor = size_t(1) << size_t(3*int(recursionDepth));
-            hilbertIndices[i] = double(integerIndex) / double(divisor);
+            hilbertIndices[i] = ValueType(integerIndex) / ValueType(divisor);
         }
     }
 
@@ -640,16 +640,16 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(
         p = HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(r, level-1);
         switch(q) {
         case 0:
-            ret = {p[1]/2,      p[0]/2};
+            ret = {ValueType(p[1]/2.0), ValueType(p[0]/2.0)};
             break;
         case 1:
-            ret = {p[0]/2,      p[1]/2 + 0.5};
+            ret = {ValueType(p[0]/2.0), ValueType(p[1]/2.0 + 0.5)};
             break;
         case 2:
-            ret = {p[0]/2+0.5,  p[1]/2 + 0.5};
+            ret = {ValueType(p[0]/2.0+0.5), ValueType(p[1]/2.0 + 0.5)};
             break;
         case 3:
-            ret = {-p[1]/2+1,   -p[0]/2 + 0.5};
+            ret = {ValueType(-p[1]/2.0+1.0), ValueType(-p[0]/2.0 + 0.5)};
             break;
         }
     }
@@ -678,28 +678,28 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(
 
         switch(q) {
         case 0:
-            ret = {p[1]/2,   p[2]/2,     p[0]/2};
+            ret = { ValueType(p[1]/2.0), ValueType(p[2]/2.0), ValueType(p[0]/2.0)};
             break;
         case 1:
-            ret = {p[2]/2,   0.5+p[0]/2,     p[1]/2};
+            ret = { ValueType(p[2]/2.0), ValueType(0.5+p[0]/2.0), ValueType(p[1]/2.0)};
             break;
         case 2:
-            ret = {0.5+p[2]/2,   0.5+p[0]/2,     p[1]/2};
+            ret = { ValueType(0.5+p[2]/2.0), ValueType(0.5+p[0]/2.0), ValueType(p[1]/2.0)};
             break;
         case 3:
-            ret = {1-p[0]/2,     0.5-p[1]/2,     p[2]/2};
+            ret = { ValueType(1.0-p[0]/2.0), ValueType(0.5-p[1]/2.0), ValueType(p[2]/2.0)};
             break;
         case 4:
-            ret = {1-p[0]/2,     0.5-p[1]/2,     0.5+p[2]/2};
+            ret = { ValueType(1.0-p[0]/2.0), ValueType(0.5-p[1]/2.0), ValueType(0.5+p[2]/2.0)};
             break;
         case 5:
-            ret = {1-p[2]/2,     0.5+p[0]/2,     1-p[1]/2};
+            ret = { ValueType(1.0-p[2]/2.0), ValueType(0.5+p[0]/2.0), ValueType(1.0-p[1]/2.0)};
             break;
         case 6:
-            ret = {0.5-p[2]/2,   0.5+p[0]/2,     1-p[1]/2};
+            ret = { ValueType(0.5-p[2]/2.0), ValueType(0.5+p[0]/2.0), ValueType(1.0-p[1]/2.0)};
             break;
         case 7:
-            ret = {p[1]/2,   0.5-p[2]/2,     1-p[0]/2};
+            ret = { ValueType(p[1]/2.0), ValueType(0.5-p[2]/2.0), ValueType(1.0-p[0]/2.0)};
             break;
         }
     }
@@ -763,7 +763,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
     const IndexType localN = coordDist->getLocalSize();
     const IndexType globalN = coordDist->getGlobalSize();
 
-    const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
+    const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(ValueType(std::log2(globalN)), ValueType(21));
     //const IndexType recursionDepth = std::min(std::log2(globalN), double(21));
 
     /*
@@ -879,8 +879,8 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     SCAI_REGION_END("HilbertCurve.redistribute.sort")
 
     sort_pair minLocalIndex = localPairs[0];
-    std::vector<double> sendThresholds(comm->getSize(), minLocalIndex.value);
-    std::vector<double> recvThresholds(comm->getSize());
+    std::vector<ValueType> sendThresholds(comm->getSize(), minLocalIndex.value);
+    std::vector<ValueType> recvThresholds(comm->getSize());
 
     MPI_Datatype MPI_ValueType = MPI_DOUBLE; //TODO: properly template this
     MPI_Alltoall(sendThresholds.data(), 1, MPI_ValueType, recvThresholds.data(),
