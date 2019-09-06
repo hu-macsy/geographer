@@ -531,7 +531,7 @@ int main(int argc, char** argv) {
                 std::ofstream outF( fileName, std::ios::out);
                 if(outF.is_open()) {
                     settings.print( outF, comm);
-                    std::cout<< "\nMetrics" << std::endl;
+                    outF << "\nMetrics" << std::endl;
                     metricsVec[r].print( outF );
                 }
             }

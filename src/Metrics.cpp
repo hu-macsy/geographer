@@ -21,21 +21,20 @@ void Metrics::print( std::ostream& out) const {
             out<< mapIt->first <<": " << mapIt->second << std::endl;
     }
 
-    /*
-    	out<< "localRefinement details" << std::endl;
-    	for( unsigned int i=0; i<this->localRefDetails.size(); i++){
-    		if( this->localRefDetails[i][0].first != -1){
-    			out << "MLRound " << i << std::endl;
-    		}
-    		for( unsigned int j=0; j<this->localRefDetails[i].size(); j++){
-    			if( this->localRefDetails[i][j].first != -1){
-    				out << "\t refine round " << j <<", gain: " << \
-    					this->localRefDetails[i][j].first << ", time: "<< \
-    					this->localRefDetails[i][j].second << std::endl;
-    			}
-    		}
-    	}
-    */
+	out<< "localRefinement details" << std::endl;
+	for( unsigned int i=0; i<this->localRefDetails.size(); i++){
+		if( this->localRefDetails[i][0].first != -1){
+			out << "MLRound " << i << std::endl;
+		}
+		for( unsigned int j=0; j<this->localRefDetails[i].size(); j++){
+			if( this->localRefDetails[i][j].first != -1){
+				out << "\t refine round " << j <<", gain: " << \
+					this->localRefDetails[i][j].first << ", time: "<< \
+					this->localRefDetails[i][j].second << std::endl;
+			}
+		}
+	}
+    
 }
 //---------------------------------------------------------------------------
 
@@ -136,6 +135,7 @@ void Metrics::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph
 
 
 std::tuple<IndexType,IndexType,IndexType> Metrics::getDiameter( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings ) {
+    SCAI_REGION("Metrics.getDiameter");
 
     std::chrono::time_point<std::chrono::high_resolution_clock> diameterStart = std::chrono::high_resolution_clock::now();
     IndexType maxBlockDiameter = 0;

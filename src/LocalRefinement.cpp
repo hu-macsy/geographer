@@ -467,10 +467,14 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
     comm->synchronize();
 
-    scai::dmemo::DistributionPtr sameDist = scai::dmemo::generalDistributionUnchecked(globalN, input.getRowDistributionPtr()->ownedGlobalIndexes(), comm);
-    input = CSRSparseMatrix<ValueType>(sameDist, input.getLocalStorage());
-    part.swap(part.getLocalValues(), sameDist);
-    origin.swap(origin.getLocalValues(), sameDist);
+    scai::dmemo::DistributionPtr sameDist;
+    {
+        SCAI_REGION( "LocalRefinement.distributedFMStep.outro");
+        sameDist = scai::dmemo::generalDistributionUnchecked(globalN, input.getRowDistributionPtr()->ownedGlobalIndexes(), comm);
+        input = CSRSparseMatrix<ValueType>(sameDist, input.getLocalStorage());
+        part.swap(part.getLocalValues(), sameDist);
+        origin.swap(origin.getLocalValues(), sameDist);
+    }
 
     if (settings.useGeometricTieBreaking) {
         for (IndexType d = 0; d < settings.dimensions; d++) {

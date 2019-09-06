@@ -23,7 +23,7 @@ struct Metrics {
     std::vector<std::tuple<ValueType, ValueType, ValueType>> kmeansProfiling; // specific for k-means profiling
     std::vector<IndexType> numBalanceIter;
 
-    std::vector< std::vector<std::pair<ValueType,ValueType>> > localRefDetails; // specific for local refinement profiilng
+    std::vector< std::vector<std::pair<ValueType,ValueType>> > localRefDetails; // specific for local refinement profiling
 
     // with multi node weights we also have multiple imbalances
     std::vector<ValueType> imbalances;

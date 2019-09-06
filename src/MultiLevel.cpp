@@ -23,6 +23,8 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         throw std::runtime_error("Dimensions do not agree: vector.size()= " + std::to_string(coordinates.size())  + " != settings.dimensions= " + std::to_string(settings.dimensions) );
     }
 
+    SCAI_REGION_START( "MultiLevel.multiLevelStep.intro");
+
     if (!input.getRowDistributionPtr()->isReplicated()) {
         //check whether distributions agree
         const scai::dmemo::Distribution &inputDist = input.getRowDistribution();
@@ -45,6 +47,8 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
     settings.thisRound++;
 
     auto origin = scai::lama::fill<DenseVector<IndexType>>(input.getRowDistributionPtr(), comm->getRank());//to track node movements through the hierarchies
+
+    SCAI_REGION_END("MultiLevel.multiLevelStep.intro");
 
     if (settings.multiLevelRounds > 0) {
         SCAI_REGION_START( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
@@ -89,10 +93,11 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         Settings settingscopy(settings);
         settingscopy.multiLevelRounds -= settings.coarseningStepsBetweenRefinement;
         SCAI_REGION_END( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
+
         // recursive call
         DenseVector<IndexType> coarseOrigin = multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, coarseHalo, settingscopy, metrics);
         SCAI_ASSERT_DEBUG(coarseOrigin.getDistribution().isEqual(coarseGraph.getRowDistribution()), "Distributions inconsistent.");
-        //SCAI_ASSERT_DEBUG(scai::dmemo::Redistributor(coarseOrigin.getLocalValues(), coarseOrigin.getDistributionPtr()).getTargetDistributionPtr()->isEqual(*oldCoarseDist), "coarseOrigin invalid");
+        
 
         {
             SCAI_REGION( "MultiLevel.multiLevelStep.uncoarsen" )
@@ -132,7 +137,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         //TODO: remove from final version?
         // write the PE graph for further experiments
         if(settings.writePEgraph) { //write PE graph for further experiments
-            //TODO: this workos only for 12 rounds
+            //TODO: this works only for 12 rounds
             PRINT0( "thisRound= " << settings.thisRound << " , multiLevelRounds= " << settings.multiLevelRounds);
             if( settings.thisRound==0) {
                 std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
@@ -425,7 +430,7 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
             HArray<ValueType> lValues(newValues.size(), newValues.data());
             graph.getLocalStorage() = CSRStorage<ValueType>(localN, globalN, std::move( newIA ), std::move( lJA ), std::move( lValues ));
         }
-    }
+    } //for (IndexType i = 0; i < iterations; i++)
 
     SCAI_REGION_START("MultiLevel.coarsen.newGlobalIndices")
     //get new global indices by computing a prefix sum over the preserved nodes

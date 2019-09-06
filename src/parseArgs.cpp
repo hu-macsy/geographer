@@ -66,6 +66,7 @@ Options populateOptions() {
     ("verbose", "Increase output.")
     ("storeInfo", "Store timing and other metrics in file.")
     ("callExit", "Call std::exit after finishing partitioning, useful in case of lingering MPI data structures.")
+    ("writePEgraph", "If enabled, it stores the processor graph (mainly for profiling)")
     // evaluation
     ("repeatTimes", "How many times we repeat the partitioning process.", value<IndexType>())
     ("noComputeDiameter", "Compute diameter of resulting block files.")
@@ -169,6 +170,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.nnCoarsening = vm.count("nnCoarsening");
     settings.bisect = vm.count("bisect");
     settings.writeDebugCoordinates = vm.count("writeDebugCoordinates");
+    settings.writePEgraph = vm.count("writePEgraph");
 
     if (vm.count("fileFormat")) {
         settings.fileFormat = vm["fileFormat"].as<ITI::Format>();
