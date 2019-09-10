@@ -95,6 +95,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     for (IndexType color = 0; color < communicationScheme.size(); color++) {
         SCAI_REGION( "LocalRefinement.distributedFMStep.loop" )
 
+SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.intro" )
         const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
         const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
         const scai::dmemo::DistributionPtr commDist = communicationScheme[color].getDistributionPtr();
@@ -117,7 +118,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
                                          + std::to_string(partnerOfPartner) + ".");
             }
         }
-
+SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.intro" )
         /*
          * check for validity of partition
          */
