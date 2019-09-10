@@ -69,7 +69,7 @@ Options populateOptions() {
     ("writePEgraph", "If enabled, it stores the processor graph (mainly for profiling)")
     // evaluation
     ("repeatTimes", "How many times we repeat the partitioning process.", value<IndexType>())
-    ("noComputeDiameter", "Compute diameter of resulting block files.")
+    ("computeDiameter", "Compute diameter of resulting block files.")
     ("maxDiameterRounds", "abort diameter algorithm after that many BFS rounds", value<IndexType>())
     ("metricsDetail", "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV", value<std::string>())
     //used for the competitors main
@@ -150,15 +150,10 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         }
     }
 
-    if( vm.count("noComputeDiameter") ) {
-        settings.computeDiameter = false;
-    } else {
-        settings.computeDiameter = true;
-    }
-
     using std::vector;
     settings.verbose = vm.count("verbose");
     settings.storeInfo = vm.count("storeInfo");
+    settings.computeDiameter = vm.count("computeDiameter");
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
     settings.noRefinement = vm.count("noRefinement");

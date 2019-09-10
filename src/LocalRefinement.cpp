@@ -87,7 +87,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     std::chrono::duration<double> beforeLoop = std::chrono::system_clock::now() - startTime;
     ValueType t1 = comm->max(beforeLoop.count());
     if(settings.verbose) {
-        //PRINT0("time elapsed before main loop: " << t1 );
+        PRINT0("time elapsed before main loop: " << t1 );
         PRINT0("number of rounds/loops: " << communicationScheme.size() );
     }
 

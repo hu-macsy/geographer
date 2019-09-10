@@ -764,7 +764,6 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
     const IndexType globalN = coordDist->getGlobalSize();
 
     const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(ValueType(std::log2(globalN)), ValueType(21));
-    //const IndexType recursionDepth = std::min(std::log2(globalN), double(21));
 
     /*
     *	create space filling curve indices.
@@ -857,7 +856,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     /*
      * fill sort pair
      */
-
+PRINT(*comm);
     scai::hmemo::HArray<IndexType> myGlobalIndices(localN, IndexType(0) );
     inputDist->getOwnedIndexes(myGlobalIndices);
     std::vector<sort_pair> localPairs(localN);
@@ -868,7 +867,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
             localPairs[i].index = rIndices[i];
         }
     }
-
+PRINT(*comm);
     MPI_Comm mpi_comm = MPI_COMM_WORLD; //TODO: cast the communicator ptr to a MPI communicator and get getMPIComm()?
     JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
     //IndexType newLocalN = localPairs.size();
@@ -877,7 +876,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     std::chrono::time_point < std::chrono::system_clock > beforeMigration = std::chrono::system_clock::now();
     assert(localPairs.size() > 0);
     SCAI_REGION_END("HilbertCurve.redistribute.sort")
-
+PRINT(*comm);
     sort_pair minLocalIndex = localPairs[0];
     std::vector<ValueType> sendThresholds(comm->getSize(), minLocalIndex.value);
     std::vector<ValueType> recvThresholds(comm->getSize());
@@ -887,6 +886,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
                  1, MPI_ValueType, mpi_comm); //TODO: replace this monstrosity with a proper call to LAMA
     //comm->all2all(recvThresholds.data(), sendTresholds.data());//TODO: maybe speed up with hypercube
     SCAI_ASSERT_LT_ERROR(recvThresholds[comm->getSize() - 1], 1, "invalid hilbert index");
+PRINT(*comm);    
     // merge to get quantities //Problem: nodes are not sorted according to their hilbert indices, so accesses are not aligned.
     // Need to sort before and after communication
     assert(std::is_sorted(recvThresholds.begin(), recvThresholds.end()));
@@ -895,7 +895,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     std::sort(permutation.begin(), permutation.end(), [&](IndexType i, IndexType j) {
         return hilbertIndices[i] < hilbertIndices[j];
     });
-
+PRINT(*comm);
     //now sorting hilbert indices themselves
     std::sort(hilbertIndices.begin(), hilbertIndices.end());
     std::vector<IndexType> quantities(comm->getSize(), 0);
@@ -912,7 +912,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
             quantities[p]++;
         }
     }
-
+PRINT(*comm);
     SCAI_REGION_START("HilbertCurve.redistribute.communicationPlan")
 
     // allocate sendPlan
@@ -923,7 +923,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     scai::dmemo::CommunicationPlan recvPlan = comm->transpose( sendPlan );
     IndexType newLocalN = recvPlan.totalQuantity();
     SCAI_REGION_END("HilbertCurve.redistribute.communicationPlan")
-
+PRINT(*comm);
     if (settings.verbose) {
         PRINT0(std::to_string(localN) + " old local values "
                + std::to_string(newLocalN) + " new ones.");
@@ -945,7 +945,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     scai::hmemo::HArray<IndexType> indexTransport(newLocalN, recvIndices.data());
     //scai::dmemo::DistributionPtr newDist = scai::dmemo::GeneralDistribution(globalN, indexTransport, comm);
     auto newDist = scai::dmemo::generalDistributionUnchecked(globalN, std::move(indexTransport), comm);
-
+PRINT(*comm);
     SCAI_ASSERT_EQUAL(newDist->getLocalSize(), newLocalN,
                       "wrong size of new distribution");
     for (IndexType i = 0; i < newLocalN; i++) {
@@ -979,6 +979,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
                 }
             }
         }
+PRINT(*comm);        
         // same for node weights
         for (IndexType w = 0; w < numNodeWeights; w++) {
             if (nodesUnweighted) {

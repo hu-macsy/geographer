@@ -207,7 +207,6 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
             std::chrono::duration<double> elapTimeFMStep = std::chrono::system_clock::now() - beforeFMStep;
             ValueType FMStepTime = comm->max( elapTimeFMStep.count() );
-            //PRINT0(" one FM step time: " << FMStepTime );
 
             if (numRefinementRounds > 0) {
                 assert(gain >= 0);
@@ -235,7 +234,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         }
         std::chrono::duration<double> elapTime2 = std::chrono::system_clock::now() - before;
         ValueType refineTime = comm->max( elapTime2.count() );
-        //PRINT0("local refinement time: " << refineTime );
+        PRINT0("local refinement time: " << refineTime );
     }
 
     if( settings.debugMode and settings.outFile.size() > 0 ) {

@@ -152,7 +152,7 @@ struct Settings {
     */
     //@{
     IndexType numBlocks = 2; 	///< number of blocks to partition to
-    double epsilon = 0.03;		///< maximum allowed imbalance of the output partition
+    ValueType epsilon = 0.03;		///< maximum allowed imbalance of the output partition
     bool repartition = false; 	///< set to true to respect the initial partition
 
     ITI::Tool initialPartition = ITI::Tool::geoKmeans;			///< the tool to use to get the initial partition, \sa Tool
