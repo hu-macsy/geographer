@@ -228,4 +228,12 @@ private:
     static std::vector<std::vector<ValueType>> Hilbert3DIndex2PointVec(const std::vector<ValueType> indices, IndexType recursionDepth);
 
 };
+
+
+template<typename T>
+MPI_Datatype getMPIType();
+
+template<typename T1, typename T2>
+MPI_Datatype getMPITypePair();
+
 }//namespace ITI

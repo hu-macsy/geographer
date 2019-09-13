@@ -93,7 +93,8 @@ DenseVector<IndexType> HilbertCurve<IndexType, ValueType>::computePartition(cons
         SCAI_REGION( "HilbertCurve.computePartition.sorting" );
         //TODO: maybe call getSortedHilbertIndices here?
         int typesize;
-        MPI_Type_size(MPI_DOUBLE_INT, &typesize);
+        //MPI_Type_size(MPI_DOUBLE_INT, &typesize);
+        MPI_Type_size(getMPITypePair<ValueType,IndexType>(), &typesize);
         //assert(typesize == sizeof(sort_pair)); //not valid for int_double, presumably due to padding
 
         std::vector<sort_pair> localPairs(localN);
@@ -115,7 +116,8 @@ DenseVector<IndexType> HilbertCurve<IndexType, ValueType>::computePartition(cons
         //call distributed sort
         //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
         MPI_Comm mpi_comm = MPI_COMM_WORLD;
-        JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
+        //JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
+        JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>());
 
         //copy indices into array
         const IndexType newLocalN = localPairs.size();
@@ -793,14 +795,16 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
         SCAI_REGION( "HilbertCurve.getSortedHilbertIndices.sorting" );
 
         int typesize;
-        MPI_Type_size(MPI_DOUBLE_INT, &typesize);
+        //MPI_Type_size(MPI_DOUBLE_INT, &typesize);
+        MPI_Type_size(getMPITypePair<ValueType,IndexType>(), &typesize);
         //assert(typesize == sizeof(sort_pair)); does not have to be true anymore due to padding
 
 
         //call distributed sort
         //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
         MPI_Comm mpi_comm = MPI_COMM_WORLD;
-        JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
+        //JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
+        JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>());
 
         //copy hilbert indices into array
 
@@ -870,8 +874,9 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     }
 
     MPI_Comm mpi_comm = MPI_COMM_WORLD; //TODO: cast the communicator ptr to a MPI communicator and get getMPIComm()?
-    JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
-    //IndexType newLocalN = localPairs.size();
+    //JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
+    JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>() );
+    
     migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
     metrics.MM["timeMigrationAlgo"] = migrationCalculation.count();
     std::chrono::time_point < std::chrono::system_clock > beforeMigration = std::chrono::system_clock::now();
@@ -882,7 +887,8 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     std::vector<ValueType> sendThresholds(comm->getSize(), minLocalIndex.value);
     std::vector<ValueType> recvThresholds(comm->getSize());
 
-    MPI_Datatype MPI_ValueType = MPI_DOUBLE; //TODO: properly template this
+    //MPI_Datatype MPI_ValueType = MPI_DOUBLE; //TODO: properly template this
+    MPI_Datatype MPI_ValueType = getMPIType<ValueType>();
     MPI_Alltoall(sendThresholds.data(), 1, MPI_ValueType, recvThresholds.data(),
                  1, MPI_ValueType, mpi_comm); //TODO: replace this monstrosity with a proper call to LAMA
     //comm->all2all(recvThresholds.data(), sendTresholds.data());//TODO: maybe speed up with hypercube
@@ -1069,7 +1075,35 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
 
     return comm->all( isSorted );
 }
+//-------------------------------------------------------------------------------------------------
 
+//template function to get a MPI datatype. These are on purpose outside
+// the class because we cannot specialize them without specializing
+// the whole class. Maybe doing so it not a problem...
+
+//template<typename IndexType, typename ValueType>
+template<>
+MPI_Datatype getMPIType<float>(){
+ return MPI_FLOAT;
+}
+
+//template<typename IndexType, typename ValueType>
+template<>
+MPI_Datatype getMPIType<double>(){
+    return MPI_DOUBLE ;
+}
+
+template<>
+MPI_Datatype getMPITypePair<double,IndexType>(){
+    return MPI_DOUBLE_INT;
+}
+
+template<>
+MPI_Datatype getMPITypePair<float,IndexType>(){
+    return MPI_FLOAT_INT;
+}
+
+//-------------------------------------------------------------------------------------------------
 
 template class HilbertCurve<IndexType, ValueType>;
 //this instantiation does not work
