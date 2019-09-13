@@ -50,22 +50,22 @@ TEST_F(FileIOTest, testWriteMetis_Dist_3D) {
     std::vector<ValueType> maxCoord= { 10, 20, 30};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
     std::cout<<"Building mesh of size "<< numPoints[0]<< "x"<< numPoints[1]<< "x"<< numPoints[2] << " , N=" << N <<std::endl;
-PRINT("*****");
+
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution( N ));
-PRINT("*****");
+
     std::vector<DenseVector<ValueType>> coords(3);
     for(IndexType i=0; i<3; i++) {
         coords[i].allocate(dist);
         coords[i] = static_cast<ValueType>( 0 );
     }
-PRINT("*****");
+
     auto adjM = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( dist, noDistPointer);
-PRINT("*****");
+
     // create the adjacency matrix and the coordinates
     MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(adjM, coords, maxCoord, numPoints, 3);
-PRINT("*****");
+
     // write the mesh in p(=number of PEs) files
     FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, graphPath+"dist3D_");
 
@@ -245,7 +245,6 @@ TEST_F(FileIOTest, testWriteCoordsDistributed) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, nodes) );
-    //scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution( nodes ));
 
     // every PE reads its own part of the coordinates based on a block distribution
     std::vector<DenseVector<ValueType>> coords2D = FileIO<IndexType, ValueType>::readCoords( coordFile, nodes, dim);
@@ -378,8 +377,7 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat) {
     IndexType N, dimensions;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    //scai::dmemo::DistributionPtr distPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, nodes) );
-
+    
     ITI::Format ff = ITI::Format::MATRIXMARKET;
 
     std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
@@ -581,7 +579,7 @@ TEST_F (FileIOTest, testWriteDenseVectorCentral) {
 TEST_F (FileIOTest, testreadOFFCentral) {
     std::string file = graphPath+ "2.off";
 
-    // open file and read number of ndoes and edges
+    // open file and read number of nodes and edges
     //
 
     IndexType numVertices, numEdges;
