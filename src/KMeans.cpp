@@ -506,7 +506,7 @@ DenseVector<IndexType> assignBlocks(
     const DenseVector<IndexType> &previousAssignment,
     const DenseVector<IndexType> &oldBlock, // if repartition, this is the prtition to be rebalanced
     const std::vector<std::vector<ValueType>> &targetBlockWeights,
-    const SpatialCell &boundingBox,
+    const SpatialCell<ValueType> &boundingBox,
     std::vector<ValueType> &upperBoundOwnCenter,
     std::vector<ValueType> &lowerBoundNextCenter,
     std::vector<std::vector<ValueType>> &influence,

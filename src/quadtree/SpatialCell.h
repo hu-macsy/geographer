@@ -19,7 +19,7 @@
 
 #include "Point.h"
 
-#include "config.h"
+//#include "config.h"
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
@@ -27,8 +27,8 @@ namespace ITI {
 
 /** Spatial cell class used by spatial tree to create a tree that stores point for faster search.
 */
-
-class SpatialCell : public std::enable_shared_from_this<SpatialCell> {
+template <typename ValueType>
+class SpatialCell : public std::enable_shared_from_this<SpatialCell<ValueType>> {
     friend class QuadTreeTest;
 public:
     SpatialCell() = default;
@@ -568,11 +568,11 @@ public:
      *  in SpatialTree::getGraphFromForest(...).
      */
     //TODO: graphNgbrsCells, is initialised only in case of forest. If we have a tree is empty, right???
-    template<typename IndexType, typename ValueType>
+    template<typename IndexType>
     scai::lama::CSRSparseMatrix<ValueType> getSubTreeAsGraph(
-        std::vector< std::set<std::shared_ptr<const SpatialCell>>>& graphNgbrsCells,
+        std::vector< std::set<std::shared_ptr<const SpatialCell<ValueType>>>>& graphNgbrsCells,
         std::vector<std::vector<ValueType>>& coords,
-        std::queue<std::shared_ptr<const SpatialCell>> frontier = std::queue<std::shared_ptr<const SpatialCell>>()) const {
+        std::queue<std::shared_ptr<const SpatialCell<ValueType>>> frontier = std::queue<std::shared_ptr<const SpatialCell<ValueType>>>()) const {
         SCAI_REGION("SpatialCell.getSubTreeAsGraph");
         unsigned int treeSize= graphNgbrsCells.size();
 

@@ -2077,8 +2077,7 @@ std::vector<IndexType> GraphUtils<IndexType, ValueType>::indexReorderCantor(cons
 }
 //-----------------------------------------------------------------------------------
 
-
-//template class GraphUtils<int, double>;
-template class GraphUtils<IndexType, ValueType>;
+template class GraphUtils<IndexType, double>;
+template class GraphUtils<IndexType, float>;
 
 } /* namespace ITI */

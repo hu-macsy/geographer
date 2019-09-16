@@ -212,8 +212,8 @@ struct Settings {
 //makes more sense to be a percentage of the nodes, not a number. Or not?
     IndexType minSamplingNodes = 100;		///< the starting number of sampled nodes. If set to -1, all nodes are considered from the start
 
-    ValueType influenceExponent = 0.5;
-    ValueType influenceChangeCap = 0.1;
+    double influenceExponent = 0.5;
+    double influenceChangeCap = 0.1;
     IndexType balanceIterations = 20;		///< maximum number of iteration to do in order to achieve balance
     IndexType maxKMeansIterations = 50;		///< maximum number of global k-means iterations
     bool tightenBounds = false;

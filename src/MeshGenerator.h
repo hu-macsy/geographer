@@ -47,8 +47,6 @@ template <typename IndexType, typename ValueType>
 class MeshGenerator {
 public:
 
-
-
     /** Creates a uniform 3D mesh and writes it to a file (as a graph) using the METIS format.
 
     @param[in] numPoints The number of points in every dimension
@@ -115,7 +113,7 @@ private:
 
     /**  Create a graph and coordinates from a quadtree.
     */
-    static void graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid &quad);
+    static void graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid<ValueType> &quad);
 
     /** Creates random points in the cube for the given dimension, points in [0,maxCoord]^dim.
      */

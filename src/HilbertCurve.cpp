@@ -1046,9 +1046,7 @@ MPI_Datatype getMPITypePair<float,IndexType>(){
 
 //-------------------------------------------------------------------------------------------------
 
-//template class HilbertCurve<IndexType, ValueType>;
 template class HilbertCurve<IndexType, double>;
 template class HilbertCurve<IndexType, float>;
-
 
 } //namespace ITI

@@ -22,7 +22,8 @@ namespace ITI {
 
 */
 
-class QuadTreeCartesianEuclid : public ITI::SpatialTree {
+template <typename ValueType>
+class QuadTreeCartesianEuclid : public ITI::SpatialTree<ValueType> {
     friend class QuadTreeCartesianEuclidTest;
 public:
     /**
@@ -33,7 +34,7 @@ public:
      *
      */
     QuadTreeCartesianEuclid(Point<ValueType> lower = Point<ValueType>({0.0, 0.0}), Point<ValueType> upper = Point<ValueType>({1.0, 1.0}), bool theoreticalSplit=true, count capacity=1000) {
-        this->root = std::shared_ptr<QuadNodeCartesianEuclid>(new QuadNodeCartesianEuclid(lower, upper, capacity, theoreticalSplit));
+        this->root = std::shared_ptr<QuadNodeCartesianEuclid<ValueType>>(new QuadNodeCartesianEuclid<ValueType>(lower, upper, capacity, theoreticalSplit));
     }
 
 //	void extractCoordinates(std::vector<Point<ValueType> > &posContainer) const {

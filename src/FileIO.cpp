@@ -6,7 +6,6 @@
  */
 
 #include "FileIO.h"
-#include "CommTree.h"
 
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
@@ -1939,10 +1938,10 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
     if(file.fail())
         throw std::runtime_error("Reading file "+ filename+ " failed.");
 
-    std::map<std::vector<ValueType>, std::shared_ptr<SpatialCell>> nodeMap;
+    std::map<std::vector<ValueType>, std::shared_ptr<SpatialCell<ValueType>>> nodeMap;
     std::map<std::vector<ValueType>, std::set<std::vector<ValueType>>> pendingEdges;
     std::map<std::vector<ValueType>, std::set<std::vector<ValueType>>> confirmedEdges;
-    std::set<std::shared_ptr<SpatialCell> > roots;
+    std::set<std::shared_ptr<SpatialCell<ValueType>> > roots;
 
     IndexType duplicateNeighbors = 0;
 
@@ -1996,7 +1995,7 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
         std::tie(minCoords, maxCoords) = getBoundingCoords(ownCoords, level);
 
         //create own cell and add to node map
-        std::shared_ptr<QuadNodeCartesianEuclid> quadNodePointer(new QuadNodeCartesianEuclid(minCoords, maxCoords));
+        std::shared_ptr<QuadNodeCartesianEuclid<ValueType>> quadNodePointer(new QuadNodeCartesianEuclid<ValueType>( Point<ValueType>(minCoords), Point<ValueType>(maxCoords)) );
         assert(nodeMap.count(ownCoords) == 0);
         nodeMap[ownCoords] = quadNodePointer;
         assert(confirmedEdges.count(ownCoords) == 0);
@@ -2015,7 +2014,7 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
         //check for parent pointer
         if (parentCoords[0] != -1 && nodeMap.count(parentCoords) == 0) {
             std::tie(minCoords, maxCoords) = getBoundingCoords(parentCoords, level+1);
-            std::shared_ptr<QuadNodeCartesianEuclid> parentPointer(new QuadNodeCartesianEuclid(minCoords, maxCoords));
+            std::shared_ptr<QuadNodeCartesianEuclid<ValueType>> parentPointer(new QuadNodeCartesianEuclid<ValueType>(minCoords, maxCoords));
             nodeMap[parentCoords] = parentPointer;
             assert(confirmedEdges.count(parentCoords) == 0);
             confirmedEdges[parentCoords] = {};
@@ -2107,7 +2106,7 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
     assert(nodesInForest == nodeMap.size());
 
     //check whether all nodes have either no or the full amount of children
-    for (std::pair<std::vector<ValueType>, std::shared_ptr<SpatialCell>> elems : nodeMap) {
+    for (std::pair<std::vector<ValueType>, std::shared_ptr<SpatialCell<ValueType>>> elems : nodeMap) {
         bool consistent = elems.second->isConsistent();
         if (!consistent) {
             std::vector<ValueType> coords = elems.first;
@@ -2121,7 +2120,7 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
     IndexType totalEdges = 0;
     IndexType numLeaves = 0;
     IndexType leafEdges = 0;
-    std::vector<std::set<std::shared_ptr<SpatialCell> > > result(nodeMap.size());
+    std::vector<std::set<std::shared_ptr<SpatialCell<ValueType>> > > result(nodeMap.size());
     for (std::pair<std::vector<ValueType>, std::set<std::vector<ValueType> > > edgeSet : confirmedEdges) {
         result[i] = {};
         for (std::vector<ValueType> neighbor : edgeSet.second) {
@@ -2155,23 +2154,23 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
         offset = root->indexSubtree(offset);
     }
 
-    std::vector<std::shared_ptr<const SpatialCell> > rootVector(roots.begin(), roots.end());
+    std::vector<std::shared_ptr<const SpatialCell<ValueType>> > rootVector(roots.begin(), roots.end());
 
     coords.clear();
     coords.resize(dimension);
 
     std::vector<std::vector<ValueType> > vCoords(dimension);
-    std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells(nodesInForest);
+    std::vector< std::set<std::shared_ptr<const SpatialCell<ValueType>>>> graphNgbrsCells(nodesInForest);
 
     for (auto outgoing : confirmedEdges) {
-        std::set<std::shared_ptr<const SpatialCell>> edgeSet;
+        std::set<std::shared_ptr<const SpatialCell<ValueType>>> edgeSet;
         for (std::vector<ValueType> edgeTarget : outgoing.second) {
             edgeSet.insert(nodeMap[edgeTarget]);
         }
         graphNgbrsCells[nodeMap[outgoing.first]->getID()] = edgeSet;
     }
 
-    scai::lama::CSRSparseMatrix<ValueType> matrix = SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsCells, rootVector, vCoords);
+    scai::lama::CSRSparseMatrix<ValueType> matrix = SpatialTree<ValueType>::template getGraphFromForest<IndexType>( graphNgbrsCells, rootVector, vCoords);
 
     for (IndexType d = 0; d < dimension; d++) {
         assert(vCoords[d].size() == numLeaves);
@@ -2343,7 +2342,7 @@ CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const st
 
         for( unsigned int w=0; w<numWeights; w++) {
             ss >> tok;
-            weights[w] = std::stod(tok);
+            weights[w] = ValueType(std::stod(tok));
         }
 
         cNode node(hierarchy, weights );
@@ -2400,6 +2399,9 @@ void FileIO<IndexType, ValueType>::trim(std::string &s) {
 
 //---------------------------------------------------------------------------
 
-template class FileIO<IndexType, ValueType>;
+
+template class FileIO<IndexType, double>;
+
+template class FileIO<IndexType, float>;
 
 } /* namespace ITI */

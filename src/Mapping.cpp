@@ -483,5 +483,6 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::applySfcRenumber(
 }//applySfcRenumber
 
 //to force instantiation
-template class Mapping<IndexType, ValueType>;
+template class Mapping<IndexType, double>;
+template class Mapping<IndexType, float>;
 }

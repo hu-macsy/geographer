@@ -22,7 +22,8 @@ using std::cos;
 
 namespace ITI {
 
-class QuadNodeCartesianEuclid : public ITI::SpatialCell {
+template <typename ValueType>
+class QuadNodeCartesianEuclid : public ITI::SpatialCell<ValueType> {
     friend class QuadTreeTest;
 private:
     static const long unsigned sanityNodeLimit = 10E15; //just assuming, for debug purposes, that this algorithm never runs on machines with more than 4 Petabyte RAM
@@ -42,7 +43,7 @@ public:
      *
      */
     QuadNodeCartesianEuclid(Point<ValueType> lower = Point<ValueType>({0.0, 0.0}), Point<ValueType> upper = Point<ValueType>({1.0, 1.0}), unsigned capacity = 1000, bool splitTheoretical = false)
-        : SpatialCell(lower, upper, capacity)	{
+        : SpatialCell<ValueType>(lower, upper, capacity)	{
         this->splitTheoretical = splitTheoretical;
     }
 
@@ -97,13 +98,13 @@ public:
     bool isConsistent() const override {
         if (this->isLeaf) {
             if (this->children.size() != 0) {
-                std::cout << children.size() << " children found in node marked as leaf." << std::endl;
+                std::cout << this->children.size() << " children found in node marked as leaf." << std::endl;
                 return false;
             }
         } else {
-            index expectedChildren = (1 << minCoords.getDimensions());
+            index expectedChildren = (1 << this->minCoords.getDimensions());
             if (this->children.size() != expectedChildren) {
-                std::cout << "Expected " << expectedChildren << " children in internal node, got " << children.size() << std::endl;
+                std::cout << "Expected " << expectedChildren << " children in internal node, got " << this->children.size() << std::endl;
                 return false;
             }
         }
