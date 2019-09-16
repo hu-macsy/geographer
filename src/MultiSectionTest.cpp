@@ -1416,13 +1416,13 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D) {
 
     rectangle bBox2;        // leafID=0 => projection[0]
     bBox2.bottom = {0, 0, 0};
-    bBox2.top = { std::floor(maxCoord[0]/2-1), std::floor(maxCoord[1]*0.75-1), maxCoord[2] };
+    bBox2.top = { ValueType(std::floor(maxCoord[0]/2.0-1)), ValueType(std::floor(maxCoord[1]*0.75-1)), maxCoord[2] };
     ValueType bBox2Weight = (bBox2.top[0]-bBox2.bottom[0]+1)*(bBox2.top[1]-bBox2.bottom[1]+1)*(bBox2.top[2]-bBox2.bottom[2]+1);
     bBox2.weight = bBox2Weight;
     root->insert( bBox2 );
 
     rectangle bBox3;        // leafID=1 => projection[1]
-    bBox3.bottom = {0, std::floor(maxCoord[1]*0.75), 0};
+    bBox3.bottom = {0, ValueType(std::floor(maxCoord[1]*0.75)), 0};
     bBox3.top = { std::floor(maxCoord[0]/2-1), maxCoord[1], maxCoord[2] };
     ValueType bBox3Weight = (bBox3.top[0]-bBox3.bottom[0]+1)*(bBox3.top[1]-bBox3.bottom[1]+1)*(bBox3.top[2]-bBox3.bottom[2]+1);
     bBox3.weight = bBox3Weight;

@@ -954,7 +954,7 @@ TEST_F(QuadTreeTest, DISABLED_benchPolarQuadProbabilisticQueryUniform) {
     std::vector<Point<ValueType> > coordVector;
     QuadTreePolarEuclid quad(minCoords, maxCoords);
     for (index i = 0; i < n; i++) {
-        Point<ValueType> coords = {(ValueType(rand()) / RAND_MAX)*2*M_PI, ValueType(rand()) / RAND_MAX};
+        Point<ValueType> coords = { ValueType((ValueType(rand()) / RAND_MAX)*2*M_PI), ValueType(rand()) / RAND_MAX};
         quad.addContent(i, coords);
         coordVector.push_back(coords);
     }
@@ -979,7 +979,7 @@ TEST_F(QuadTreeTest, DISABLED_benchPolarKDProbabilisticQueryUniform) {
     std::vector<Point<ValueType> > coordVector;
     KDTreeEuclidean<false> tree(minCoords, maxCoords);
     for (index i = 0; i < n; i++) {
-        std::vector<ValueType> coords = {(ValueType(rand()) / RAND_MAX)*2*M_PI, ValueType(rand()) / RAND_MAX};
+        std::vector<ValueType> coords = { ValueType( (ValueType(rand()) / RAND_MAX)*2*M_PI), ValueType(rand()) / RAND_MAX};
         tree.addContent(i, coords);
         coordVector.push_back(coords);
     }
