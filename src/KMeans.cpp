@@ -66,7 +66,7 @@ Settings settings) {
     std::vector<IndexType> sortedLocalIndices(localN);
     {
         // get local hilbert indices
-        std::vector<ValueType> sfcIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
+        std::vector<double> sfcIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
         SCAI_ASSERT_EQ_ERROR(sfcIndices.size(), localN, "wrong local number of indices (?) ");
 
         // prepare indices for sorting

@@ -569,7 +569,7 @@ TEST_F(HilbertCurveTest, testGetSortedHilbertIndices_Distributed) {
         }
 
         //take local hilbert indices and verify that they are sorted
-        std::vector<ValueType> localHilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coords, settings.sfcResolution+1, settings.dimensions);
+        std::vector<double> localHilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coords, settings.sfcResolution+1, settings.dimensions);
 
         EXPECT_EQ( newLocalN, localHilbertIndices.size() );
 

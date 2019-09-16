@@ -409,7 +409,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::getSfcRenumber(
     //get the sfc index of the centers
     //
 
-    std::vector<ValueType> centerSFC;
+    std::vector<double> centerSFC;
 
     //convert to vector<DenseVector> in order to call getHilbertIndexVector
     {

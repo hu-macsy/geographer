@@ -78,7 +78,7 @@ public:
     *
     * @return A value in the unit interval [0,1]
     */
-    static ValueType getHilbertIndex(ValueType const *point, const IndexType dimensions, const IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+    static double getHilbertIndex(ValueType const *point, const IndexType dimensions, const IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 
     /** @brief Gets a vector of 2D/3D coordinates and returns a vector with the  hilbert indices for all coordinates.
      *
@@ -88,7 +88,7 @@ public:
      *
      * @return A vector with the hilbert indices for every local point. return.size()=coordinates[0].size()
      */
-    static std::vector<ValueType> getHilbertIndexVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth, const IndexType dimensions);
+    static std::vector<double> getHilbertIndexVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth, const IndexType dimensions);
 
     //
     //reverse: from hilbert index to 2D/3D point
@@ -164,11 +164,11 @@ public:
 private:
     /** @brief Accepts a 2D point and returns is hilbert index.
      */
-    static ValueType getHilbertIndex2D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+    static double getHilbertIndex2D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 
     /** @brief Gets a vector of coordinates in 2D as input and returns a vector with the hilbert indices for all coordinates.
      */
-    static std::vector<ValueType> getHilbertIndex2DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth);
+    static std::vector<double> getHilbertIndex2DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth);
     /**
     *@brief Accepts a point in 3 dimensions and calculates where along the hilbert curve it lies.
     *
@@ -181,12 +181,12 @@ private:
     *
     * @return A value in the unit interval [0,1]
     */
-    static ValueType getHilbertIndex3D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+    static double getHilbertIndex3D(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 
     /* Gets a vector of coordinates (either 2D or 3D) as input and returns a vector with the
      * hilbert indices for all coordinates.
      */
-    static std::vector<ValueType> getHilbertIndex3DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth);
+    static std::vector<double> getHilbertIndex3DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth);
 
     //
     //reverse: from hilbert index to 2D/3D point
