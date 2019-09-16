@@ -172,16 +172,22 @@ DenseVector<IndexType> HilbertCurve<IndexType, ValueType>::computePartition(cons
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>//TODO: template this to help branch prediction
-ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
+ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(ValueType const * point, const IndexType dimensions, const IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
     SCAI_REGION( "HilbertCurve.getHilbertIndex_newVersion")
 
+    size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
+    IndexType newRecursionDepth = recursionDepth;
+    if (recursionDepth > bitsInValueType/dimensions) {
+        newRecursionDepth = IndexType(bitsInValueType/dimensions);
+        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        PRINT0("*** Warning: Requested space-filling curve with precision " << recursionDepth << " but return datatype only holds " <<bitsInValueType/dimensions << ". Setting recursion depth to " << newRecursionDepth);
+    }
+
     if(dimensions==2)
-        return HilbertCurve<IndexType, ValueType>::getHilbertIndex2D( point, dimensions, recursionDepth,
-                minCoords, maxCoords);
+        return HilbertCurve<IndexType, ValueType>::getHilbertIndex2D( point, dimensions, newRecursionDepth, minCoords, maxCoords);
 
     if(dimensions==3)
-        return HilbertCurve<IndexType, ValueType>::getHilbertIndex3D( point, dimensions, recursionDepth,
-                minCoords, maxCoords);
+        return HilbertCurve<IndexType, ValueType>::getHilbertIndex3D( point, dimensions, newRecursionDepth, minCoords, maxCoords);
 
     throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
 }
@@ -191,14 +197,6 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(ValueType const * 
 template<typename IndexType, typename ValueType>
 ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const* point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
     SCAI_REGION("HilbertCurve.getHilbertIndex2D")
-
-    size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
-    if (recursionDepth > bitsInValueType/dimensions) {
-        recursionDepth = IndexType(bitsInValueType/dimensions);
-        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
-            + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
-    }
 
     std::vector<ValueType> scaledCoord(dimensions);
 
@@ -257,14 +255,6 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
 
     if (dimensions != 3) {
         throw std::logic_error("Space filling curve for 3 dimensions.");
-    }
-
-    size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
-    if ((unsigned int) recursionDepth > bitsInValueType/dimensions) {
-        recursionDepth = IndexType(bitsInValueType/dimensions);
-        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
-            + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
     }
 
     std::vector<ValueType> scaledCoord(dimensions);
@@ -361,12 +351,21 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
 template<typename IndexType, typename ValueType>
 std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndexVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth, const IndexType dimensions) {
 
+    size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
+    IndexType newRecursionDepth = recursionDepth;
+
+    if (recursionDepth > bitsInValueType/dimensions) {
+        newRecursionDepth = IndexType(bitsInValueType/dimensions);
+        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        PRINT0("Requested space-filling curve with precision " << recursionDepth << " but return datatype only holds " << bitsInValueType/dimensions << ". Setting recursion depth to " << newRecursionDepth);
+    }
+
     if(dimensions==2) {
-        return HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector( coordinates, recursionDepth);
+        return HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector( coordinates, newRecursionDepth);
     }
 
     if(dimensions==3) {
-        return HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVector( coordinates, recursionDepth);
+        return HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVector( coordinates, newRecursionDepth);
     }
 
     throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
@@ -379,14 +378,6 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
     SCAI_REGION("HilbertCurve.getHilbertIndex2DVector")
 
     const IndexType dimensions = coordinates.size();
-
-    size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
-    if (recursionDepth > bitsInValueType/dimensions) {
-        recursionDepth = IndexType(bitsInValueType/dimensions);
-        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
-            + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
-    }
 
     if( dimensions!=2 ) {
         const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -430,6 +421,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
         scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
         scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
         //scai::hmemo::WriteOnlyAccess<ValueType> hilbertIndices(hilbertIndices.getLocalValues());
+        const unsigned long divisor = size_t(1) << size_t(2*int(recursionDepth));
 
         for (IndexType i = 0; i < localN; i++) {
             scaledPoint[0] = (coordAccess0[i]-minCoords[0])/dim0Extent;
@@ -468,7 +460,6 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
                 //std::cout<< subSquare<<std::endl;
                 integerIndex = (integerIndex << 2) | subSquare;
             }
-            unsigned long divisor = size_t(1) << size_t(2*int(recursionDepth));
             hilbertIndices[i] = ValueType(integerIndex) / ValueType(divisor);
         }
     }
@@ -483,14 +474,6 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
     SCAI_REGION("HilbertCurve.getHilbertIndex3DVector")
 
     const IndexType dimensions = coordinates.size();
-
-    size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
-    if (recursionDepth > bitsInValueType/dimensions) {
-        recursionDepth = IndexType(bitsInValueType/dimensions);
-        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
-            + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
-    }
 
     if( dimensions!=3 ) {
         const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -533,6 +516,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
         scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
         scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
         //scai::hmemo::WriteOnlyAccess<ValueType> hilbertIndices(hilbertIndices.getLocalValues());
+        const unsigned long long divisor = size_t(1) << size_t(3*int(recursionDepth));
 
         for (IndexType i = 0; i < localN; i++) {
             x = (coordAccess0[i]-minCoords[0])/dim0Extent;
@@ -599,7 +583,6 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
                 }
                 integerIndex = (integerIndex << 3) | subSquare;
             }
-            unsigned long long divisor = size_t(1) << size_t(3*int(recursionDepth));
             hilbertIndices[i] = ValueType(integerIndex) / ValueType(divisor);
         }
     }
@@ -1105,8 +1088,9 @@ MPI_Datatype getMPITypePair<float,IndexType>(){
 
 //-------------------------------------------------------------------------------------------------
 
-template class HilbertCurve<IndexType, ValueType>;
-//this instantiation does not work
-//template class HilbertCurve<int, double>;
+//template class HilbertCurve<IndexType, ValueType>;
+template class HilbertCurve<IndexType, double>;
+template class HilbertCurve<IndexType, float>;
+
 
 } //namespace ITI

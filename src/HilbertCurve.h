@@ -78,7 +78,7 @@ public:
     *
     * @return A value in the unit interval [0,1]
     */
-    static ValueType getHilbertIndex(ValueType const *point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
+    static ValueType getHilbertIndex(ValueType const *point, const IndexType dimensions, const IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords);
 
     /** @brief Gets a vector of 2D/3D coordinates and returns a vector with the  hilbert indices for all coordinates.
      *

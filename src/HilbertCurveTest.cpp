@@ -15,6 +15,7 @@
 #include <fstream>
 #include <iostream>
 #include <chrono>
+#include <type_traits>
 
 #include "GraphUtils.h"
 #include "gtest/gtest.h"
@@ -22,10 +23,7 @@
 #include "MeshGenerator.h"
 #include "FileIO.h"
 
-
 using namespace scai;
-
-using namespace std; //should be avoided, but better here than in header file
 
 namespace ITI {
 
@@ -47,7 +45,7 @@ TEST_P(HilbertCurveTest, testHilbertIndexUnitSquare_Local) {
     ASSERT_GE(dimensions, 2);
     ASSERT_LE(dimensions, 3);
 
-    const IndexType recursionDepth = 11;
+    const IndexType recursionDepth = 10;
     IndexType N;
 
     std::vector<ValueType> maxCoords(dimensions);
@@ -213,7 +211,7 @@ TEST_F(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
 */
 TEST_P(HilbertCurveTest, testHilbertIndexRandom_Distributed) {
     const IndexType dimensions = GetParam();
-    const IndexType N = 200000;
+    const IndexType N = 20;
     const IndexType recursionDepth = 19;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -225,7 +223,12 @@ TEST_P(HilbertCurveTest, testHilbertIndexRandom_Distributed) {
         coordinates[i].allocate(dist);
         coordinates[i] = static_cast<ValueType>( 0 );
     }
-
+if( std::is_same<ValueType,float>::value ){
+    PRINT0("ValueType is float");
+}
+if (std::is_same<ValueType,double>::value){
+    PRINT0("ValueType is double");
+}
     //broadcast seed value from root to ensure equal pseudorandom numbers.
     ValueType seed[1] = {static_cast<ValueType>(time(NULL))};
     comm->bcast( seed, 1, 0 );
@@ -376,7 +379,6 @@ TEST_F(HilbertCurveTest, testStrucuturedHilbertPoint2IndexWriteInFile_Distribute
 }
 //-------------------------------------------------------------------------------------------------
 
-
 TEST_F(HilbertCurveTest, testHilbertRedistribution) {
     std::string fileName = "bigtrace-00000.graph";
     std::string file = graphPath + fileName;
@@ -395,12 +397,14 @@ TEST_F(HilbertCurveTest, testHilbertRedistribution) {
     std::vector<DenseVector<ValueType>> coordCopy(coords);
     Metrics metrics(settings);
 
-    //check sums
+    //get sums
     std::vector<ValueType> coordSum(settings.dimensions);
 
     for (IndexType d = 0; d < settings.dimensions; d++) {
         coordSum[d] = coords[d].sum();
     }
+
+settings.sfcResolution = 10;
 
     HilbertCurve<IndexType, ValueType>::redistribute(coords, nodeWeightsContainer, settings, metrics);
     nodeWeights = nodeWeightsContainer[0];
@@ -413,7 +417,7 @@ TEST_F(HilbertCurveTest, testHilbertRedistribution) {
 
     //check checksum
     for (IndexType d = 0; d < settings.dimensions; d++) {
-        EXPECT_NEAR(coordSum[d], coords[d].sum(), 1e-6*coordSum[d]);
+        EXPECT_NEAR(coordSum[d], coords[d].sum(), 1e-5*coordSum[d]);
     }
 
     //check distribution equality
