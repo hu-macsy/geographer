@@ -2314,7 +2314,7 @@ CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const st
 
     //read by line to create the leaves
 
-    std::vector<cNode> leaves(numPEs);
+    std::vector<cNode<IndexType,ValueType>> leaves(numPEs);
 
     for(int i=0; i<numPEs; i++) {
         bool read = !std::getline(file, line).fail();
@@ -2345,7 +2345,7 @@ CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const st
             weights[w] = ValueType(std::stod(tok));
         }
 
-        cNode node(hierarchy, weights );
+        cNode<IndexType,ValueType> node(hierarchy, weights );
         leaves[i]= node;
     }
 
@@ -2401,7 +2401,6 @@ void FileIO<IndexType, ValueType>::trim(std::string &s) {
 
 
 template class FileIO<IndexType, double>;
-
 template class FileIO<IndexType, float>;
 
 } /* namespace ITI */

@@ -22,6 +22,8 @@
 namespace ITI {
 namespace KMeans {
 
+using point = point<ValueType>;
+
 // base implementation
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<point>> findInitialCentersSFC(

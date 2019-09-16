@@ -34,7 +34,8 @@ namespace KMeans {
 
 
 //to make it more readable
-using point = std::vector<ValueType>;
+template <typename ValueType>
+using point = typename std::vector<ValueType>;
 
 /**
  * @brief Partition a point set using balanced k-means.
@@ -61,7 +62,7 @@ DenseVector<IndexType> computePartition(
     const std::vector<DenseVector<ValueType>> &nodeWeights, \
     const std::vector<std::vector<ValueType>> &blockSizes, \
     const DenseVector<IndexType>& prevPartition,\
-    std::vector<std::vector<point>> centers, \
+    std::vector<std::vector<point<ValueType>>> centers, \
     const Settings settings, \
     struct Metrics &metrics);
 
@@ -166,13 +167,13 @@ DenseVector<IndexType> computeRepartition(
 	@return A vector of vectors of points.
 */
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<point>> findInitialCentersSFC(
-                                 const std::vector<DenseVector<ValueType> >& coordinates,
-                                 const std::vector<ValueType> &minCoords,
-                                 const std::vector<ValueType> &maxCoords,
-                                 const scai::lama::DenseVector<IndexType> &partition,
-                                 const std::vector<cNode> hierLevel,
-                                 Settings settings);
+std::vector<std::vector<point<ValueType>>> findInitialCentersSFC(
+     const std::vector<DenseVector<ValueType> >& coordinates,
+     const std::vector<ValueType> &minCoords,
+     const std::vector<ValueType> &maxCoords,
+     const scai::lama::DenseVector<IndexType> &partition,
+     const std::vector<cNode<IndexType,ValueType>> hierLevel,
+     Settings settings);
 
 /**
  * Find initial centers for k-means by sorting the local points along a space-filling curve.
@@ -238,7 +239,7 @@ std::vector<std::vector<ValueType>> findLocalCenters(
  * @return coordinates of centers
  */
 template<typename IndexType, typename ValueType, typename Iterator>
-std::vector<point> findCenters(
+std::vector<point<ValueType>> findCenters(
     const std::vector<DenseVector<ValueType>> &coordinates,
     const DenseVector<IndexType> &partition,
     const IndexType k,
@@ -310,7 +311,7 @@ template<typename IndexType, typename ValueType, typename Iterator>
 DenseVector<IndexType> assignBlocks(
     const std::vector<std::vector<ValueType>> &coordinates,
     //const std::vector<std::vector<point>> &centers,
-    const std::vector<point>& centers,
+    const std::vector<point<ValueType>>& centers,
     const std::vector<IndexType>& blockSizesPrefixSum,
     const Iterator firstIndex,
     const Iterator lastIndex,
@@ -335,7 +336,7 @@ numPoints*dimensions. In general, if the given 2D vector has size
 A*B, the returned vector has size B*A.
 */
 template<typename IndexType, typename ValueType>
-std::vector<point> vectorTranspose( const std::vector<std::vector<ValueType>>& points);
+std::vector<point<ValueType>> vectorTranspose( const std::vector<std::vector<ValueType>>& points);
 
 } /* namespace KMeans */
 } /* namespace ITI */

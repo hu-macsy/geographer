@@ -15,6 +15,10 @@ namespace ITI {
 */
 struct Metrics {
 
+    //hard code IndexType and ValueType; no need to be templates
+    typedef long int IndexType;
+    typedef double ValueType;
+
     // timing results
     //
 

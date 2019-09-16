@@ -998,6 +998,7 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 //---------------------------------------------------------------------------------------
 
 //to force instantiation
-template class ParcoRepart<IndexType, ValueType>;
+template class ParcoRepart<IndexType, double>;
+template class ParcoRepart<IndexType, float>;
 
 } //namespace ITI

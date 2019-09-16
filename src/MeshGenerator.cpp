@@ -977,9 +977,10 @@ ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<T>
 }
 //-------------------------------------------------------------------------------------------------
 
-template class MeshGenerator<IndexType, ValueType>;
+template class MeshGenerator<IndexType, double>;
+template class MeshGenerator<IndexType, float>;
 
-template ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<IndexType> p1, const std::vector<IndexType> p2);
-template ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<ValueType> p1, const std::vector<ValueType> p2);
+//template ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<IndexType> p1, const std::vector<IndexType> p2);
+//template ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<ValueType> p1, const std::vector<ValueType> p2);
 
 } //namespace ITI

@@ -219,7 +219,7 @@ Settings settings) {
     //
 
     // for all dimensions i: bBox.bottom[i]<bBox.top[i]
-    struct rectangle bBox;
+    struct rectangle<ValueType> bBox;
 
     // at first the bounding box is the whole space
     for(int d=0; d<dim; d++) {
@@ -299,7 +299,7 @@ IndexType MultiSection<IndexType, ValueType>::projectAnd1Dpartition(
 
         // choose the dimension to project for each leaf/rectangle
         for( IndexType l=0; l<allLeaves.size(); l++) {
-            struct rectangle thisRectangle = allLeaves[l]->getRect();
+            struct rectangle<ValueType> thisRectangle = allLeaves[l]->getRect();
             ValueType maxExtent = 0;
             for(int d=0; d<dim; d++) {
                 ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
@@ -334,14 +334,14 @@ IndexType MultiSection<IndexType, ValueType>::projectAnd1Dpartition(
             SCAI_ASSERT( std::accumulate(thisProjection.begin(), thisProjection.end(), 0.0)==std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0.0), "Weights are wrong for leaf "<< l << ": totalWeight of thisProjection= "  << std::accumulate(thisProjection.begin(), thisProjection.end(), 0.0) << " , total weight of weightPerPart= " << std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0.0) );
 
             //TODO: make sure that projections[l] and allLeaves[l] refer to the same rectangle
-            struct rectangle thisRectangle = allLeaves[l]->getRect();
+            struct rectangle<ValueType> thisRectangle = allLeaves[l]->getRect();
 
             ValueType optWeight = thisRectangle.weight/(*thisDimCuts);
             ValueType maxWeight = 0;
 
             // create the new rectangles and add them to the queue
             //ValueType dbg_rectW=0;
-            struct rectangle newRect;
+            struct rectangle<ValueType> newRect;
             newRect.bottom = thisRectangle.bottom;
             newRect.top = thisRectangle.top;
 
@@ -724,7 +724,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
     const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
 
     // for all dimensions i: bBox.bottom[i]<bBox.top[i]
-    struct rectangle bBox;
+    struct rectangle<ValueType> bBox;
 
     // at first the bounding box is the whole space
     for(int d=0; d<dim; d++) {
@@ -811,7 +811,7 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
 
         // choose the dimension to project for all leaves/rectangles
         for( IndexType l=0; l<allLeaves.size(); l++) {
-            struct rectangle thisRectangle = allLeaves[l]->getRect();
+            struct rectangle<ValueType> thisRectangle = allLeaves[l]->getRect();
             maxExtent = 0;
             for(int d=0; d<dim; d++) {
                 ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
@@ -839,12 +839,12 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
             SCAI_ASSERT_EQ_ERROR( std::accumulate(thisProjection.begin(), thisProjection.end(), 0.0), std::accumulate( weightPerPart.begin(), weightPerPart.end(), 0.0), "Weights are wrong." );
 
             //TODO: make sure that projections[l] and allLeaves[l] refer to the same rectangle
-            struct rectangle thisRectangle = allLeaves[l]->getRect();
+            struct rectangle<ValueType> thisRectangle = allLeaves[l]->getRect();
 
             IndexType thisChosenDim = chosenDim[l];
 
             // create the new rectangles and add them to the queue
-            struct rectangle newRect;
+            struct rectangle<ValueType> newRect;
             newRect.bottom = thisRectangle.bottom;
             newRect.top = thisRectangle.top;
 
@@ -917,7 +917,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
         scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights.getLocalValues() );
         // a pointer to the cell that contains point i
         std::shared_ptr<rectCell<IndexType,ValueType>> thisRectCell;
-        struct rectangle thisRect;
+        struct rectangle<ValueType> thisRect;
 
         for(IndexType i=0; i<localN; i++) {
             SCAI_REGION_START("MultiSection.projection.localProjection.indexAndCopyCoords");
@@ -973,7 +973,7 @@ std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projecti
 // Checks if given index is in the bounding box bBox.
 template<typename IndexType, typename ValueType>
 template<typename T>
-bool MultiSection<IndexType, ValueType>::inBBox( const std::vector<T>& coords, const struct rectangle& bBox) {
+bool MultiSection<IndexType, ValueType>::inBBox( const std::vector<T>& coords, const struct rectangle<ValueType>& bBox) {
     SCAI_REGION("MultiSection.inBBox");
 
     IndexType dimension = bBox.top.size();
@@ -1000,7 +1000,7 @@ bool MultiSection<IndexType, ValueType>::inBBox( const std::vector<T>& coords, c
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, const IndexType sideLen, Settings settings) {
+ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle<ValueType>& bBox, const IndexType sideLen, Settings settings) {
     SCAI_REGION("MultiSection.getRectangleWeight");
 
     const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
@@ -1033,7 +1033,7 @@ template<typename T>
 ValueType MultiSection<IndexType, ValueType>::getRectangleWeight(
     const std::vector<scai::lama::DenseVector<T>> &coordinates,
     const scai::lama::DenseVector<ValueType>& nodeWeights,
-    const struct rectangle& bBox,
+    const struct rectangle<ValueType>& bBox,
     Settings settings) {
     SCAI_REGION("MultiSection.getRectangleWeight");
 
@@ -1066,7 +1066,7 @@ ValueType MultiSection<IndexType, ValueType>::getRectangleWeight(
 
 template<typename IndexType, typename ValueType>
 template<typename T>
-ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<std::vector<T>>& coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle& bBox, Settings settings) {
+ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<std::vector<T>>& coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle<ValueType>& bBox, Settings settings) {
     SCAI_REGION("MultiSection.getRectangleWeight");
 
     const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
@@ -1236,9 +1236,10 @@ std::vector<T> MultiSection<IndexType, ValueType>::indexTo3D(IndexType ind, std:
 // instantiations
 //
 
-template class MultiSection<IndexType, ValueType>;
+template class MultiSection<IndexType, double>;
+template class MultiSection<IndexType, float>;
 
-
+/*
 template IndexType MultiSection<IndexType, ValueType>::projectAnd1Dpartition(
     std::shared_ptr<rectCell<IndexType,ValueType>>& root,
     const std::vector<std::vector<IndexType>>& coordinates,
@@ -1261,5 +1262,6 @@ template std::vector<ValueType> MultiSection<IndexType, ValueType>::indexToCoord
 template scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr  distPtr, const std::vector<std::vector<IndexType>>& localPoints);
 
 template scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::setPartition( std::shared_ptr<rectCell<IndexType,ValueType>> root, const scai::dmemo::DistributionPtr  distPtr, const std::vector<std::vector<ValueType>>& localPoints);
+*/
 
 };

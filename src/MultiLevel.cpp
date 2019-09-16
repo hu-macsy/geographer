@@ -1086,6 +1086,7 @@ scai::lama::CSRSparseMatrix<ValueType> MultiLevel<IndexType, ValueType>::pixeled
 }
 //---------------------------------------------------------------------------------------
 
-template class MultiLevel<IndexType, ValueType>;
+template class MultiLevel<IndexType, double>;
+template class MultiLevel<IndexType, float>;
 
 } // namespace ITI

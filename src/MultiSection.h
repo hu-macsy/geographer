@@ -20,8 +20,9 @@ namespace ITI {
  *
  * Note: This is now using the typedef'd ValueType from config.h
  * */
-struct rectangle {
-
+template<typename ValueType>
+class rectangle {
+public:
     ValueType weight;
 
     // for all i: 0<i<dimension, bottom[i]<top[i]
@@ -143,13 +144,13 @@ class rectCell {
 
 public:
 
-    rectCell( const rectangle rect ) {
+    rectCell( const rectangle<ValueType> rect ) {
         myRect = rect;
         weight = -1;
         isLeaf = true;
     }
 
-    rectCell( const rectangle rect, const ValueType w) {
+    rectCell( const rectangle<ValueType> rect, const ValueType w) {
         myRect = rect;
         weight = w;
         isLeaf = true;
@@ -158,7 +159,7 @@ public:
     /**Insert a rectangle in the tree
      */
     //TODO: not handling the case where a rectangle intersects to rectangles allready in the tree
-    void insert(rectangle& rect) {
+    void insert(rectangle<ValueType>& rect) {
         SCAI_REGION("rectCell.insert");
 
         //check dimension is correct
@@ -356,7 +357,7 @@ public:
 
         for(int l=0; l<numLeaves; l++) {
             std::shared_ptr<rectCell> thisLeaf = allLeaves[l];
-            rectangle thisRect = thisLeaf->getRect();
+            rectangle<ValueType> thisRect = thisLeaf->getRect();
 
             for(int d=0; d<dimension; d++) {
                 f<< thisRect.bottom[d] << " ";
@@ -369,11 +370,11 @@ public:
         }
     }
 
-    rectangle getRect() {
+    rectangle<ValueType> getRect() {
         return myRect;
     }
 
-    std::shared_ptr<rectangle> getRectPtr() {
+    std::shared_ptr<rectangle<ValueType>> getRectPtr() {
         return std::make_shared<rectangle>(myRect);
     }
 
@@ -386,7 +387,7 @@ public:
     }
 
 protected:
-    rectangle myRect;
+    rectangle<ValueType> myRect;
     //std::shared_ptr<rectangle> myRect;
     std::vector<std::shared_ptr<rectCell>> children;
     ValueType weight;
@@ -632,7 +633,7 @@ public:
      *
      */
     template<typename T>
-    static bool inBBox( const std::vector<T>& coords, const struct rectangle& bBox);
+    static bool inBBox( const std::vector<T>& coords, const struct rectangle<ValueType>& bBox);
 
     /** Calculates the weight of the rectangle.
      *
@@ -644,7 +645,7 @@ public:
      */
     static ValueType getRectangleWeight(
         const scai::lama::DenseVector<ValueType>& nodeWeights,
-        const struct rectangle& bBox,
+        const struct rectangle<ValueType>& bBox,
         const IndexType sideLen,
         Settings settings);
 
@@ -655,7 +656,7 @@ public:
     static ValueType getRectangleWeight(
         const std::vector<scai::lama::DenseVector<T>> &coordinates,
         const scai::lama::DenseVector<ValueType>& nodeWeights,
-        const struct rectangle& bBox,
+        const struct rectangle<ValueType>& bBox,
         Settings settings);
 
     /* Overloaded version for the non-uniform grid with different type for coordinates.
@@ -665,7 +666,7 @@ public:
     static ValueType getRectangleWeight(
         const std::vector<std::vector<T>> &coordinates,
         const scai::lama::DenseVector<ValueType>& nodeWeights,
-        const struct rectangle& bBox,
+        const struct rectangle<ValueType>& bBox,
         Settings settings);
 
 

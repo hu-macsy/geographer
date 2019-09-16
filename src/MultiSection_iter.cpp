@@ -60,7 +60,7 @@ IndexType MultiSection<IndexType, ValueType>::iterativeProjectionAndPart(
 
         // choose the dimension to project for each leaf/rectangle
         for( IndexType l=0; l<allLeaves.size(); l++) {
-            struct rectangle thisRectangle = allLeaves[l]->getRect();
+            struct rectangle<ValueType> thisRectangle = allLeaves[l]->getRect();
             ValueType maxExtent = 0;
             for(int d=0; d<dim; d++) {
                 ValueType extent = thisRectangle.top[d] - thisRectangle.bottom[d];
@@ -94,7 +94,7 @@ IndexType MultiSection<IndexType, ValueType>::iterativeProjectionAndPart(
                 SCAI_REGION("MultiSection.getRectanglesNonUniform.forAllRectangles.forLeaves");
 
                 const IndexType thisChosenDim = chosenDim[l];
-                struct rectangle thisRectangle = allLeaves[l]->getRect();
+                struct rectangle<ValueType> thisRectangle = allLeaves[l]->getRect();
                 std::vector<ValueType>& thisHyperplanes = hyperplanes[l];
                 const std::vector<ValueType>& thisProjection = projections[l];
 
@@ -226,9 +226,10 @@ const std::vector<IndexType>& dimensionToProject) {
 // instantiations
 //
 
-template class MultiSection<IndexType, ValueType>;
+template class MultiSection<IndexType, double>;
+template class MultiSection<IndexType, float>;
 
-
+/*
 template IndexType MultiSection<IndexType, ValueType>::iterativeProjectionAndPart(
     std::shared_ptr<rectCell<IndexType,ValueType>> root,
     const std::vector<std::vector<IndexType>>& coordinates,
@@ -242,6 +243,6 @@ template IndexType MultiSection<IndexType, ValueType>::iterativeProjectionAndPar
     const scai::lama::DenseVector<ValueType>& nodeWeights,
     const std::vector<IndexType>& numCuts,
     Settings settings);
-
+*/
 
 }//ITI
