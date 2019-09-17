@@ -404,7 +404,7 @@ protected:
 /** @brief Get a partition of a point set by partitioning in rectangular regions recursively for every dimension.
 */
 
-template <typename IndexType, typename ValueType>
+template<typename IndexType, typename ValueType>
 class MultiSection {
 public:
 
