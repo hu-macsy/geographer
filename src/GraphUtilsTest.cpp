@@ -13,6 +13,7 @@
 
 namespace ITI {
 
+template<typename T>
 class GraphUtilsTest : public ::testing::Test {
 protected:
     // the directory of all the meshes used
@@ -20,11 +21,18 @@ protected:
     const std::string graphPath = projectRoot+"/meshes/";
 };
 
-TEST_F(GraphUtilsTest, testReindexCut) {
+using testTypes = ::testing::Types<double,float>;
+TYPED_TEST_SUITE(GraphUtilsTest, testTypes);
+
+//-----------------------------------------------
+
+TYPED_TEST(GraphUtilsTest, testReindexCut) {
+    using ValueType = TypeParam;
+
     std::string fileName = "trace-00008.graph";
     //std::string fileName = "delaunayTest.graph";
 
-    std::string file = graphPath + fileName;
+    std::string file = GraphUtilsTest<ValueType>::graphPath + fileName;
 
     const IndexType dimensions= 2;
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
@@ -78,9 +86,11 @@ TEST_F(GraphUtilsTest, testReindexCut) {
 }
 //-----------------------------------------------------------------
 
-TEST_F(GraphUtilsTest, testConstructLaplacian) {
+TYPED_TEST(GraphUtilsTest, testConstructLaplacian) {
+    using ValueType = TypeParam;
+
     std::string fileName = "bubbles-00010.graph";
-    std::string file = graphPath + fileName;
+    std::string file = GraphUtilsTest<ValueType>::graphPath + fileName;
     const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType n = graph.getNumRows();
     scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
@@ -108,18 +118,24 @@ TEST_F(GraphUtilsTest, testConstructLaplacian) {
     CSRSparseMatrix<ValueType> diff = scai::lama::eval<CSRSparseMatrix<ValueType>> (LFromReplicated - L);
     EXPECT_EQ(0, diff.l2Norm());
 }
+//-----------------------------------------------------------------
 
-TEST_F(GraphUtilsTest, benchConstructLaplacian) {
+TYPED_TEST(GraphUtilsTest, benchConstructLaplacian) {
+    using ValueType = TypeParam;
+
     std::string fileName = "bubbles-00010.graph";
-    std::string file = graphPath + fileName;
+    std::string file = GraphUtilsTest<ValueType>::graphPath + fileName;
     const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 
     CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
 }
+//-----------------------------------------------------------------
 
-TEST_F(GraphUtilsTest, DISABLED_benchConstructLaplacianBig) {
+TYPED_TEST(GraphUtilsTest, DISABLED_benchConstructLaplacianBig) {
+    using ValueType = TypeParam;
+
     std::string fileName = "hugebubbles-00000.graph";
-    std::string file = graphPath + fileName;
+    std::string file = GraphUtilsTest<ValueType>::graphPath + fileName;
     const scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 
     CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
@@ -129,9 +145,10 @@ TEST_F(GraphUtilsTest, DISABLED_benchConstructLaplacianBig) {
 
 //-----------------------------------------------------------------
 
-TEST_F (GraphUtilsTest, testLocalDijkstra) {
+TYPED_TEST (GraphUtilsTest, testLocalDijkstra) {
+    using ValueType = TypeParam;
 
-    std::string file = graphPath + "Grid4x4";
+    std::string file = GraphUtilsTest<ValueType>::graphPath + "Grid4x4";
     IndexType dimensions = 2;
     IndexType N;
     bool executed = true;
@@ -204,9 +221,10 @@ TEST_F (GraphUtilsTest, testLocalDijkstra) {
 
 //---------------------------------------------------------------------------------------
 
-TEST_F (GraphUtilsTest, testComputeCommVolumeAndBoundaryNodes) {
+TYPED_TEST (GraphUtilsTest, testComputeCommVolumeAndBoundaryNodes) {
+    using ValueType = TypeParam;
 
-    std::string file = graphPath + "Grid32x32";
+    std::string file = GraphUtilsTest<ValueType>::graphPath + "Grid32x32";
     IndexType dimensions = 2;
     IndexType N;
 
@@ -249,8 +267,9 @@ TEST_F (GraphUtilsTest, testComputeCommVolumeAndBoundaryNodes) {
 
 //---------------------------------------------------------------------------------------
 
-TEST_F (GraphUtilsTest, testGraphMaxDegree) {
+TYPED_TEST (GraphUtilsTest, testGraphMaxDegree) {
 
+    using ValueType = TypeParam;
     const IndexType N = 1000;
 
     //define distributions
@@ -280,7 +299,8 @@ TEST_F (GraphUtilsTest, testGraphMaxDegree) {
 
 //---------------------------------------------------------------------------------------
 
-TEST_F (GraphUtilsTest,testEdgeList2CSR) {
+TYPED_TEST (GraphUtilsTest,testEdgeList2CSR) {
+    using ValueType = TypeParam;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const IndexType thisPE = comm->getRank();
@@ -310,7 +330,8 @@ TEST_F (GraphUtilsTest,testEdgeList2CSR) {
 //---------------------------------------------------------------------------------------
 // trancated function
 /*
-TEST_F(GraphUtilsTest, testIndexReordering){
+TYPED_TEST(GraphUtilsTest, testIndexReordering){
+    using ValueType = TypeParam;
 
 	IndexType M = 1000;
 	for( IndexType maxIndex = 100; maxIndex<M; maxIndex++){
@@ -327,8 +348,10 @@ TEST_F(GraphUtilsTest, testIndexReordering){
 */
 //------------------------------------------------------------------------------------
 
-TEST_F(GraphUtilsTest, testNonLocalNeighbors) {
-    std::string file = graphPath + "trace-00008.graph";
+TYPED_TEST(GraphUtilsTest, testNonLocalNeighbors) {
+    using ValueType = TypeParam;
+
+    std::string file = GraphUtilsTest<ValueType>::graphPath + "trace-00008.graph";
     IndexType dimensions = 2;
 
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
@@ -345,10 +368,12 @@ TEST_F(GraphUtilsTest, testNonLocalNeighbors) {
 }
 //------------------------------------------------------------------------------------
 
-TEST_F(GraphUtilsTest, testMEColoring_local) {
-    std::string file = graphPath + "Grid8x8";
-    //std::string file = graphPath + "delaunayTest.graph";
-    //std::string file = graphPath + "bigtrace-00000.graph";
+TYPED_TEST(GraphUtilsTest, testMEColoring_local) {
+    using ValueType = TypeParam;
+
+    std::string file = GraphUtilsTest<ValueType>::graphPath + "Grid8x8";
+    //std::string file = GraphUtilsTest<ValueType>::graphPath + "delaunayTest.graph";
+    //std::string file = GraphUtilsTest<ValueType>::graphPath + "bigtrace-00000.graph";
     IndexType dimensions = 2;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -433,9 +458,10 @@ TEST_F(GraphUtilsTest, testMEColoring_local) {
 }
 //------------------------------------------------------------------------------------
 
-TEST_F(GraphUtilsTest, testImbalance) {
+TYPED_TEST(GraphUtilsTest, testImbalance) {
+    using ValueType = TypeParam;
 
-    std::string file = graphPath + "Grid8x8";
+    std::string file = GraphUtilsTest<ValueType>::graphPath + "Grid8x8";
     const IndexType dimensions = 2;
     const IndexType k = 4;
 
@@ -551,9 +577,11 @@ TEST_F(GraphUtilsTest, testImbalance) {
 }
 //------------------------------------------------------------------------------
 
-TEST_F ( GraphUtilsTest, testGetPEGraph) {
-    std::string file = graphPath + "trace-00008.graph";
-    //std::string file = graphPath + "Grid8x8";
+TYPED_TEST ( GraphUtilsTest, testGetPEGraph) {
+    using ValueType = TypeParam;
+
+    std::string file = GraphUtilsTest<ValueType>::graphPath + "trace-00008.graph";
+    //std::string file = GraphUtilsTest<ValueType>::graphPath + "Grid8x8";
     std::ifstream f(file);
     IndexType dimensions= 2, k;
     IndexType N, edges;
@@ -597,9 +625,11 @@ TEST_F ( GraphUtilsTest, testGetPEGraph) {
 }
 //------------------------------------------------------------------------------
 
-TEST_F ( GraphUtilsTest, testGetBlockGraph) {
-    std::string file = graphPath + "trace-00008.graph";
-    //std::string file = graphPath + "Grid8x8";
+TYPED_TEST ( GraphUtilsTest, testGetBlockGraph) {
+    using ValueType = TypeParam;
+
+    std::string file = GraphUtilsTest<ValueType>::graphPath + "trace-00008.graph";
+    //std::string file = GraphUtilsTest<ValueType>::graphPath + "Grid8x8";
     std::ifstream f(file);
     IndexType dimensions= 2, k;
     IndexType N, edges;
@@ -667,9 +697,11 @@ TEST_F ( GraphUtilsTest, testGetBlockGraph) {
 }
 //------------------------------------------------------------------------------
 
-TEST_F ( GraphUtilsTest, testPEGraphBlockGraph_k_equal_p_Distributed) {
-    //std::string file = graphPath + "Grid16x16";
-    std::string file = graphPath + "trace-00008.graph";
+TYPED_TEST ( GraphUtilsTest, testPEGraphBlockGraph_k_equal_p_Distributed) {
+    using ValueType = TypeParam;
+    
+    //std::string file = GraphUtilsTest<ValueType>::graphPath + "Grid16x16";
+    std::string file = GraphUtilsTest<ValueType>::graphPath + "trace-00008.graph";
     std::ifstream f(file);
     IndexType dimensions= 2, k;
     IndexType N, edges;

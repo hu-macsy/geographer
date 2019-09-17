@@ -8,6 +8,7 @@
 
 namespace ITI {
 
+template<typename T>
 class MappingTest : public ::testing::Test {
 protected:
     // the directory of all the meshes used
@@ -15,11 +16,17 @@ protected:
     const std::string graphPath = projectRoot+"/meshes/";
 };
 
-TEST_F(MappingTest, testTorstenMapping) {
+using testTypes = ::testing::Types<double,float>;
+TYPED_TEST_SUITE(MappingTest, testTypes);
+
+//-----------------------------------------------
+
+TYPED_TEST(MappingTest, testTorstenMapping) {
+    using ValueType = TypeParam;
 
     //std::string fileName = "bigtrace-00000.graph";
     std::string fileName = "Grid4x4";
-    std::string file = graphPath + fileName;
+    std::string file = MappingTest<ValueType>::graphPath + fileName;
     Settings settings;
     settings.dimensions = 2;
     settings.numBlocks = 1;
@@ -80,12 +87,14 @@ TEST_F(MappingTest, testTorstenMapping) {
     }
     EXPECT_TRUE(executed ) << "too many PEs, must be <7 for this test" ;
 }
+//---------------------------------------------------------------------
 
-TEST_F(MappingTest, testSfcMapping) {
+TYPED_TEST(MappingTest, testSfcMapping) {
+    using ValueType = TypeParam;
 
     //std::string fileName = "bigtrace-00000.graph";
     std::string fileName = "Grid32x32";
-    std::string file = graphPath + fileName;
+    std::string file = MappingTest<ValueType>::graphPath + fileName;
 
     std::ifstream f(file);
     IndexType N;
