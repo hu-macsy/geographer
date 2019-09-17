@@ -36,8 +36,6 @@ namespace ITI {
 
 template<typename T>
 class auxTest : public ::testing::TestWithParam<int> {
-
-//class auxTest : public ::testing::Test {
 protected:
     // the directory of all the meshes used
     // projectRoot is defined in config.h.in
@@ -49,11 +47,11 @@ protected:
 using testTypes = ::testing::Types<double,float>;
 TYPED_TEST_SUITE(auxTest, testTypes);
 
-TYPED_TEST (auxTest, testInitialPartitions) {
-//TEST_F(auxTest, testInitialPartitions) {
-    using ValueType = TypeParam;
-    //using ValueType = double;
+//-----------------------------------------------
 
+TYPED_TEST (auxTest, testInitialPartitions) {
+    using ValueType = TypeParam;
+    
     //std::string fileName = "trace-00008.graph";
     std::string fileName = "Grid64x64";
     std::string file = auxTest<ValueType>::graphPath + fileName;
@@ -178,8 +176,7 @@ TYPED_TEST (auxTest, testInitialPartitions) {
     // get a hilbertPartition
     scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::partitionGraph(coordinates, nodeWeights, settings, metrics);
 
-    //newDist = scai::dmemo::DistributionPtr( new scai::dmemo::GeneralDistribution ( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() ) );
-    /*scai::dmemo::DistributionPtr*/ newDist = scai::dmemo::generalDistributionByNewOwners( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() );
+    newDist = scai::dmemo::generalDistributionByNewOwners( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() );
     hilbertPartition.redistribute(newDist);
     graph.redistribute(newDist, noDistPointer);
     for (IndexType d = 0; d < dimensions; d++) {
@@ -221,9 +218,7 @@ TYPED_TEST (auxTest, testInitialPartitions) {
 
 TYPED_TEST (auxTest, testPixelDistance) {
 
-//using ValueType = double;
     using ValueType = TypeParam;
-
     typedef aux<IndexType,ValueType> aux;
 
     IndexType sideLen = 100;
@@ -259,11 +254,10 @@ TYPED_TEST (auxTest, testPixelDistance) {
 //-----------------------------------------------------------------
 
 TYPED_TEST(auxTest, testIndex2_3DPoint) {
-    std::vector<IndexType> numPoints(3);
 
-//using ValueType = double;    
     using ValueType = TypeParam;
 
+    std::vector<IndexType> numPoints(3);
     srand(time(NULL));
     for(int i=0; i<3; i++) {
         numPoints[i] = (IndexType) (rand()%5 + 10);
@@ -283,12 +277,10 @@ TYPED_TEST(auxTest, testIndex2_3DPoint) {
 //-----------------------------------------------------------------
 
 TYPED_TEST(auxTest, testIndex2_2DPoint) {
+    
+    using ValueType = TypeParam;
+
     std::vector<IndexType> numPoints= {9, 11};
-
-
-//using ValueType = double;
-using ValueType = TypeParam;
-
     srand(time(NULL));
     for(int i=0; i<2; i++) {
         numPoints[i] = (IndexType) (rand()%5 + 10);
@@ -368,8 +360,7 @@ TEST_F(auxTest, testBenchIndexReordering){
 
 TYPED_TEST(auxTest, testRedistributeFromPartition) {
 
-//using ValueType = double;
-using ValueType = TypeParam;
+    using ValueType = TypeParam;
 
     std::string fileName = "bubbles-00010.graph";
     std::string file = auxTest<ValueType>::graphPath + fileName;
@@ -482,8 +473,7 @@ using ValueType = TypeParam;
 
 TYPED_TEST(auxTest, benchmarkRedistributeFromPartition) {
 
-//using ValueType = double;
-using ValueType = TypeParam;
+    using ValueType = TypeParam;
 
     std::string fileName = "353off.graph";
     std::string file = auxTest<ValueType>::graphPath + fileName;
@@ -577,7 +567,6 @@ using ValueType = TypeParam;
 //
 
 /*
-//INSTANTIATE_TEST_CASE_P(InstantiationName,
 INSTANTIATE_TYPED_TEST_SUITE_P(InstantiationName,
                         auxTest,
                         testing::Values(true, false) );
