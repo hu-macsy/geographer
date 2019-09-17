@@ -35,12 +35,11 @@ using namespace scai;
 namespace ITI {
 
 template<typename T>
-class auxTest : public ::testing::TestWithParam<int> {
+class auxTest : public ::testing::Test {
 protected:
     // the directory of all the meshes used
     // projectRoot is defined in config.h.in
     std::string graphPath = projectRoot+"/meshes/";
-    //using ValueType = T;
 };
 
 

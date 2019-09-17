@@ -5,16 +5,21 @@
 
 namespace ITI {
 
+template<typename T>
 class CommTreeTest : public ::testing::Test {
 protected:
     // the directory of all the meshes used
     // projectRoot is defined in config.h.in
     std::string graphPath = projectRoot+"/meshes/";
 };
+using testTypes = ::testing::Types<double,float>;
+TYPED_TEST_SUITE(CommTreeTest, testTypes);
+
+//-----------------------------------------------
 
 typedef typename CommTree<IndexType,ValueType>::commNode cNode;
 
-TEST_F(CommTreeTest, testTreeFromLeaves) {
+TYPED_TEST(CommTreeTest, testTreeFromLeaves) {
 
     std::vector<cNode> leaves1 = {
         // 				{hierachy ids}, numCores, mem, speed
@@ -108,7 +113,7 @@ TEST_F(CommTreeTest, testTreeFromLeaves) {
 
 //------------------------------------------------------------------------
 
-TEST_F(CommTreeTest, testTreeFlatHomogeneous) {
+TYPED_TEST(CommTreeTest, testTreeFlatHomogeneous) {
 
     IndexType k= 12;
 
@@ -121,11 +126,11 @@ TEST_F(CommTreeTest, testTreeFlatHomogeneous) {
     EXPECT_EQ( cTree.getHierLevel(0).size(), 1 );
     EXPECT_EQ( numNodes, cTree.getNumNodes() );
     EXPECT_EQ( numNodes, k+1);
-}//TEST_F(CommTreeTest, testTreeFlatHomogeneous)
+}//TYPED_TEST(CommTreeTest, testTreeFlatHomogeneous)
 
 //------------------------------------------------------------------------
 
-TEST_F(CommTreeTest, testTreeNonFlatHomogeneous) {
+TYPED_TEST(CommTreeTest, testTreeNonFlatHomogeneous) {
 
     IndexType k= 2*3*4*5;
 
@@ -136,11 +141,11 @@ TEST_F(CommTreeTest, testTreeNonFlatHomogeneous) {
     EXPECT_EQ( cTree.getNumLeaves(), k );
     EXPECT_EQ( cTree.getHierLevel(0).size(), 1 );
 
-}//TEST_F(CommTreeTest, testTreeNonFlatHomogeneous)
+}//TYPED_TEST(CommTreeTest, testTreeNonFlatHomogeneous)
 
 //------------------------------------------------------------------------
 
-TEST_F(CommTreeTest, testLabelDistance) {
+TYPED_TEST(CommTreeTest, testLabelDistance) {
 
     std::vector<cNode> nodes = {
         // 				      {hierachy ids}, numCores, mem, speed
@@ -165,10 +170,10 @@ TEST_F(CommTreeTest, testLabelDistance) {
     EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[4], nodes[5])), 0 );
 
 
-}//TEST_F(CommTreeTest, testLabelDistance)
+}//TYPED_TEST(CommTreeTest, testLabelDistance)
 //------------------------------------------------------------------------
 
-TEST_F(CommTreeTest, testExportGraph) {
+TYPED_TEST(CommTreeTest, testExportGraph) {
 
     std::vector<cNode> leaves = {
         // 				{hierachy ids}, numCores, mem, speed , //leaf IDs
@@ -232,10 +237,9 @@ TEST_F(CommTreeTest, testExportGraph) {
     EXPECT_EQ( leaves, getLeaves );
 
 
-}//TEST_F(CommTreeTest, testExportGraph)
-//------------------------------------------------------------------------
+TYPED_TEST//------------------------------------------------------------------------
 
-TEST_F(CommTreeTest, testAdaptWeights) {
+TYPED_TEST(CommTreeTest, testAdaptWeights) {
 
     std::vector<cNode> leaves = {
         // 				{hierachy ids}, numCores, mem, speed
