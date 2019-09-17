@@ -18,7 +18,6 @@ namespace ITI {
  * Also, the rectangle contains the points [bottom, top], so, in a 1D rectangle, [4,8] contains
  * the points 4,5,6,7 and 8.
  *
- * Note: This is now using the typedef'd ValueType from config.h
  * */
 template<typename ValueType>
 class rectangle {

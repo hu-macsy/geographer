@@ -17,7 +17,8 @@ using ITI::version;
 using ITI::Metrics;
 using scai::lama::DenseVector;
 
-typedef double ValueType;
+using ValueType = double; //hardcode to double
+
 
 int main(int argc, char** argv) {
     using namespace cxxopts;
