@@ -17,9 +17,10 @@ TYPED_TEST_SUITE(CommTreeTest, testTypes);
 
 //-----------------------------------------------
 
-typedef typename CommTree<IndexType,ValueType>::commNode cNode;
 
 TYPED_TEST(CommTreeTest, testTreeFromLeaves) {
+    using ValueType = TypeParam;
+    typedef typename CommTree<IndexType,ValueType>::commNode cNode;
 
     std::vector<cNode> leaves1 = {
         // 				{hierachy ids}, numCores, mem, speed
@@ -114,7 +115,8 @@ TYPED_TEST(CommTreeTest, testTreeFromLeaves) {
 //------------------------------------------------------------------------
 
 TYPED_TEST(CommTreeTest, testTreeFlatHomogeneous) {
-
+    using ValueType = TypeParam;
+    
     IndexType k= 12;
 
     ITI::CommTree<IndexType,ValueType> cTree;
@@ -131,6 +133,7 @@ TYPED_TEST(CommTreeTest, testTreeFlatHomogeneous) {
 //------------------------------------------------------------------------
 
 TYPED_TEST(CommTreeTest, testTreeNonFlatHomogeneous) {
+    using ValueType = TypeParam;
 
     IndexType k= 2*3*4*5;
 
@@ -146,6 +149,8 @@ TYPED_TEST(CommTreeTest, testTreeNonFlatHomogeneous) {
 //------------------------------------------------------------------------
 
 TYPED_TEST(CommTreeTest, testLabelDistance) {
+    using ValueType = TypeParam;
+    typedef typename CommTree<IndexType,ValueType>::commNode cNode;
 
     std::vector<cNode> nodes = {
         // 				      {hierachy ids}, numCores, mem, speed
@@ -174,6 +179,8 @@ TYPED_TEST(CommTreeTest, testLabelDistance) {
 //------------------------------------------------------------------------
 
 TYPED_TEST(CommTreeTest, testExportGraph) {
+    using ValueType = TypeParam;
+    typedef typename CommTree<IndexType,ValueType>::commNode cNode;
 
     std::vector<cNode> leaves = {
         // 				{hierachy ids}, numCores, mem, speed , //leaf IDs
@@ -236,10 +243,13 @@ TYPED_TEST(CommTreeTest, testExportGraph) {
     const std::vector<cNode> getLeaves = cTree.getLeaves();
     EXPECT_EQ( leaves, getLeaves );
 
+}//TYPED_TEST(CommTreeTest, testExportGraph) 
 
-TYPED_TEST//------------------------------------------------------------------------
+//------------------------------------------------------------------------
 
 TYPED_TEST(CommTreeTest, testAdaptWeights) {
+    using ValueType = TypeParam;
+    typedef typename CommTree<IndexType,ValueType>::commNode cNode;
 
     std::vector<cNode> leaves = {
         // 				{hierachy ids}, numCores, mem, speed

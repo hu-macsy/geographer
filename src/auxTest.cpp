@@ -42,7 +42,6 @@ protected:
     std::string graphPath = projectRoot+"/meshes/";
 };
 
-
 using testTypes = ::testing::Types<double,float>;
 TYPED_TEST_SUITE(auxTest, testTypes);
 

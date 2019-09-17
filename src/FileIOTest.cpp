@@ -35,16 +35,20 @@ using scai::lama::CSRStorage;
 
 namespace ITI {
 
+template<typename T>
 class FileIOTest : public ::testing::Test {
-
 protected:
     // the directory of all the meshes used
     // projectRoot is defined in config.h.in
     const std::string graphPath = projectRoot+"/meshes/";
 };
 
+using testTypes = ::testing::Types<double,float>;
+TYPED_TEST_SUITE(FileIOTest, testTypes);
+
 //-----------------------------------------------------------------
-TEST_F(FileIOTest, testWriteMetis_Dist_3D) {
+TYPED_TEST(FileIOTest, testWriteMetis_Dist_3D) {
+    using ValueType = TypeParam;
 
     std::vector<IndexType> numPoints= { 10, 10, 10};
     std::vector<ValueType> maxCoord= { 10, 20, 30};
@@ -67,7 +71,7 @@ TEST_F(FileIOTest, testWriteMetis_Dist_3D) {
     MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(adjM, coords, maxCoord, numPoints, 3);
 
     // write the mesh in p(=number of PEs) files
-    FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, graphPath+"dist3D_");
+    FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, FileIOTest<ValueType>::graphPath+"dist3D_");
 
 }
 
@@ -78,10 +82,12 @@ TEST_F(FileIOTest, testWriteMetis_Dist_3D) {
  * Occasionally throws error, probably because own process tries to read the file while some other is still writing in it.
  */
 
-TEST_F(FileIOTest, testReadAndWriteGraphFromFile) {
+TYPED_TEST(FileIOTest, testReadAndWriteGraphFromFile) {
+    using ValueType = TypeParam;
+
     //std::string file = "Grid8x8";
     std::string file = "slowrot-00000.graph";
-    std::string filename= graphPath + file;
+    std::string filename= FileIOTest<ValueType>::graphPath + file;
     CSRSparseMatrix<ValueType> Graph;
 
     std::ifstream f(filename);
@@ -101,7 +107,7 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile) {
     EXPECT_EQ(nodes, Graph.getNumColumns());
     EXPECT_EQ(edges, (Graph.getNumValues())/2 );
 
-    std::string fileTo= graphPath + std::string("MY_") + file;
+    std::string fileTo= FileIOTest<ValueType>::graphPath + std::string("MY_") + file;
 
     // write the graph you read in a new file
     FileIO<IndexType, ValueType>::writeGraph(Graph, fileTo );
@@ -138,7 +144,8 @@ TEST_F(FileIOTest, testReadAndWriteGraphFromFile) {
 }
 //-----------------------------------------------------------------
 
-TEST_F(FileIOTest, testWriteGraphWithEdgeWeights) {
+TYPED_TEST(FileIOTest, testWriteGraphWithEdgeWeights) {
+    using ValueType = TypeParam;
     const IndexType N = 10;
 
     //define distributions
@@ -163,14 +170,16 @@ TEST_F(FileIOTest, testWriteGraphWithEdgeWeights) {
 //-----------------------------------------------------------------
 // read a graph from a file in METIS format and its coordinates in 2D and partition that graph
 // usually, graph file: "file.graph", coordinates file: "file.graph.xy" or .xyz
-TEST_F(FileIOTest, testPartitionFromFile_dist_2D) {
+TYPED_TEST(FileIOTest, testPartitionFromFile_dist_2D) {
+    using ValueType = TypeParam;
+
     CSRSparseMatrix<ValueType> graph;       //the graph as an adjacency matrix
     IndexType dim= 2, k= 8;
     ValueType epsilon= 0.1;
 
     std::string file= "slowrot-00000.graph";
-    std::string grFile= graphPath +file;
-    std::string coordFile= graphPath +file +".xyz";  //graph file and coordinates file
+    std::string grFile= FileIOTest<ValueType>::graphPath +file;
+    std::string coordFile= grFile+".xyz";  //graph file and coordinates file
     std::fstream f(grFile);
     IndexType nodes, edges;
     f>> nodes>> edges;
@@ -232,10 +241,12 @@ TEST_F(FileIOTest, testPartitionFromFile_dist_2D) {
 }
 //-------------------------------------------------------------------------------------------------
 
-TEST_F(FileIOTest, testWriteCoordsDistributed) {
+TYPED_TEST(FileIOTest, testWriteCoordsDistributed) {
+    using ValueType = TypeParam;
 
     std::string file= "Grid8x8";
-    std::string grFile= graphPath +file, coordFile= graphPath +file +".xyz";   //graph file and coordinates file
+    std::string grFile= FileIOTest<ValueType>::graphPath +file;
+    std::string coordFile= grFile +".xyz";   //graph file and coordinates file
     std::fstream f(grFile);
     IndexType nodes, edges;
     f>> nodes>> edges;
@@ -255,8 +266,10 @@ TEST_F(FileIOTest, testWriteCoordsDistributed) {
 }
 //-------------------------------------------------------------------------------------------------
 
-TEST_F(FileIOTest, testReadCoordsOcean) {
-    std::string coordFile = graphPath + "node2d_core2.out";
+TYPED_TEST(FileIOTest, testReadCoordsOcean) {
+    using ValueType = TypeParam;
+
+    std::string coordFile = FileIOTest<ValueType>::graphPath + "node2d_core2.out";
     const IndexType n = 126858;
 
     std::vector<DenseVector<ValueType> > coords = FileIO<IndexType, ValueType>::readCoordsOcean(coordFile, 2);
@@ -272,8 +285,10 @@ TEST_F(FileIOTest, testReadCoordsOcean) {
 
 //-------------------------------------------------------------------------------------------------
 
-TEST_F(FileIOTest, testReadQuadTree) {
-    std::string filename = graphPath + "cells.dat";
+TYPED_TEST(FileIOTest, testReadQuadTree) {
+    using ValueType = TypeParam;
+
+    std::string filename = FileIOTest<ValueType>::graphPath + "cells.dat";
 
     scai::lama::CSRSparseMatrix<ValueType> matrix = FileIO<IndexType, ValueType>::readQuadTree(filename);
 
@@ -285,8 +300,10 @@ TEST_F(FileIOTest, testReadQuadTree) {
 
 //-------------------------------------------------------------------------------------------------
 
-TEST_F(FileIOTest, testReadBinaryEdgeList) {
-    std::string filename = graphPath + "delaunay-3D-12.edgelist";
+TYPED_TEST(FileIOTest, testReadBinaryEdgeList) {
+    using ValueType = TypeParam;
+
+    std::string filename = FileIOTest<ValueType>::graphPath + "delaunay-3D-12.edgelist";
 
     scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(filename, ITI::Format::BINARYEDGELIST);
 
@@ -328,11 +345,13 @@ TEST_F(FileIOTest, testReadBinaryEdgeList) {
 
 //-------------------------------------------------------------------------------------------------
 
-TEST_F(FileIOTest, testReadGraphBinary) {
+TYPED_TEST(FileIOTest, testReadGraphBinary) {
+    using ValueType = TypeParam;
+
     std::string file = "trace-00008.bgf";   // trace-08: n=8993, m=13370
     //std::string file = "Grid16x16.bgf";   // Grid16x16: n= 256, m=480
     //std::string file = "Grid8x8.bgf";   // Grid8x8: n= 64, m=224
-    std::string filename= graphPath + file;
+    std::string filename= FileIOTest<ValueType>::graphPath + file;
 
     scai::lama::CSRSparseMatrix<ValueType> graph;
 
@@ -342,7 +361,7 @@ TEST_F(FileIOTest, testReadGraphBinary) {
 
     //TODO: read same graph with the original reader. Matrices must be identical
 
-    std::string txtFile= graphPath+"/trace-00008.graph";
+    std::string txtFile= FileIOTest<ValueType>::graphPath+"/trace-00008.graph";
     std::fstream f(txtFile);
     if (f.fail()) {
         throw std::runtime_error("Reading graph from " + txtFile + " failed.");
@@ -367,9 +386,11 @@ TEST_F(FileIOTest, testReadGraphBinary) {
 }
 //-------------------------------------------------------------------------------------------------
 
-TEST_F(FileIOTest, testReadMatrixMarketFormat) {
-    std::string graphFile = graphPath + "whitaker3.mtx";
-    std::string coordFile = graphPath + "whitaker3_coord.mtx";
+TYPED_TEST(FileIOTest, testReadMatrixMarketFormat) {
+    using ValueType = TypeParam;
+
+    std::string graphFile = FileIOTest<ValueType>::graphPath + "whitaker3.mtx";
+    std::string coordFile = FileIOTest<ValueType>::graphPath + "whitaker3_coord.mtx";
 
     std::ifstream coordF( coordFile );
 
@@ -422,7 +443,9 @@ TEST_F(FileIOTest, testReadMatrixMarketFormat) {
 }
 //-------------------------------------------------------------------------------------------------
 
-TEST_F(FileIOTest, testReadBlockSizes) {
+TYPED_TEST(FileIOTest, testReadBlockSizes) {
+
+    using ValueType = TypeParam;
 
     std::string path = projectRoot+"/testing/";
     std::string blocksFile = path + "blockSizes.txt";
@@ -434,9 +457,10 @@ TEST_F(FileIOTest, testReadBlockSizes) {
 }
 //-------------------------------------------------------------------------------------------------
 
-TEST_F(FileIOTest, testWriteCoordsParallel) {
+TYPED_TEST(FileIOTest, testWriteCoordsParallel) {
+    using ValueType = TypeParam;
 
-    std::string file = graphPath + "delaunayTest.graph";
+    std::string file = FileIOTest<ValueType>::graphPath + "delaunayTest.graph";
     std::ifstream f(file);
 
     //WARNING: for this example we need dimension 3 because the Schamberger graphs have always 3 coordinates
@@ -476,11 +500,12 @@ TEST_F(FileIOTest, testWriteCoordsParallel) {
 }
 //-------------------------------------------------------------------------------------------------
 
-TEST_F(FileIOTest, testReadGraphAndCoordsBinary) {
+TYPED_TEST(FileIOTest, testReadGraphAndCoordsBinary) {
+    using ValueType = TypeParam;    
 
-    std::string fileBin = graphPath + "delaunayTest.bgf";
+    std::string fileBin = FileIOTest<ValueType>::graphPath + "delaunayTest.bgf";
     std::string coordFileBin = fileBin+".xyz";
-    std::string fileMetis = graphPath + "delaunayTest.graph";
+    std::string fileMetis = FileIOTest<ValueType>::graphPath + "delaunayTest.graph";
     std::string coordFileMetis = fileMetis+".xyz";
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -553,7 +578,8 @@ TEST_F(FileIOTest, testReadGraphAndCoordsBinary) {
 }
 //-------------------------------------------------------------------------------------------------
 
-TEST_F (FileIOTest, testWriteDenseVectorCentral) {
+TYPED_TEST (FileIOTest, testWriteDenseVectorCentral) {
+    using ValueType = TypeParam;
 
     const IndexType N = 9001;
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -576,8 +602,10 @@ TEST_F (FileIOTest, testWriteDenseVectorCentral) {
 
 //-------------------------------------------------------------------------------------------------
 
-TEST_F (FileIOTest, testreadOFFCentral) {
-    std::string file = graphPath+ "2.off";
+TYPED_TEST (FileIOTest, testreadOFFCentral) {
+    using ValueType = TypeParam;
+
+    std::string file = FileIOTest<ValueType>::graphPath+ "2.off";
 
     // open file and read number of nodes and edges
     //
@@ -626,7 +654,8 @@ TEST_F (FileIOTest, testreadOFFCentral) {
 }
 //-------------------------------------------------------------------------------------------------
 
-TEST_F (FileIOTest, testReadEdgeListDistributed) {
+TYPED_TEST (FileIOTest, testReadEdgeListDistributed) {
+    using ValueType = TypeParam;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     if( comm->getSize() != 4 ) {
@@ -635,7 +664,7 @@ TEST_F (FileIOTest, testReadEdgeListDistributed) {
         }
     } else {
 
-        std::string file = graphPath + "tmp4/out";
+        std::string file = FileIOTest<ValueType>::graphPath + "tmp4/out";
 
         scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file );
 
@@ -649,9 +678,10 @@ TEST_F (FileIOTest, testReadEdgeListDistributed) {
 }
 //-------------------------------------------------------------------------------------------------
 
-TEST_F (FileIOTest, testReadPETree) {
+TYPED_TEST (FileIOTest, testReadPETree) {
+    using ValueType = TypeParam;
 
-    std::string file = graphPath+ "processorTrees/testPEgraph28.txt";
+    std::string file = FileIOTest<ValueType>::graphPath+ "processorTrees/testPEgraph28.txt";
 
     ITI::CommTree<IndexType, ValueType> tree =  FileIO<IndexType, ValueType>::readPETree( file );
     PRINT("read file " << file );
