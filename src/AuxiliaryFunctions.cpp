@@ -378,6 +378,6 @@ bool ITI::aux<IndexType, ValueType>::checkConsistency(
 
 
 template class aux<IndexType, double>;
-template class aux<IndexType, float;
+template class aux<IndexType, float>;
 
 }//namespace ITI

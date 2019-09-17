@@ -13,10 +13,11 @@
 
 using ITI::Settings;
 using ITI::IndexType;
-using ITI::ValueType;
 using ITI::version;
 using ITI::Metrics;
 using scai::lama::DenseVector;
+
+typedef double ValueType;
 
 int main(int argc, char** argv) {
     using namespace cxxopts;

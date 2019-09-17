@@ -399,9 +399,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
 
         if (settings.repartition) {
-            result = ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
+            result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
         } else if (settings.initialPartition == ITI::Tool::geoKmeans) {
-            result = ITI::KMeans::computePartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
+            result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
         } else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart) {
             const IndexType numWeights = nodeWeightCopy.size();
             SCAI_ASSERT_GT_ERROR( settings.hierLevels.size(), 0, "Must provide the tree level sizes in order to call hierarchical KMeans" );
@@ -415,11 +415,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
             commTree.adaptWeights( nodeWeightCopy );
 
             if (settings.initialPartition == ITI::Tool::geoHierKM) {
-                result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
+                result = ITI::KMeans<IndexType,ValueType>::computeHierarchicalPartition( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
             }
             if (settings.initialPartition == ITI::Tool::geoHierRepart) {
                 //settings.debugMode = true;
-                result = ITI::KMeans::computeHierPlusRepart<IndexType, ValueType>( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
+                result = ITI::KMeans<IndexType,ValueType>::computeHierPlusRepart( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
             }
             SCAI_ASSERT_EQ_ERROR( nodeWeightCopy[0].getDistributionPtr()->getLocalSize(),\
                                   result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");

@@ -54,6 +54,8 @@ CommTree<IndexType, ValueType>::CommTree( const std::vector<commNode> &leaves, c
 template <typename IndexType, typename ValueType>
 CommTree<IndexType, ValueType>::CommTree( const std::vector<IndexType> &levels, const IndexType numWeights ) {
 
+    typedef cNode<IndexType,ValueType> cNode;
+
     const IndexType numLevels = levels.size();
     const IndexType numLeaves = std::accumulate( levels.begin(), levels.end(), 1, std::multiplies<IndexType>() );
     //PRINT("There are " << numLevels << " levels of hierarchy with " << numLeaves << " leaves in total." );
@@ -127,7 +129,7 @@ IndexType CommTree<IndexType, ValueType>::createFlatHomogeneous(
     //in the homogeneous case we may have several weights, but all leaves have the same weight
     std::vector<std::vector<ValueType>> sizes(numNodeWeights, std::vector<ValueType>(numLeaves, 1) );
 
-    std::vector<cNode> leaves = createLeaves( sizes );
+    std::vector<cNode<IndexType,ValueType>> leaves = createLeaves( sizes );
     SCAI_ASSERT_EQ_ERROR( leaves.size(), numLeaves, "Wrong number of leaves" );
     SCAI_ASSERT_EQ_ERROR( leaves[0].getNumWeights(), numNodeWeights, "Wrong number of weights");
 
@@ -142,7 +144,7 @@ IndexType CommTree<IndexType, ValueType>::createFlatHomogeneous(
 template <typename IndexType, typename ValueType>
 IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneous( const std::vector<std::vector<ValueType>> &leafSizes ) {
     //leafSizes.size() = number of weights
-    std::vector<cNode> leaves = createLeaves( leafSizes );
+    std::vector<cNode<IndexType, ValueType>> leaves = createLeaves( leafSizes );
     SCAI_ASSERT_EQ_ERROR( leaves.size(), leafSizes[0].size(), "Wrong number of leaves" );
     SCAI_ASSERT_EQ_ERROR( leaves[0].getNumWeights(), leafSizes.size(), "Wrong number of weights");
 
@@ -163,6 +165,7 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
     const IndexType numLeaves = sizes[0].size();
     SCAI_ASSERT_GT_ERROR( numLeaves, 0, "Provided sizes vector is empty, there are no block size" );
 
+    typedef cNode<IndexType,ValueType> cNode;
     std::vector<cNode> leaves( numLeaves );
 
     for( unsigned int i=0; i<numLeaves; i++ ) {
@@ -211,8 +214,8 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
                 SCAI_ASSERT_GE_ERROR( sumHierWeights, sumNodeWeights, "Provided node weights do not fit in the given tree for weight " << i );
             } else {
                 //go over the nodes and adapt the weights
-                for( commNode &cNode : hierLevel ) {
-                    cNode.weights[i] *= scalingFactor;
+                for( commNode& node : hierLevel ) {
+                    node.weights[i] *= scalingFactor;
                     //scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
                     //PRINT0( cNode.weights[i] );
                 }
@@ -301,6 +304,8 @@ std::vector<unsigned int> CommTree<IndexType, ValueType>::getGrouping(const std:
     std::vector<unsigned int> groupSizes;
     unsigned int numNewTotalNodes;//for debugging, printing
 
+    typedef cNode<IndexType,ValueType> cNode;
+
     std::vector<cNode> prevLevel = createLevelAbove(thisLevel);
 
     for( cNode c: prevLevel) {
@@ -319,6 +324,8 @@ std::vector<unsigned int> CommTree<IndexType, ValueType>::getGrouping(const std:
 
 template <typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType>> CommTree<IndexType, ValueType>::getBalanceVectors( const IndexType level) const {
+
+    typedef cNode<IndexType,ValueType> cNode;
 
     //for -1, return the leaves
     const std::vector<cNode>& hierLvl = level==-1 ? tree.back() : tree[level];
@@ -421,8 +428,7 @@ std::vector<ValueType> CommTree<IndexType,ValueType>::computeImbalance(
     const IndexType k,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights) {
 
-    //cNode is typedefed in CommTree.h
-    const std::vector<cNode>& leaves = this->getLeaves();
+    const std::vector<cNode<IndexType,ValueType>>& leaves = this->getLeaves();
     const IndexType numLeaves = leaves.size();
     SCAI_ASSERT_EQ_ERROR( numLeaves, k, "Number of blocks of the partition and number of leaves of the tree do not agree" );
 

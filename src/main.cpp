@@ -24,7 +24,6 @@
 #include "ParcoRepart.h"
 #include "Settings.h"
 #include "Metrics.h"
-#include "SpectralPartition.h"
 #include "GraphUtils.h"
 #include "parseArgs.h"
 
@@ -46,7 +45,9 @@
 //void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);
 
 int main(int argc, char** argv) {
+
     using namespace ITI;
+    typedef double ValueType;   //use double
 
     std::string blockSizesFile;
     //ITI::Format coordFormat;
