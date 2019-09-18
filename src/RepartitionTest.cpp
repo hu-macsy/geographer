@@ -17,7 +17,6 @@
 #include <numeric>
 
 #include "GraphUtils.h"
-#include "MeshGenerator.h"
 #include "FileIO.h"
 #include "Repartition.h"
 #include "AuxiliaryFunctions.h"

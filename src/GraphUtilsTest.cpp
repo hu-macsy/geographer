@@ -5,7 +5,6 @@
 #include "ParcoRepart.h"
 #include "FileIO.h"
 #include "GraphUtils.h"
-#include "MeshGenerator.h"
 
 #include <scai/dmemo/CyclicDistribution.hpp>
 #include <scai/hmemo/ReadAccess.hpp>

@@ -958,6 +958,8 @@ ValueType MeshGenerator<IndexType, ValueType>::dist3DSquared(std::tuple<IndexTyp
     return distanceSquared;
 }
 //-------------------------------------------------------------------------------------------------
+
+/*
 template<typename IndexType, typename ValueType>
 template<typename T>
 ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<T> p1, const std::vector<T> p2) {
@@ -975,12 +977,13 @@ ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<T>
 
     return distanceSquared;
 }
+*/
+
 //-------------------------------------------------------------------------------------------------
 
 template class MeshGenerator<IndexType, double>;
 template class MeshGenerator<IndexType, float>;
 
-//template ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<IndexType> p1, const std::vector<IndexType> p2);
-//template ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<ValueType> p1, const std::vector<ValueType> p2);
+//template double MeshGenerator<long int, double>::distSquared( const std::vector<long int> p1, const std::vector<long int> p2);
 
 } //namespace ITI

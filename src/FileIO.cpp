@@ -6,6 +6,7 @@
  */
 
 #include "FileIO.h"
+#include "quadtree/QuadTreeCartesianEuclid.h"
 
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>

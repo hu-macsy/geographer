@@ -18,7 +18,6 @@
 
 #include "gtest/gtest.h"
 
-#include "MeshGenerator.h"
 #include "FileIO.h"
 #include "MultiSection.h"
 

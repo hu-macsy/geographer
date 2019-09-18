@@ -20,7 +20,6 @@
 #include "GraphUtils.h"
 #include "gtest/gtest.h"
 #include "HilbertCurve.h"
-#include "MeshGenerator.h"
 #include "FileIO.h"
 
 using namespace scai;

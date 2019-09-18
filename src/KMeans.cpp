@@ -16,6 +16,7 @@
 #include "KMeans.h"
 #include "HilbertCurve.h"
 #include "MultiLevel.h"
+#include "quadtree/QuadNodeCartesianEuclid.h"
 // temporary, for debugging
 #include "FileIO.h"
 

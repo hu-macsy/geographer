@@ -15,13 +15,13 @@
 #include <scai/lama/DenseVector.hpp>
 #include <scai/tracing.hpp>
 
-#include "quadtree/QuadNodeCartesianEuclid.h"
 #include "Settings.h"
 #include "Metrics.h"
 #include "GraphUtils.h"
 #include "HilbertCurve.h"
 #include "AuxiliaryFunctions.h"
 #include "CommTree.h"
+#include "quadtree/SpatialCell.h"
 
 namespace ITI {
 

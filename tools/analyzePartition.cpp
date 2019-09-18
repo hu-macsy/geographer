@@ -130,7 +130,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
     metrics.getEasyMetrics( graph, part, nodeWeights, settings );
 
     if (comm->getRank() == 0) {
