@@ -135,6 +135,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         scai::lama::CSRSparseMatrix<ValueType> processGraph = GraphUtils<IndexType, ValueType>::getPEGraph(input);
 
         //TODO: remove from final version?
+        /*
         // write the PE graph for further experiments
         if(settings.writePEgraph) { //write PE graph for further experiments
             //TODO: this works only for 12 rounds
@@ -149,7 +150,8 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
                 PRINT0("time to write PE graph: :" << elapTime.count() );
             }
         }
-
+        */
+        
         std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
 
         std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph, settings);
@@ -174,11 +176,11 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
             std::chrono::time_point<std::chrono::system_clock> beforeFMStep =  std::chrono::system_clock::now();
 
-            /* TODO: if getting the graph is fast, maybe doing it in every step might help
+            // TODO: if getting the graph is fast, maybe doing it in every step might help
             // get graph before every step
-            processGraph = GraphUtils::getPEGraph<IndexType, ValueType>(input);
+            processGraph = GraphUtils<IndexType, ValueType>::getPEGraph(input);
             communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph, settings);
-            nodesWithNonLocalNeighbors = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(input);
+            nodesWithNonLocalNeighbors = GraphUtils<IndexType, ValueType>::getNodesWithNonLocalNeighbors(input);
             elapTime = std::chrono::system_clock::now() - beforeFMStep;
             maxTime = comm->max( elapTime.count() );
             minTime = comm->min( elapTime.count() );
@@ -186,7 +188,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
             if(settings.verbose){
             	PRINT0("getCommPairs and border nodes: time " << minTime << " -- " << maxTime );
             }
-            */
+            
 
             std::vector<ValueType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(input, part, nodesWithNonLocalNeighbors, nodeWeights, coordinates, distances, origin, communicationScheme, settings);
             gain = 0;
