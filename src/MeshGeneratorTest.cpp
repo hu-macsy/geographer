@@ -103,13 +103,6 @@ TYPED_TEST(MeshGeneratorTest, testCreateStructuredMesh_Distributed_3D) {
     // create the adjacency matrix and the coordinates
     MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(adjM, coords, maxCoord, numPoints, 3);
 
-    // print local values
-    /*
-    for(IndexType i=0; i<dist->getLocalSize(); i++){
-        std::cout<< i<< ": "<< *comm<< " - " <<coords[0].getLocalValues()[i] << " , " << coords[1].getLocalValues()[i] << " , " << coords[2].getLocalValues()[i] << std::endl;
-    }
-    */
-
     EXPECT_EQ( adjM.getLocalNumColumns(), N);
     EXPECT_EQ( adjM.getLocalNumRows(), coords[0].getLocalValues().size() );
     EXPECT_EQ( true, adjM.getRowDistribution().isEqual(coords[0].getDistribution()) );

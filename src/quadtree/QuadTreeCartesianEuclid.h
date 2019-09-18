@@ -24,7 +24,6 @@ namespace ITI {
 
 template <typename ValueType>
 class QuadTreeCartesianEuclid : public ITI::SpatialTree<ValueType> {
-    //friend class QuadTreeCartesianEuclidTest;
 public:
     /**
      * @param lower Minimal coordinates of region
@@ -36,10 +35,6 @@ public:
     QuadTreeCartesianEuclid(Point<ValueType> lower = Point<ValueType>({0.0, 0.0}), Point<ValueType> upper = Point<ValueType>({1.0, 1.0}), bool theoreticalSplit=true, count capacity=1000) {
         this->root = std::shared_ptr<QuadNodeCartesianEuclid<ValueType>>(new QuadNodeCartesianEuclid<ValueType>(lower, upper, capacity, theoreticalSplit));
     }
-
-//	void extractCoordinates(std::vector<Point<ValueType> > &posContainer) const {
-//		this->root->getCoordinates(posContainer);
-//	}
 
     void getElementsInEuclideanCircle(const Point<ValueType> circleCenter, const ValueType radius, std::vector<index> &circleDenizens) const {
         this->getElementsInCircle(circleCenter, radius, circleDenizens);

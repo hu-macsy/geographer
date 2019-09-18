@@ -19,7 +19,6 @@
 
 #include "Point.h"
 
-//#include "config.h"
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
@@ -29,7 +28,7 @@ namespace ITI {
 */
 template <typename ValueType>
 class SpatialCell : public std::enable_shared_from_this<SpatialCell<ValueType>> {
-    //friend class QuadTreeTest;
+
 public:
     SpatialCell() = default;
     virtual ~SpatialCell() = default;

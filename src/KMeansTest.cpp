@@ -81,6 +81,7 @@ TYPED_TEST(KMeansTest, testFindInitialCentersSFC) {
     for (IndexType i=0; i<k; i++) {
         ValueType coordSum = std::accumulate(centers[i].begin(), centers[i].end(), 0.0);
         ValueType totalSum = comm->sum(coordSum);
+        //WARNING: fails with p=5 for ValueType float
         EXPECT_LT(std::abs(p*coordSum - totalSum), 1e-5);
     }
 }

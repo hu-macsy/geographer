@@ -957,27 +957,6 @@ ValueType MeshGenerator<IndexType, ValueType>::dist3DSquared(std::tuple<IndexTyp
     ValueType distanceSquared = distX*distX+distY*distY+distZ*distZ;
     return distanceSquared;
 }
-//-------------------------------------------------------------------------------------------------
-
-/*
-template<typename IndexType, typename ValueType>
-template<typename T>
-ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<T> p1, const std::vector<T> p2) {
-    SCAI_REGION( "MeshGenerator.distSquared" )
-
-    const IndexType dimensions=p1.size();
-    SCAI_ASSERT_EQ_ERROR( p2.size(), dimensions, "The two points must have the same dimension" );
-
-    ValueType distanceSquared=0;
-
-    for( int d=0; d<dimensions; d++) {
-        ValueType distThisDim = p1[d]-p2[d];
-        distanceSquared += distThisDim*distThisDim;
-    }
-
-    return distanceSquared;
-}
-*/
 
 //-------------------------------------------------------------------------------------------------
 

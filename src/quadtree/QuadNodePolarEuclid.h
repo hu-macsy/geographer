@@ -20,7 +20,7 @@ namespace ITI {
 
 template <typename ValueType>
 class QuadNodePolarEuclid : public ITI::SpatialCell<ValueType> {
-    //friend class QuadTreeTest<ValueType>;
+    
 private:
     static const long unsigned sanityNodeLimit = 10E15; //just assuming, for debug purposes, that this algorithm never runs on machines with more than 4 Petabyte RAM
     bool splitTheoretical;

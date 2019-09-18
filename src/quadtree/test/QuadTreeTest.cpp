@@ -32,8 +32,6 @@ TYPED_TEST(QuadTreeTest, testGetGraphFromForestRandom_2D) {
     std::vector<std::shared_ptr<const SpatialCell<ValueType>>> forest;
 
     IndexType n= 20;
-    //vector<Point<ValueType> > positions(n);
-    //vector<index> content(n);
 
     Point<ValueType> min(0.0, 0.0);
     Point<ValueType> max(1.0, 1.0);

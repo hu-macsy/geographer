@@ -28,13 +28,7 @@
 #include <tuple>
 #include <random>
 
-/*
-#include "quadtree/Point.h"
-#include "quadtree/SpatialTree.h"
-#include "quadtree/SpatialCell.h"
-*/
 #include "quadtree/QuadTreeCartesianEuclid.h"
-
 #include "AuxiliaryFunctions.h"
 #include "Settings.h"
 
