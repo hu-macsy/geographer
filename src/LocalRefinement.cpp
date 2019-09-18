@@ -1328,6 +1328,8 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distancesFrom
 
 //---------------------------------------------------------------------------------------
 
-template class LocalRefinement<IndexType, ValueType>;
+
+template class LocalRefinement<IndexType, double>;
+template class LocalRefinement<IndexType, float>;
 
 } // namespace ITI

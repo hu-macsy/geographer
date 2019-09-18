@@ -13,10 +13,12 @@
 
 using ITI::Settings;
 using ITI::IndexType;
-using ITI::ValueType;
 using ITI::version;
 using ITI::Metrics;
 using scai::lama::DenseVector;
+
+using ValueType = double; //hardcode to double
+
 
 int main(int argc, char** argv) {
     using namespace cxxopts;
@@ -128,7 +130,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
     metrics.getEasyMetrics( graph, part, nodeWeights, settings );
 
     if (comm->getRank() == 0) {

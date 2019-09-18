@@ -18,8 +18,9 @@
 
 namespace ITI {
 
-class QuadNodePolarEuclid : public ITI::SpatialCell {
-    friend class QuadTreeTest;
+template <typename ValueType>
+class QuadNodePolarEuclid : public ITI::SpatialCell<ValueType> {
+    
 private:
     static const long unsigned sanityNodeLimit = 10E15; //just assuming, for debug purposes, that this algorithm never runs on machines with more than 4 Petabyte RAM
     bool splitTheoretical;
@@ -32,7 +33,7 @@ public:
      *
      */
     QuadNodePolarEuclid(Point<ValueType> minCoords = {0,0}, Point<ValueType> maxCoords = {2*M_PI, 1}, unsigned capacity = 1000, bool splitTheoretical = false, ValueType balance = 0.5)
-        : SpatialCell(minCoords, maxCoords, capacity) {
+        : SpatialCell<ValueType>(minCoords, maxCoords, capacity) {
         if (balance <= 0 || balance >= 1) throw std::runtime_error("Quadtree balance parameter must be between 0 and 1.");
         if (minCoords.getDimensions() != 2) throw std::runtime_error("Currently only supported for two dimensions");
         this->balance = balance;

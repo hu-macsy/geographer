@@ -21,6 +21,7 @@ using scai::lama::DenseVector;
 using scai::lama::DenseMatrix;
 using scai::dmemo::DistributionPtr;
 
+template<typename T>
 class DiffusionTest : public ::testing::Test {
 protected:
     // the directory of all the meshes used
@@ -29,10 +30,17 @@ protected:
 
 };
 
-TEST_F(DiffusionTest, testPotentials) {
+using testTypes = ::testing::Types<double,float>;
+TYPED_TEST_SUITE(DiffusionTest, testTypes);
+
+//-----------------------------------------------
+
+TYPED_TEST(DiffusionTest, testPotentials) {
+    using ValueType = TypeParam;
+
     //std::string fileName = "trace-00008.graph";
     std::string fileName = "Grid16x16";
-    std::string file = graphPath + fileName;
+    std::string file = DiffusionTest<ValueType>::graphPath + fileName;
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType n = graph.getNumRows();
     scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
@@ -47,11 +55,13 @@ TEST_F(DiffusionTest, testPotentials) {
     ASSERT_LT(potentials.sum(), 0.005);
 }
 
-TEST_F(DiffusionTest, testMultiplePotentials) {
+TYPED_TEST(DiffusionTest, testMultiplePotentials) {
+    using ValueType = TypeParam;
+
     const IndexType numLandmarks = 2;
     //std::string fileName = "trace-00008.graph";
     std::string fileName = "Grid16x16";
-    std::string file = graphPath + fileName;
+    std::string file = DiffusionTest<ValueType>::graphPath + fileName;
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
     const IndexType globalN = inputDist->getGlobalSize();
@@ -95,7 +105,9 @@ TEST_F(DiffusionTest, testMultiplePotentials) {
 
 }
 
-TEST_F(DiffusionTest, testConstructFJLTMatrix) {
+TYPED_TEST(DiffusionTest, testConstructFJLTMatrix) {
+    using ValueType = TypeParam;
+
     const ValueType epsilon = 0.1;
     const IndexType n = 10000;
     const IndexType origDimension = 20;

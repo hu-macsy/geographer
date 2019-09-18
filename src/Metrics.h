@@ -13,7 +13,12 @@ namespace ITI {
 
 /** @brief A struct to hold and calculate several metrics for the partition.
 */
-struct Metrics {
+template <typename ValueType>
+class Metrics {
+public:
+    //hard code IndexType and ValueType; no need to be templates
+    //typedef long int IndexType;
+    //typedef double ValueType;
 
     // timing results
     //
@@ -170,19 +175,18 @@ struct Metrics {
 //-------------------------------------------------------------------------------------------------------------
 
 //TODO: add default constructor and remove Settings
-
-inline struct Metrics aggregateVectorMetrics( const std::vector<struct Metrics>& metricsVec ) {
+template<typename ValueType>
+inline Metrics<ValueType> aggregateVectorMetrics( const std::vector<Metrics<ValueType>>& metricsVec ) {
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
     IndexType numRuns = metricsVec.size();
 
-    Metrics aggregateMetrics( metricsVec[0] );
-    //aggregateMetrics  = metricsVec[0] ?
+    Metrics<ValueType> aggregateMetrics( metricsVec[0] );
 
     for(IndexType run=1; run<numRuns; run++) {
         //this is copied because the compiler complains about the const-ness if we use a reference
-        Metrics thisMetric = metricsVec[ run ];
+        Metrics<ValueType> thisMetric = metricsVec[ run ];
 		
 		for( auto metIt = aggregateMetrics.MM.begin(); metIt!=aggregateMetrics.MM.end(); metIt++){
 			std::string metString = metIt->first;

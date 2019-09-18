@@ -9,7 +9,7 @@ namespace ITI {
 using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
 
-
+template<typename T>
 class KMeansTest : public ::testing::Test {
 protected:
     // the directory of all the meshes used
@@ -17,9 +17,16 @@ protected:
     const std::string graphPath = projectRoot+"/meshes/";
 };
 
-TEST_F(KMeansTest, testFindInitialCentersSFC) {
+using testTypes = ::testing::Types<double,float>;
+TYPED_TEST_SUITE(KMeansTest, testTypes);
+
+//-----------------------------------------------
+
+TYPED_TEST(KMeansTest, testFindInitialCentersSFC) {
+    using ValueType = TypeParam;
+
     std::string fileName = "bubbles-00010.graph";
-    std::string graphFile = graphPath + fileName;
+    std::string graphFile = KMeansTest<ValueType>::graphPath + fileName;
     std::string coordFile = graphFile + ".xyz";
     const IndexType dimensions = 2;
     const IndexType k = 8;
@@ -42,7 +49,7 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
         SCAI_ASSERT_NE_ERROR( minCoords[dim], maxCoords[dim], "min=max for dimension "<< dim << ", this will cause problems to the hilbert index. local= " << coords[0].getLocalValues().size() );
     }
 
-    std::vector<std::vector<ValueType>> centers = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords,  minCoords, maxCoords, settings);
+    std::vector<std::vector<ValueType>> centers = KMeans<IndexType,ValueType>::findInitialCentersSFC(coords,  minCoords, maxCoords, settings);
 
     //check for size
     EXPECT_EQ(k, centers.size());
@@ -74,13 +81,17 @@ TEST_F(KMeansTest, testFindInitialCentersSFC) {
     for (IndexType i=0; i<k; i++) {
         ValueType coordSum = std::accumulate(centers[i].begin(), centers[i].end(), 0.0);
         ValueType totalSum = comm->sum(coordSum);
+        //WARNING: fails with p=5 for ValueType float
         EXPECT_LT(std::abs(p*coordSum - totalSum), 1e-5);
     }
 }
+//------------------------------------------- -----------------------
 
-TEST_F(KMeansTest, testFindCenters) {
+TYPED_TEST(KMeansTest, testFindCenters) {
+    using ValueType = TypeParam;
+
     std::string fileName = "bubbles-00010.graph";
-    std::string graphFile = graphPath + fileName;
+    std::string graphFile = KMeansTest<ValueType>::graphPath + fileName;
     std::string coordFile = graphFile + ".xyz";
     const IndexType dimensions = 2;
 
@@ -105,7 +116,7 @@ TEST_F(KMeansTest, testFindCenters) {
     //get centers
     std::vector<IndexType> nodeIndices(uniformWeights.getLocalValues().size());
     std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
-    std::vector<std::vector<ValueType> > centers = KMeans::findCenters(coords, part, k,	nodeIndices.begin(), nodeIndices.end(), uniformWeights);
+    std::vector<std::vector<ValueType> > centers = KMeans<IndexType,ValueType>::findCenters(coords, part, k,	nodeIndices.begin(), nodeIndices.end(), uniformWeights);
 
     //check for size
     EXPECT_EQ(dimensions, centers.size());
@@ -115,14 +126,16 @@ TEST_F(KMeansTest, testFindCenters) {
     part = DenseVector<IndexType>(dist, 0);
 
     //get centers
-    centers = KMeans::findCenters(coords, part, k, nodeIndices.begin(), nodeIndices.end(), uniformWeights);
+    centers = KMeans<IndexType,ValueType>::findCenters(coords, part, k, nodeIndices.begin(), nodeIndices.end(), uniformWeights);
 }
 
 
 
-TEST_F(KMeansTest, testCentersOnlySfc) {
+TYPED_TEST(KMeansTest, testCentersOnlySfc) {
+    using ValueType = TypeParam;
+
     std::string fileName = "bubbles-00010.graph";
-    std::string graphFile = graphPath + fileName;
+    std::string graphFile = KMeansTest<ValueType>::graphPath + fileName;
     std::string coordFile = graphFile + ".xyz";
     const IndexType dimensions = 2;
 
@@ -141,19 +154,19 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 
     //get min and max
     std::vector<ValueType> minCoords, maxCoords;
-    std::tie(minCoords, maxCoords) = KMeans::getLocalMinMaxCoords(coords);
+    std::tie(minCoords, maxCoords) = KMeans<IndexType,ValueType>::getLocalMinMaxCoords(coords);
 
     // get centers
-    std::vector<std::vector<ValueType>> centers1 = KMeans::findInitialCentersSFC<IndexType,ValueType>(coords, minCoords, maxCoords, settings);
+    std::vector<std::vector<ValueType>> centers1 = KMeans<IndexType,ValueType>::findInitialCentersSFC(coords, minCoords, maxCoords, settings);
     EXPECT_EQ( centers1.size(), k );
     EXPECT_EQ( centers1[0].size(), dimensions );
 
     settings.sfcResolution = std::log2(k);
-    std::vector<std::vector<ValueType>> centers2 = KMeans::findInitialCentersFromSFCOnly<IndexType,ValueType>( minCoords, maxCoords, settings);
+    std::vector<std::vector<ValueType>> centers2 = KMeans<IndexType,ValueType>::findInitialCentersFromSFCOnly( minCoords, maxCoords, settings);
     EXPECT_EQ( centers2.size(), dimensions );
 
 //WARNING: quick fix for tests to pass
-//TODO: the functions should agree on their return type: either a vector of size k*dimensions (centers2) or dimension*k (centers2)
+//TODO: the functions should agree on their return type: either a vector of size k*dimensions (centers1) or dimension*k (centers2)
     {
         std::vector<std::vector<ValueType>> reversedCenters( dimensions, std::vector<ValueType>(settings.numBlocks, 0.0) );
         for( unsigned int c=0; c<settings.numBlocks; c++) {
@@ -201,11 +214,13 @@ TEST_F(KMeansTest, testCentersOnlySfc) {
 }
 
 
-TEST_F(KMeansTest, testHierarchicalPartition) {
+TYPED_TEST(KMeansTest, testHierarchicalPartition) {
+    using ValueType = TypeParam;
+
     //std::string fileName = "bubbles-00010.graph";
     std::string fileName = "Grid32x32";
     //std::string fileName = "Grid8x8";
-    std::string graphFile = graphPath + fileName;
+    std::string graphFile = KMeansTest<ValueType>::graphPath + fileName;
     std::string coordFile = graphFile + ".xyz";
     const IndexType dimensions = 2;
 
@@ -215,6 +230,9 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
     const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
     const IndexType n = graph.getNumRows();
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
+
+    EXPECT_TRUE( coords[0].getDistributionPtr()->isEqual( coords[1].getDistribution()) );
+    EXPECT_TRUE( coords[0].getDistributionPtr()->isEqual( graph.getRowDistribution()) );
 
     //set uniform node weights
     scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
@@ -241,13 +259,8 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
     for( unsigned int i=0; i<nodeWeights.size(); i++ ) {
         PRINT0( "weight " << i << ": " << nodeWeights[i].sum());
     }
-    /*
-    std::transform( unitNodeWeights.begin(), unitNodeWeights.end(), unitNodeWeights.begin(), \
-    	std::bind( std::multiplies<ValueType>(), 2) ) };
-    */
-    //const IndexType k = comm->getSize();
-    //using KMeans::cNode;
 
+    typedef typename CommTree<IndexType,ValueType>::commNode cNode;
     //set CommTree
     std::vector<cNode> leaves = {
         // 				{hierachy ids}, numCores, mem, speed
@@ -272,7 +285,7 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
     struct Settings settings;
     settings.dimensions = dimensions;
     settings.numBlocks = leaves.size();
-    settings.debugMode = false;
+    settings.debugMode = true;
     settings.verbose = false;
     settings.storeInfo = false;
     settings.epsilon = 0.05;
@@ -280,9 +293,9 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
     settings.maxKMeansIterations = 5;
     settings.minSamplingNodes = -1;
 
-    Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
-    scai::lama::DenseVector<IndexType> partition = KMeans::computeHierarchicalPartition( coords, nodeWeights, cTree, settings, metrics);
+    scai::lama::DenseVector<IndexType> partition = KMeans<IndexType,ValueType>::computeHierarchicalPartition( coords, nodeWeights, cTree, settings, metrics);
 
     //checks - prints
 
@@ -297,9 +310,11 @@ TEST_F(KMeansTest, testHierarchicalPartition) {
     }
 }
 
-TEST_F(KMeansTest, testComputePartitionWithMultipleWeights) {
+TYPED_TEST(KMeansTest, testComputePartitionWithMultipleWeights) {
+    using ValueType = TypeParam;
+
     std::string fileName = "bubbles-00010.graph";
-    std::string graphFile = graphPath + fileName;
+    std::string graphFile = KMeansTest<ValueType>::graphPath + fileName;
     std::string coordFile = graphFile + ".xyz";
 
     const IndexType numNodeWeights = 2;
@@ -335,9 +350,9 @@ TEST_F(KMeansTest, testComputePartitionWithMultipleWeights) {
         blockSizes[i].resize(settings.numBlocks, std::ceil(nodeWeightSum[i]/settings.numBlocks));
     }
 
-    Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
     //use hilbert redistribution before?
-    scai::lama::DenseVector<IndexType> partition = ITI::KMeans::computePartition<IndexType, ValueType>( coords, nodeWeights, blockSizes, settings, metrics);
+    scai::lama::DenseVector<IndexType> partition = KMeans<IndexType, ValueType>::computePartition( coords, nodeWeights, blockSizes, settings, metrics);
 
     //assert that distributions are still the same
 
@@ -365,10 +380,12 @@ TEST_F(KMeansTest, testComputePartitionWithMultipleWeights) {
 }
 
 /*
-TEST_F(KMeansTest, testPartitionWithNodeWeights) {
+TYPED_TEST(KMeansTest, testPartitionWithNodeWeights) {
+    using ValueType = TypeParam;
+
 	//std::string fileName = "Grid32x32";
 	std::string fileName = "bubbles-00010.graph";
-	std::string graphFile = graphPath + fileName;
+	std::string graphFile = KMeansTest<ValueType>::graphPath + fileName;
 	std::string coordFile = graphFile + ".xyz";
 	const IndexType dimensions = 2;
 
@@ -393,7 +410,7 @@ TEST_F(KMeansTest, testPartitionWithNodeWeights) {
 
 	scai::lama::DenseVector<IndexType> firstPartition = ITI::KMeans::computePartition ( coords, settings.numBlocks, unitNodeWeights, blockSizes, settings);
 
-	struct Metrics metrics(1);
+	Metrics<ValueType> metrics(1);
 	metrics.getEasyMetrics( graph, firstPartition, unitNodeWeights, settings );
 	if(comm->getRank()==0){
 		printMetricsShort( metrics, std::cout);

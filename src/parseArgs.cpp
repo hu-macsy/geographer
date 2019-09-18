@@ -51,8 +51,8 @@ Options populateOptions() {
     ("pixeledSideLen", "The resolution for the pixeled partition or the spectral", value<IndexType>())
     // K-Means
     ("minSamplingNodes", "Tuning parameter for K-Means", value<IndexType>())
-    ("influenceExponent", "Tuning parameter for K-Means, default is ", value<ValueType>()->default_value(std::to_string(settings.influenceExponent)))
-    ("influenceChangeCap", "Tuning parameter for K-Means", value<ValueType>())
+    ("influenceExponent", "Tuning parameter for K-Means, default is ", value<double>()->default_value(std::to_string(settings.influenceExponent)))
+    ("influenceChangeCap", "Tuning parameter for K-Means", value<double>())
     ("balanceIterations", "Tuning parameter for K-Means", value<IndexType>())
     ("maxKMeansIterations", "Tuning parameter for K-Means", value<IndexType>())
     ("tightenBounds", "Tuning parameter for K-Means")
@@ -247,10 +247,10 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         settings.minSamplingNodes = vm["minSamplingNodes"].as<IndexType>();
     }
     if (vm.count("influenceExponent")) {
-        settings.influenceExponent = vm["influenceExponent"].as<ValueType>();
+        settings.influenceExponent = vm["influenceExponent"].as<double>();
     }
     if (vm.count("influenceChangeCap")) {
-        settings.influenceChangeCap = vm["influenceChangeCap"].as<ValueType>();
+        settings.influenceChangeCap = vm["influenceChangeCap"].as<double>();
     }
     if (vm.count("balanceIterations")) {
         settings.balanceIterations = vm["balanceIterations"].as<IndexType>();

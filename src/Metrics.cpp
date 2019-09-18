@@ -2,7 +2,8 @@
 
 using namespace ITI;
 
-void Metrics::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
+template<typename ValueType>
+void Metrics<ValueType>::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
 
     getEasyMetrics( graph, partition, nodeWeights, settings );
 
@@ -13,7 +14,8 @@ void Metrics::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, 
     }
 }
 
-void Metrics::print( std::ostream& out) const {
+template<typename ValueType>
+void Metrics<ValueType>::print( std::ostream& out) const {
 
     //out<<"TEST print" << std::endl;
     for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ) {
@@ -21,24 +23,11 @@ void Metrics::print( std::ostream& out) const {
             out<< mapIt->first <<": " << mapIt->second << std::endl;
     }
 
-	out<< "localRefinement details" << std::endl;
-	for( unsigned int i=0; i<this->localRefDetails.size(); i++){
-		if( this->localRefDetails[i][0].first != -1){
-			out << "MLRound " << i << std::endl;
-		}
-		for( unsigned int j=0; j<this->localRefDetails[i].size(); j++){
-			if( this->localRefDetails[i][j].first != -1){
-				out << "\t refine round " << j <<", gain: " << \
-					this->localRefDetails[i][j].first << ", time: "<< \
-					this->localRefDetails[i][j].second << std::endl;
-			}
-		}
-	}
-    
 }
 //---------------------------------------------------------------------------
 
-void Metrics::printHorizontal( std::ostream& out) const {
+template<typename ValueType>
+void Metrics<ValueType>::printHorizontal( std::ostream& out) const {
 
     for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ) {
         if( mapIt->second!=-1)
@@ -53,7 +42,8 @@ void Metrics::printHorizontal( std::ostream& out) const {
 }
 //---------------------------------------------------------------------------
 
-void Metrics::printHorizontal2( std::ostream& out) const {
+template<typename ValueType>
+void Metrics<ValueType>::printHorizontal2( std::ostream& out) const {
 
     for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ) {
         if( mapIt->second!=-1)
@@ -63,13 +53,15 @@ void Metrics::printHorizontal2( std::ostream& out) const {
 }
 //---------------------------------------------------------------------------
 
-void Metrics::printKMeansProfiling( std::ostream& out ) const {
+template<typename ValueType>
+void Metrics<ValueType>::printKMeansProfiling( std::ostream& out ) const {
     out << "KMeans::assignBlocks was called " << numBalanceIter.size() << " times" << std::endl;
     out << "Average number of balance iterations: " << std::accumulate( numBalanceIter.begin(), numBalanceIter.end(), 0.0 )/numBalanceIter.size() << std::endl;
 }
 //---------------------------------------------------------------------------
 
-void Metrics::getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
+template<typename ValueType>
+void Metrics<ValueType>::getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
 
     getAllMetrics( graph, partition, nodeWeights, settings);
 
@@ -80,7 +72,9 @@ void Metrics::getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> gra
 
 }
 //---------------------------------------------------------------------------
-void Metrics::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
+
+template<typename ValueType>
+void Metrics<ValueType>::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
 
     MM["finalCut"] = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
     for( unsigned int w=0; w<nodeWeights.size(); w++ ) {
@@ -133,9 +127,8 @@ void Metrics::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph
 }
 //---------------------------------------------------------------------------
 
-
-std::tuple<IndexType,IndexType,IndexType> Metrics::getDiameter( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings ) {
-    SCAI_REGION("Metrics.getDiameter");
+template<typename ValueType>
+std::tuple<IndexType,IndexType,IndexType> Metrics<ValueType>::getDiameter( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings ) {
 
     std::chrono::time_point<std::chrono::high_resolution_clock> diameterStart = std::chrono::high_resolution_clock::now();
     IndexType maxBlockDiameter = 0;
@@ -197,8 +190,8 @@ std::tuple<IndexType,IndexType,IndexType> Metrics::getDiameter( const scai::lama
 }
 //---------------------------------------------------------------------------
 
-
-void Metrics::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings, const IndexType repeatTimes ) {
+template<typename ValueType>
+void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings, const IndexType repeatTimes ) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const IndexType N = graph.getNumRows();
@@ -301,7 +294,8 @@ void Metrics::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueT
 
 /* Calculate the volume, aka the data that will be exchanged when redistributing from oldDist to newDist.
  */
-std::pair<IndexType,IndexType> Metrics::getRedistributionVol( const scai::dmemo::DistributionPtr newDist, const scai::dmemo::DistributionPtr oldDist) {
+template<typename ValueType>
+std::pair<IndexType,IndexType> Metrics<ValueType>::getRedistributionVol( const scai::dmemo::DistributionPtr newDist, const scai::dmemo::DistributionPtr oldDist) {
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -328,7 +322,8 @@ std::pair<IndexType,IndexType> Metrics::getRedistributionVol( const scai::dmemo:
 }
 //---------------------------------------------------------------------------------------
 
-void Metrics::getMappingMetrics(
+template<typename ValueType>
+void Metrics<ValueType>::getMappingMetrics(
     const scai::lama::CSRSparseMatrix<ValueType> blockGraph,
     const scai::lama::CSRSparseMatrix<ValueType> PEGraph,
     const std::vector<IndexType> mapping) {
@@ -443,8 +438,8 @@ void Metrics::getMappingMetrics(
 
 }//getMappingMetrics
 //---------------------------------------------------------------------------------------
-
-void Metrics::getMappingMetrics(
+template<typename ValueType>
+void Metrics<ValueType>::getMappingMetrics(
     const scai::lama::CSRSparseMatrix<ValueType> appGraph,
     const scai::lama::DenseVector<IndexType> partition,
     const scai::lama::CSRSparseMatrix<ValueType> PEGraph ) {
@@ -462,3 +457,6 @@ void Metrics::getMappingMetrics(
 
     getMappingMetrics( blockGraph, PEGraph, identityMapping);
 }//getMappingMetrics
+
+template class Metrics<double>;
+template class Metrics<float>;

@@ -13,8 +13,9 @@ using scai::lama::DenseVector;
 using scai::lama::fill;
 using ITI::Settings;
 using ITI::IndexType;
-using ITI::ValueType;
 using ITI::version;
+
+using ValueType = double; //hardcode to double
 
 int main(int argc, char** argv) {
     using namespace cxxopts;

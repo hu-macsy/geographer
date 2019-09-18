@@ -447,6 +447,8 @@ private:
 
 };//class CommTree
 
-typedef typename ITI::CommTree<IndexType,ValueType>::commNode cNode;
+template <typename IndexType, typename ValueType>
+using cNode = typename ITI::CommTree<IndexType,ValueType>::commNode;
+//typedef typename ITI::CommTree<IndexType,ValueType>::commNode cNode;
 
 }//namespace ITI

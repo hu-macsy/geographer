@@ -127,6 +127,8 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(const
     return scai::lama::distribute<DenseMatrix<ValueType>>(DenseStorage<ValueType>(l, localN, resultContainer), lDist, dist);
 }
 
-template class Diffusion<IndexType, ValueType>;
+
+template class Diffusion<IndexType, double>;
+template class Diffusion<IndexType, float>;
 
 } /* namespace ITI */

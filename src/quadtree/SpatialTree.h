@@ -11,6 +11,7 @@
 
 namespace ITI {
 
+template <typename ValueType>
 class SpatialTree {
 public:
     SpatialTree() = default;
@@ -74,7 +75,7 @@ public:
         }
     }
 
-    std::shared_ptr<SpatialCell> getRoot() {
+    std::shared_ptr<SpatialCell<ValueType>> getRoot() {
         return root;
     }
 
@@ -91,21 +92,21 @@ public:
         return root->getDimensions();
     }
 
-    template<typename IndexType, typename ValueType>
-    scai::lama::CSRSparseMatrix<ValueType>  getTreeAsGraph( std::vector< std::set<std::shared_ptr< const SpatialCell>>>& graphNgbrsCells, std::vector<std::vector<ValueType>>& coords ) const {
+    template<typename IndexType> //, typename ValueType>
+    scai::lama::CSRSparseMatrix<ValueType>  getTreeAsGraph( std::vector< std::set<std::shared_ptr< const SpatialCell<ValueType>>>>& graphNgbrsCells, std::vector<std::vector<ValueType>>& coords ) const {
         if (!root->isIndexed()) {
             throw std::runtime_error("Call indexSubtree first.");
         }
-        return root->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coords );
+        return root->template getSubTreeAsGraph<IndexType>( graphNgbrsCells, coords );
     }
 
     /* Given several tree (thus, a forest) we create the corresponding graph. \sa SpatialCell::getSubTreeAsGraph()
     */
 
-    template<typename IndexType, typename ValueType>
+    template<typename IndexType> //, typename ValueType>
     static scai::lama::CSRSparseMatrix<ValueType>  getGraphFromForest(
-        std::vector< std::set<std::shared_ptr< const SpatialCell>>>& graphNgbrsCells,
-        const std::vector<std::shared_ptr< const SpatialCell>>& treePtrVector,
+        std::vector< std::set<std::shared_ptr< const SpatialCell<ValueType>>>>& graphNgbrsCells,
+        const std::vector<std::shared_ptr< const SpatialCell<ValueType>>>& treePtrVector,
         std::vector<std::vector<ValueType>>& coords) {
         IndexType numTrees = treePtrVector.size();
         //  both vectors must have the same size = forestSize
@@ -113,7 +114,7 @@ public:
         //PRINT("graphNgbrsCells.size()= " << graphNgbrsCells.size() << ", forest size= " << forestSize);
         assert( forestSize == graphNgbrsCells.size() );
 
-        std::shared_ptr<const SpatialCell> onlyChild;
+        std::shared_ptr<const SpatialCell<ValueType>> onlyChild;
         if(treePtrVector.size()!=0) {
             onlyChild= treePtrVector[0];
         } else {
@@ -122,17 +123,17 @@ public:
 
         int maxHeight= 0;
         for(IndexType i=0; i<numTrees; i++) {
-            std::shared_ptr<const SpatialCell> thisNode = treePtrVector[i];
+            std::shared_ptr<const SpatialCell<ValueType>> thisNode = treePtrVector[i];
             if( thisNode->height() > maxHeight) {
                 onlyChild = thisNode;
                 maxHeight = thisNode->height();
             }
         }
         //PRINT("numTrees= "<< numTrees);
-        std::shared_ptr<const SpatialCell> dummyRoot= onlyChild;
+        std::shared_ptr<const SpatialCell<ValueType>> dummyRoot= onlyChild;
 
         // convert the tree vector to a queue for the starting frontier
-        std::queue<std::shared_ptr<const SpatialCell>> frontier;
+        std::queue<std::shared_ptr<const SpatialCell<ValueType>>> frontier;
         for(int i=0; i< numTrees; i++) {
             frontier.push( treePtrVector[i] );
         }
@@ -141,12 +142,12 @@ public:
          * TODO: turn getSubTreeAsGraph to static ??
          */
 
-        return dummyRoot->getSubTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coords, frontier);
+        return dummyRoot->template getSubTreeAsGraph<IndexType>( graphNgbrsCells, coords, frontier);
     }
 
 
 protected:
-    std::shared_ptr<SpatialCell> root;
+    std::shared_ptr<SpatialCell<ValueType>> root;
 };
 
 } /* namespace ITI */
