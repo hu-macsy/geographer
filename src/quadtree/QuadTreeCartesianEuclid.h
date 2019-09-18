@@ -24,7 +24,7 @@ namespace ITI {
 
 template <typename ValueType>
 class QuadTreeCartesianEuclid : public ITI::SpatialTree<ValueType> {
-    friend class QuadTreeCartesianEuclidTest;
+    //friend class QuadTreeCartesianEuclidTest;
 public:
     /**
      * @param lower Minimal coordinates of region

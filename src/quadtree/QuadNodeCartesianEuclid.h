@@ -1,5 +1,5 @@
 /*
- * QuadNodePolarEuclid.h
+ * QuadNodeCartesianEuclid.h
  *
  *  Created on: 21.05.2014
  *      Author: Moritz v. Looz (moritz.looz-corswarem@kit.edu)
@@ -24,7 +24,7 @@ namespace ITI {
 
 template <typename ValueType>
 class QuadNodeCartesianEuclid : public ITI::SpatialCell<ValueType> {
-    friend class QuadTreeTest;
+    //friend class QuadTreeTest;
 private:
     static const long unsigned sanityNodeLimit = 10E15; //just assuming, for debug purposes, that this algorithm never runs on machines with more than 4 Petabyte RAM
     bool splitTheoretical;

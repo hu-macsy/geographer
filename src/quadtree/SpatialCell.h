@@ -29,7 +29,7 @@ namespace ITI {
 */
 template <typename ValueType>
 class SpatialCell : public std::enable_shared_from_this<SpatialCell<ValueType>> {
-    friend class QuadTreeTest;
+    //friend class QuadTreeTest;
 public:
     SpatialCell() = default;
     virtual ~SpatialCell() = default;

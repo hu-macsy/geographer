@@ -25,10 +25,11 @@
 
 namespace ITI {
 
-TEST_F(QuadTreeTest, testGetGraphFromForestRandom_2D) {
+TYPED_TEST(QuadTreeTest, testGetGraphFromForestRandom_2D) {
+    using ValueType = TypeParam;
 
     // every forest[i] is a pointer to the root of a tree
-    std::vector<std::shared_ptr<const SpatialCell>> forest;
+    std::vector<std::shared_ptr<const SpatialCell<ValueType>>> forest;
 
     IndexType n= 20;
     //vector<Point<ValueType> > positions(n);
@@ -38,8 +39,8 @@ TEST_F(QuadTreeTest, testGetGraphFromForestRandom_2D) {
     Point<ValueType> max(1.0, 1.0);
     index capacity = 1;
 
-    QuadTreeCartesianEuclid quad(min, max, true, capacity);
-    QuadTreeCartesianEuclid quad2(min, max, true, capacity);
+    QuadTreeCartesianEuclid<ValueType> quad(min, max, true, capacity);
+    QuadTreeCartesianEuclid<ValueType> quad2(min, max, true, capacity);
     index i=0;
     srand(time(NULL));
 
@@ -62,15 +63,15 @@ TEST_F(QuadTreeTest, testGetGraphFromForestRandom_2D) {
 
 
     // graphNgbrsPtrs[i]= a set with pointers to the neighbours of -i- in the CSR matrix/graph
-    std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsPtrs( globIndexing );
+    std::vector< std::set<std::shared_ptr<const SpatialCell<ValueType>>>> graphNgbrsPtrs( globIndexing );
     //WARNING: this kind of edges must be symmetric
-    graphNgbrsPtrs[forest[0]->getID()].insert( std::shared_ptr<const SpatialCell> (forest[1]) );
-    graphNgbrsPtrs[forest[1]->getID()].insert( std::shared_ptr<const SpatialCell> (forest[0]) );
+    graphNgbrsPtrs[forest[0]->getID()].insert( std::shared_ptr<const SpatialCell<ValueType>> (forest[1]) );
+    graphNgbrsPtrs[forest[1]->getID()].insert( std::shared_ptr<const SpatialCell<ValueType>> (forest[0]) );
 
     PRINT("num trees= " << numTrees << ", globIndex= " << globIndexing);
     int dimension = 2;
     std::vector<std::vector<ValueType>> coords( dimension );
-    scai::lama::CSRSparseMatrix<ValueType> graph= SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsPtrs,  forest, coords);
+    scai::lama::CSRSparseMatrix<ValueType> graph= SpatialTree<ValueType>::template getGraphFromForest<IndexType>( graphNgbrsPtrs,  forest, coords);
 
     // checkSymmetry is really expensive for big graphs, used only for small instances
     graph.checkSymmetry();
@@ -79,10 +80,11 @@ TEST_F(QuadTreeTest, testGetGraphFromForestRandom_2D) {
 //-------------------------------------------------------------------------------------------------
 
 
-TEST_F(QuadTreeTest, testGetGraphFromForestByHand_2D) {
+TYPED_TEST(QuadTreeTest, testGetGraphFromForestByHand_2D) {
+    using ValueType = TypeParam;
 
     // every forest[i] is a pointer to the root of a tree
-    std::vector<std::shared_ptr<const SpatialCell>> forest;
+    std::vector<std::shared_ptr<const SpatialCell<ValueType>>> forest;
 
     IndexType n= 2;
     vector<Point<ValueType> > positions(n);
@@ -93,19 +95,19 @@ TEST_F(QuadTreeTest, testGetGraphFromForestByHand_2D) {
     index capacity = 1;
     index i=0;
 
-    QuadTreeCartesianEuclid quad0(min, max, true, capacity);
+    QuadTreeCartesianEuclid<ValueType> quad0(min, max, true, capacity);
     quad0.addContent( i++, Point<ValueType>({0.4, 0.3}) );
     quad0.addContent( i++, Point<ValueType>({0.4, 0.8}) );
 
-    QuadTreeCartesianEuclid quad1( Point<ValueType>({1.0, 0.0}), Point<ValueType>({2.0, 1.0}), true, capacity);
+    QuadTreeCartesianEuclid<ValueType> quad1( Point<ValueType>({1.0, 0.0}), Point<ValueType>({2.0, 1.0}), true, capacity);
     quad1.addContent(i++, Point<ValueType>({1.3, 0.2}));
     quad1.addContent(i++, Point<ValueType>({1.3, 0.8}));
 
-    QuadTreeCartesianEuclid quad2( Point<ValueType>({0.0, 1.0}), Point<ValueType>({1.0, 2.0}), true, capacity);
+    QuadTreeCartesianEuclid<ValueType> quad2( Point<ValueType>({0.0, 1.0}), Point<ValueType>({1.0, 2.0}), true, capacity);
     quad2.addContent( i++, Point<ValueType>({0.6, 1.1}) );
     quad2.addContent( i++, Point<ValueType>({0.6, 1.8}) );
 
-    QuadTreeCartesianEuclid quad3( Point<ValueType>({1.0, 1.0}), Point<ValueType>({2.0, 2.0}), true, capacity);
+    QuadTreeCartesianEuclid<ValueType> quad3( Point<ValueType>({1.0, 1.0}), Point<ValueType>({2.0, 2.0}), true, capacity);
     quad3.addContent( i++, Point<ValueType>({1.3, 1.2}) );
     quad3.addContent( i++, Point<ValueType>({1.3, 1.8}) );
 
@@ -130,26 +132,26 @@ TEST_F(QuadTreeTest, testGetGraphFromForestByHand_2D) {
 
     // graphNgbrsPtrs[i]= a set with pointers to the neighbours of -i- in the CSR matrix/graph
     // graphNgbrsPtrs.size() == size of the forest , all nodes on every tree
-    std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsPtrs( globIndexing );
+    std::vector< std::set<std::shared_ptr<const SpatialCell<ValueType>>>> graphNgbrsPtrs( globIndexing );
     //WARNING: this kind of edges must be symmetric
 
     // quad0 connects with quad1 and 2
-    graphNgbrsPtrs[forest[0]->getID()].insert( std::shared_ptr<const SpatialCell> (forest[1]) );
-    graphNgbrsPtrs[forest[1]->getID()].insert( std::shared_ptr<const SpatialCell> (forest[0]) );
-    graphNgbrsPtrs[forest[0]->getID()].insert( std::shared_ptr<const SpatialCell> (forest[2]) );
-    graphNgbrsPtrs[forest[2]->getID()].insert( std::shared_ptr<const SpatialCell> (forest[0]) );
+    graphNgbrsPtrs[forest[0]->getID()].insert( std::shared_ptr<const SpatialCell<ValueType>> (forest[1]) );
+    graphNgbrsPtrs[forest[1]->getID()].insert( std::shared_ptr<const SpatialCell<ValueType>> (forest[0]) );
+    graphNgbrsPtrs[forest[0]->getID()].insert( std::shared_ptr<const SpatialCell<ValueType>> (forest[2]) );
+    graphNgbrsPtrs[forest[2]->getID()].insert( std::shared_ptr<const SpatialCell<ValueType>> (forest[0]) );
 
     // quad1 connects with 0 and 3
-    graphNgbrsPtrs[forest[1]->getID()].insert( std::shared_ptr<const SpatialCell> (forest[3]) );
-    graphNgbrsPtrs[forest[3]->getID()].insert( std::shared_ptr<const SpatialCell> (forest[1]) );
+    graphNgbrsPtrs[forest[1]->getID()].insert( std::shared_ptr<const SpatialCell<ValueType>> (forest[3]) );
+    graphNgbrsPtrs[forest[3]->getID()].insert( std::shared_ptr<const SpatialCell<ValueType>> (forest[1]) );
 
-    graphNgbrsPtrs[forest[2]->getID()].insert( std::shared_ptr<const SpatialCell> (forest[3]) );
-    graphNgbrsPtrs[forest[3]->getID()].insert( std::shared_ptr<const SpatialCell> (forest[2]) );
+    graphNgbrsPtrs[forest[2]->getID()].insert( std::shared_ptr<const SpatialCell<ValueType>> (forest[3]) );
+    graphNgbrsPtrs[forest[3]->getID()].insert( std::shared_ptr<const SpatialCell<ValueType>> (forest[2]) );
 
     int dimension = 2;
     std::vector<std::vector<ValueType>> coords( dimension );
     PRINT("num trees= " << numTrees << ", globInde= " << globIndexing);
-    scai::lama::CSRSparseMatrix<ValueType> graph= SpatialTree::getGraphFromForest<IndexType, ValueType>( graphNgbrsPtrs,  forest, coords);
+    scai::lama::CSRSparseMatrix<ValueType> graph= SpatialTree<ValueType>::template getGraphFromForest<IndexType>( graphNgbrsPtrs,  forest, coords);
 
     EXPECT_EQ(coords.size(), dimension);
     EXPECT_EQ(coords[0].size(), graph.getNumRows());
@@ -180,9 +182,10 @@ TEST_F(QuadTreeTest, testGetGraphFromForestByHand_2D) {
 }
 
 
-TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
-    count n = 3500;
+TYPED_TEST(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
+    using ValueType = TypeParam;
 
+    count n = 3500;
     vector<Point<ValueType> > positions(n);
     vector<index> content(n);
 
@@ -190,7 +193,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
     Point<ValueType> max(1.0, 1.0, 1.0);
     index capacity = 1;
 
-    QuadTreeCartesianEuclid quad(min, max, true, capacity);
+    QuadTreeCartesianEuclid<ValueType> quad(min, max, true, capacity);
     index i=0;
     srand(time(NULL));
 
@@ -209,11 +212,11 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
 
     // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
     // of -i- in the output graph, not the quad tree.
-    std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells( treeSize );
+    std::vector< std::set<std::shared_ptr<const SpatialCell<ValueType>>>> graphNgbrsCells( treeSize );
     int dimension = 3;
     std::vector<std::vector<ValueType>> coords( dimension );
 
-    scai::lama::CSRSparseMatrix<ValueType> graph= quad.getTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coords );
+    scai::lama::CSRSparseMatrix<ValueType> graph= quad.template getTreeAsGraph<IndexType>( graphNgbrsCells, coords );
 
     // checkSymmetry is really expensive for big graphs, used only for small instances
     //graph.checkSymmetry();
@@ -261,7 +264,8 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_3D) {
 }
 //-------------------------------------------------------------------------------------------------
 
-TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
+TYPED_TEST(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
+    using ValueType = TypeParam;
 
     count n = 500;
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -273,7 +277,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
     Point<ValueType> max(1.0, 1.0, 1.0);
     index capacity = 1;
 
-    QuadTreeCartesianEuclid quad(min, max, true, capacity);
+    QuadTreeCartesianEuclid<ValueType> quad(min, max, true, capacity);
     index i=0;
 
     //broadcast seed value from root to ensure equal pseudorandom numbers.
@@ -296,11 +300,11 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 
     // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
     // of -i- in the output graph, not the quad tree.
-    std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells( treeSize );
+    std::vector< std::set<std::shared_ptr<const SpatialCell<ValueType>>>> graphNgbrsCells( treeSize );
     int dimension = 3;
     std::vector<std::vector<ValueType>> coords( dimension );
 
-    scai::lama::CSRSparseMatrix<ValueType> graph= quad.getTreeAsGraph<IndexType,ValueType>(graphNgbrsCells, coords);
+    scai::lama::CSRSparseMatrix<ValueType> graph= quad.template getTreeAsGraph<IndexType>(graphNgbrsCells, coords);
 
     // checkSymmetry is really expensive for big graphs, use only for small instances
     graph.checkSymmetry();
@@ -364,7 +368,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
     settings.minGainForNextRound = 5;
     settings.storeInfo = false;
 
-    struct Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
     EXPECT_EQ( coords[0].size(), N);
     EXPECT_EQ( graph.getNumRows(), N);
@@ -384,7 +388,8 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
 }
 
 
-TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_2D) {
+TYPED_TEST(QuadTreeTest, testGetGraphMatrixFromTree_2D) {
+    using ValueType = TypeParam;
 
     index n=8;
     vector<Point<ValueType> > positions(n);
@@ -395,7 +400,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_2D) {
     index capacity = 1;
 
     // the quadtree
-    QuadTreeCartesianEuclid quad(min, max, true, capacity);
+    QuadTreeCartesianEuclid<ValueType> quad(min, max, true, capacity);
 
     index i=0;
     // 2D points
@@ -417,11 +422,11 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_2D) {
 
     // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
     // of -i- in the output graph, not the quad tree.
-    std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells( treeSize );
+    std::vector< std::set<std::shared_ptr<const SpatialCell<ValueType>>>> graphNgbrsCells( treeSize );
     int dimension = 2;
     std::vector<std::vector<ValueType>> coords( dimension );
 
-    scai::lama::CSRSparseMatrix<ValueType> graph= quad.getTreeAsGraph<IndexType, ValueType>(graphNgbrsCells, coords);
+    scai::lama::CSRSparseMatrix<ValueType> graph= quad.template getTreeAsGraph<IndexType>(graphNgbrsCells, coords);
 
     // checkSymmetry is really expensive for big graphs, used only for small instances
     graph.checkSymmetry();
@@ -473,7 +478,8 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_2D) {
 
 
 
-TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
+TYPED_TEST(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
+    using ValueType = TypeParam;
 
     count n = 100;
 
@@ -484,7 +490,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
     Point<ValueType> max(1000.0, 1000.0);
     index capacity = 1;
 
-    QuadTreeCartesianEuclid quad(min, max, true, capacity);
+    QuadTreeCartesianEuclid<ValueType> quad(min, max, true, capacity);
     index i=0;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -522,11 +528,11 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 
     // A set for every node in the tree, graphNgbrsCells[i] contains shared_ptrs to every neighbour
     // of -i- in the output graph, not the quad tree.
-    std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells( treeSize );
+    std::vector< std::set<std::shared_ptr<const SpatialCell<ValueType>>>> graphNgbrsCells( treeSize );
     int dimension = 2;
     std::vector<std::vector<ValueType>> coords( dimension );
 
-    scai::lama::CSRSparseMatrix<ValueType> graph= quad.getTreeAsGraph<IndexType, ValueType>(graphNgbrsCells, coords);
+    scai::lama::CSRSparseMatrix<ValueType> graph= quad.template getTreeAsGraph<IndexType>(graphNgbrsCells, coords);
 
     // checkSymmetry is really expensive for big graphs, use only for small instances
     if(N<3000) {
@@ -611,7 +617,7 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 	settings.initialPartition = ITI::Tool::geoSFC;
 	settings.noRefinement = true;
 	
-	struct Metrics metrics(settings);
+	Metrics<ValueType> metrics(settings);
 	
 	std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, DenseVector<ValueType>(graph.getRowDistributionPtr(), 1));
 
@@ -673,23 +679,20 @@ TEST_F(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_2D) {
 
 //
 
-TEST_F(QuadTreeTest, DISABLED_testCartesianEuclidQuery) {
+TYPED_TEST(QuadTreeTest, DISABLED_testCartesianEuclidQuery) {
+    using ValueType = TypeParam;
+    
     count n = 10000;
-
-    assert(n > 0);
-
     std::vector<Point<ValueType> > positions(n);
     std::vector<index> content(n);
 
-    QuadTreeCartesianEuclid quad({0,0}, {1,1}, true);
+    QuadTreeCartesianEuclid<ValueType> quad({0,0}, {1,1}, true);
     for (index i = 0; i < n; i++) {
         Point<ValueType> pos = Point<ValueType>({ValueType(rand()) / RAND_MAX, ValueType(rand()) / RAND_MAX});
         positions[i] = pos;
         content[i] = i;
         quad.addContent(i, pos);
     }
-
-
 
     EXPECT_EQ(n, quad.size());
     quad.recount();
@@ -733,7 +736,9 @@ TEST_F(QuadTreeTest, DISABLED_testCartesianEuclidQuery) {
 
 
 
-TEST_F(QuadTreeTest, DISABLED_testPolarEuclidQuery) {
+TYPED_TEST(QuadTreeTest, DISABLED_testPolarEuclidQuery) {
+    using ValueType = TypeParam;
+
     /**
      * setup of data structures and constants
      */
@@ -764,7 +769,7 @@ TEST_F(QuadTreeTest, DISABLED_testPolarEuclidQuery) {
     }
 
     const bool splitTheoretical = true;
-    QuadTreePolarEuclid tree(angles, radii, content, splitTheoretical);
+    QuadTreePolarEuclid<ValueType> tree(angles, radii, content, splitTheoretical);
     EXPECT_EQ(n, tree.size());
 
     tree.trim();
@@ -791,7 +796,9 @@ TEST_F(QuadTreeTest, DISABLED_testPolarEuclidQuery) {
     EXPECT_EQ(0, near.size());
 }
 
-TEST_F(QuadTreeTest, testQuadTreePolarEuclidInsertion) {
+TYPED_TEST(QuadTreeTest, testQuadTreePolarEuclidInsertion) {
+    using ValueType = TypeParam;
+
     /**
      * setup of data structures and constants
      */
@@ -821,7 +828,7 @@ TEST_F(QuadTreeTest, testQuadTreePolarEuclidInsertion) {
         content[i] = i;
     }
 
-    QuadTreePolarEuclid tree(angles, radii, content);
+    QuadTreePolarEuclid<ValueType> tree(angles, radii, content);
     EXPECT_EQ(n, tree.size());
 
     /**
@@ -835,14 +842,16 @@ TEST_F(QuadTreeTest, testQuadTreePolarEuclidInsertion) {
     }
 }
 
-TEST_F(QuadTreeTest, testQuadNodePolarEuclidDistanceBounds) {
+TYPED_TEST(QuadTreeTest, testQuadNodePolarEuclidDistanceBounds) {
+    using ValueType = TypeParam;
+
     Point<ValueType> query = {3.81656, 1.18321};
     Point<ValueType> lowerLeft = {1.5708, 0};
     Point<ValueType> upperRight = {2.35619, 0.706942};
     Point<ValueType> interior = {2.35602,0.129449};
     Point<ValueType> projected = {2.35619,0.129449};
 
-    QuadNodePolarEuclid testNode(lowerLeft, upperRight);
+    QuadNodePolarEuclid<ValueType> testNode(lowerLeft, upperRight);
     ASSERT_TRUE(testNode.responsible(interior));
     EXPECT_LE(testNode.distances(query).first, testNode.euclidDistancePolar(query[0], query[1], interior[0], interior[1]));
 
@@ -853,7 +862,9 @@ TEST_F(QuadTreeTest, testQuadNodePolarEuclidDistanceBounds) {
 }
 
 
-TEST_F(QuadTreeTest, testQuadNodeCartesianDistances) {
+TYPED_TEST(QuadTreeTest, testQuadNodeCartesianDistances) {
+    using ValueType = TypeParam;
+
     Point<ValueType> lower({0.24997519780061023, 0.7499644402803205});
     Point<ValueType> upper({0.49995039560122045, 0.99995258704042733});
 
@@ -864,7 +875,7 @@ TEST_F(QuadTreeTest, testQuadNodeCartesianDistances) {
 
     Point<ValueType> query({0.81847946542324035, 0.91885035291473593});
 
-    QuadNodeCartesianEuclid node(lower, upper, 1000);
+    QuadNodeCartesianEuclid<ValueType> node(lower, upper, 1000);
     //count steps = 100;
     Point<ValueType> posAtMin = lower;
     ValueType minDistance = posAtMin.distance(query);
@@ -879,18 +890,20 @@ TEST_F(QuadTreeTest, testQuadNodeCartesianDistances) {
     EXPECT_LE(distanceQueryToCell, minDistance);
 }
 
-TEST_F(QuadTreeTest, DISABLED_benchCartesianQuadProbabilisticQueryUniform) {
+TYPED_TEST(QuadTreeTest, DISABLED_benchCartesianQuadProbabilisticQueryUniform) {
+    using ValueType = TypeParam;
+
     const index maxDim = 10;
     const count n = 50000;
-    std::vector<Point<ValueType> > points;
+    std::vector<Point<ValueType>> points;
     auto edgeProb = [n](ValueType distance) -> ValueType {return std::min<ValueType>(1, (1/(distance*n)));};
 
     for (index dim = 1; dim < maxDim; dim++) {
         std::vector<ValueType> minCoords(dim, 0);
         std::vector<ValueType> maxCoords(dim, 1);
 
-        std::vector<Point<ValueType> > coordVector;
-        QuadTreeCartesianEuclid quad(minCoords, maxCoords);
+        std::vector<Point<ValueType>> coordVector;
+        QuadTreeCartesianEuclid<ValueType> quad(minCoords, maxCoords);
         for (index i = 0; i < n; i++) {
             std::vector<ValueType> coords(dim);
             for (index j = 0; j < dim; j++) {
@@ -910,10 +923,12 @@ TEST_F(QuadTreeTest, DISABLED_benchCartesianQuadProbabilisticQueryUniform) {
     }
 }
 
-TEST_F(QuadTreeTest, DISABLED_benchCartesianKDProbabilisticQueryUniform) {
+TYPED_TEST(QuadTreeTest, DISABLED_benchCartesianKDProbabilisticQueryUniform) {
+    using ValueType = TypeParam;
+
     const index maxDim = 10;
     const count n = 50000;
-    std::vector<Point<ValueType> > points;
+    std::vector<Point<ValueType>> points;
     auto edgeProb = [n](ValueType distance) -> ValueType {return std::min<ValueType>(1, (1/(distance*n)));};
 
     for (index dim = 1; dim < maxDim; dim++) {
@@ -921,7 +936,7 @@ TEST_F(QuadTreeTest, DISABLED_benchCartesianKDProbabilisticQueryUniform) {
         std::vector<ValueType> maxCoords(dim, 1);
 
         std::vector<Point<ValueType> > coordVector;
-        KDTreeEuclidean<true> tree(minCoords, maxCoords);
+        KDTreeEuclidean<ValueType,true> tree(minCoords, maxCoords);
         for (index i = 0; i < n; i++) {
             std::vector<ValueType> coords(dim);
             for (index j = 0; j < dim; j++) {
@@ -941,9 +956,11 @@ TEST_F(QuadTreeTest, DISABLED_benchCartesianKDProbabilisticQueryUniform) {
     }
 }
 
-TEST_F(QuadTreeTest, DISABLED_benchPolarQuadProbabilisticQueryUniform) {
+TYPED_TEST(QuadTreeTest, DISABLED_benchPolarQuadProbabilisticQueryUniform) {
+    using ValueType = TypeParam;
+
     const count n = 50000;
-    std::vector<Point<ValueType> > points;
+    std::vector<Point<ValueType>> points;
     auto edgeProb = [n](ValueType distance) -> ValueType {return std::min<ValueType>(1, (1/(distance*n)));};
 
     std::vector<ValueType> minCoords(2, 0);
@@ -951,8 +968,8 @@ TEST_F(QuadTreeTest, DISABLED_benchPolarQuadProbabilisticQueryUniform) {
     maxCoords[0] = 2*M_PI;
     maxCoords[1] = 1;
 
-    std::vector<Point<ValueType> > coordVector;
-    QuadTreePolarEuclid quad(minCoords, maxCoords);
+    std::vector<Point<ValueType>> coordVector;
+    QuadTreePolarEuclid<ValueType> quad(minCoords, maxCoords);
     for (index i = 0; i < n; i++) {
         Point<ValueType> coords = { ValueType((ValueType(rand()) / RAND_MAX)*2*M_PI), ValueType(rand()) / RAND_MAX};
         quad.addContent(i, coords);
@@ -968,7 +985,9 @@ TEST_F(QuadTreeTest, DISABLED_benchPolarQuadProbabilisticQueryUniform) {
     }
 }
 
-TEST_F(QuadTreeTest, DISABLED_benchPolarKDProbabilisticQueryUniform) {
+TYPED_TEST(QuadTreeTest, DISABLED_benchPolarKDProbabilisticQueryUniform) {
+    using ValueType = TypeParam;
+
     const count n = 50000;
     std::vector<Point<ValueType> > points;
     auto edgeProb = [n](ValueType distance) -> ValueType {return std::min<ValueType>(1, (1/(distance*n)));};
@@ -977,7 +996,7 @@ TEST_F(QuadTreeTest, DISABLED_benchPolarKDProbabilisticQueryUniform) {
     std::vector<ValueType> maxCoords({2*M_PI, 1});
 
     std::vector<Point<ValueType> > coordVector;
-    KDTreeEuclidean<false> tree(minCoords, maxCoords);
+    KDTreeEuclidean<ValueType, false> tree(minCoords, maxCoords);
     for (index i = 0; i < n; i++) {
         std::vector<ValueType> coords = { ValueType( (ValueType(rand()) / RAND_MAX)*2*M_PI), ValueType(rand()) / RAND_MAX};
         tree.addContent(i, coords);
@@ -992,7 +1011,5 @@ TEST_F(QuadTreeTest, DISABLED_benchPolarKDProbabilisticQueryUniform) {
         numResults += result.size();
     }
 }
-
-
 
 } /* namespace ITI */

@@ -11,14 +11,14 @@
 
 namespace ITI {
 
-template <bool cartesian=true>
-class KDNodeEuclidean: public ITI::SpatialCell {
+template <typename ValueType, bool cartesian=true>
+class KDNodeEuclidean: public ITI::SpatialCell<ValueType> {
 public:
     KDNodeEuclidean() = default;
     virtual ~KDNodeEuclidean() = default;
 
     KDNodeEuclidean(const Point<ValueType> &minCoords, const Point<ValueType> &maxCoords, count capacity=1000)
-        : SpatialCell(minCoords, maxCoords, capacity) {
+        : SpatialCell<ValueType>(minCoords, maxCoords, capacity) {
         if (!cartesian) {
             if (minCoords.getDimensions() != 2) {
                 throw std::runtime_error("Polar Coordinates only supported for 2 dimensions");
@@ -74,8 +74,8 @@ public:
         newLower[mostSpreadDimension] = middle;
         newUpper[mostSpreadDimension] = middle;
 
-        std::shared_ptr<KDNodeEuclidean<cartesian> > firstChild(new KDNodeEuclidean<cartesian>(this->minCoords, newUpper, this->capacity));
-        std::shared_ptr<KDNodeEuclidean<cartesian> > secondChild(new KDNodeEuclidean<cartesian>(newLower, this->maxCoords, this->capacity));
+        std::shared_ptr<KDNodeEuclidean<ValueType,cartesian> > firstChild(new KDNodeEuclidean<ValueType,cartesian>(this->minCoords, newUpper, this->capacity));
+        std::shared_ptr<KDNodeEuclidean<ValueType,cartesian> > secondChild(new KDNodeEuclidean<ValueType,cartesian>(newLower, this->maxCoords, this->capacity));
 
         this->children = {firstChild, secondChild};
         this->isLeaf = false;

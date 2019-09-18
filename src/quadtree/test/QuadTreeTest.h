@@ -16,15 +16,20 @@
 
 namespace ITI {
 
+template<typename T>
 class QuadTreeTest: public testing::Test {
 public:
     QuadTreeTest() = default;
     virtual ~QuadTreeTest() = default;
 
 protected:
-    std::vector<std::shared_ptr<SpatialCell > > getChildren(std::shared_ptr<SpatialCell> node) {
+    std::vector<std::shared_ptr<SpatialCell<T>>> getChildren(std::shared_ptr<SpatialCell<T>> node) {
         return node->children;
     }
 };
+
+using testTypes = ::testing::Types<double,float>;
+TYPED_TEST_SUITE(QuadTreeTest, testTypes);
+
 
 } /* namespace ITI */
