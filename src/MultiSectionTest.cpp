@@ -27,22 +27,28 @@ using namespace scai;
 
 namespace ITI {
 
-class MultiSectionTest : public ::testing::TestWithParam<bool> {
+template<typename T>
+class MultiSectionTest : public ::testing::Test {
 protected:
     // the directory of all the meshes used
     // projectRoot is defined in config.h.in
     const std::string graphPath = projectRoot+"/meshes/";
 };
 
+using testTypes = ::testing::Types<double,float>;
+TYPED_TEST_SUITE(MultiSectionTest, testTypes);
 
-TEST_F(MultiSectionTest, testComputePartitionNonUniformFromFile) {
+//-----------------------------------------------
+
+TYPED_TEST(MultiSectionTest, testComputePartitionNonUniformFromFile) {
+    using ValueType = TypeParam;
 
     const IndexType dimensions = 2;
     const IndexType k = std::pow( 4, dimensions);
 
     std::string fileName = "Grid64x64";
     //std::string fileName = "trace-00003.graph";
-    std::string file = graphPath + fileName;
+    std::string file = MultiSectionTest<ValueType>::graphPath + fileName;
     std::ifstream f(file);
     IndexType N, edges;
     f >> N >> edges;
@@ -119,7 +125,8 @@ TEST_F(MultiSectionTest, testComputePartitionNonUniformFromFile) {
 //---------------------------------------------------------------------------------------
 
 
-TEST_F(MultiSectionTest, testGetRectangles) {
+TYPED_TEST(MultiSectionTest, testGetRectangles) {
+    using ValueType = TypeParam;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     IndexType sideLen= 30;
@@ -155,7 +162,7 @@ TEST_F(MultiSectionTest, testGetRectangles) {
     ValueType minWeight = LONG_MAX, maxWeight = 0;
 
     for(int r=0; r<settings.numBlocks; r++) {
-        struct rectangle thisRectangle = rectangles[r]->getRect();
+        rectangle<ValueType> thisRectangle = rectangles[r]->getRect();
 
         if( comm->getRank()==0 and settings.numBlocks<20) {
             thisRectangle.print(std::cout);
@@ -185,7 +192,7 @@ TEST_F(MultiSectionTest, testGetRectangles) {
         for(int r2=0; r2<settings.numBlocks; r2++) {
             if( r2==r) continue; // do not self-check
 
-            struct rectangle otherRectangle = rectangles[r2]->getRect();
+            rectangle<ValueType> otherRectangle = rectangles[r2]->getRect();
             bool overlap = true;
             for(int d=0; d<dim; d++) {
                 if( thisRectangle.bottom[d]>=otherRectangle.top[d] or thisRectangle.top[d]<=otherRectangle.bottom[d] ) {
@@ -215,7 +222,8 @@ TEST_F(MultiSectionTest, testGetRectangles) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, test1DPartitionGreedy) {
+TYPED_TEST(MultiSectionTest, test1DPartitionGreedy) {
+    using ValueType = TypeParam;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     IndexType sideLen= 20;
@@ -244,7 +252,7 @@ TEST_F(MultiSectionTest, test1DPartitionGreedy) {
     Settings settings;
     settings.dimensions = dim;
 
-    rectangle bBox;
+    rectangle<ValueType> bBox;
     bBox.bottom = {0,0};
     bBox.top = { (ValueType) sideLen, (ValueType) sideLen};
     // create the root of the tree that contains the whole grid
@@ -316,7 +324,8 @@ TEST_F(MultiSectionTest, test1DPartitionGreedy) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, test1DPartitionOptimal) {
+TYPED_TEST(MultiSectionTest, test1DPartitionOptimal) {
+    using ValueType = TypeParam;
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -357,7 +366,8 @@ TEST_F(MultiSectionTest, test1DPartitionOptimal) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, test1DPartitionOptimalRandomWeights) {
+TYPED_TEST(MultiSectionTest, test1DPartitionOptimalRandomWeights) {
+    using ValueType = TypeParam;
 
     const IndexType N= 87;
     const IndexType k= 13;
@@ -433,7 +443,8 @@ TEST_F(MultiSectionTest, test1DPartitionOptimalRandomWeights) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, testProbeFunction ) {
+TYPED_TEST(MultiSectionTest, testProbeFunction ) {
+    using ValueType = TypeParam;
 
     const IndexType N = 88;
     const IndexType k = 17;
@@ -507,7 +518,10 @@ TEST_F(MultiSectionTest, testProbeFunction ) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, testRectTree) {
+TYPED_TEST(MultiSectionTest, testRectTree) {
+    using ValueType = TypeParam;
+
+    using rectangle = rectangle<ValueType>;
 
     rectangle initialRect;
     initialRect.bottom = { 0, 0};
@@ -642,7 +656,8 @@ TEST_F(MultiSectionTest, testRectTree) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, testGetRectangleWeightNonUniform) {
+TYPED_TEST(MultiSectionTest, testGetRectangleWeightNonUniform) {
+    using ValueType = TypeParam;
 
     const IndexType N = 16;
     const IndexType dimensions = 2;
@@ -668,7 +683,7 @@ TEST_F(MultiSectionTest, testGetRectangleWeightNonUniform) {
 
     Settings settings;
 
-    rectangle bBox;
+    rectangle<ValueType> bBox;
 
     std::vector<ValueType> maxCoord = { N, N };
 
@@ -706,7 +721,8 @@ TEST_F(MultiSectionTest, testGetRectangleWeightNonUniform) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, testGetRectangleWeight) {
+TYPED_TEST(MultiSectionTest, testGetRectangleWeight) {
+    using ValueType = TypeParam;
 
     IndexType N= 16;
     IndexType sideLen = 4;
@@ -725,7 +741,7 @@ TEST_F(MultiSectionTest, testGetRectangleWeight) {
 
     Settings settings;
 
-    rectangle bBox;        // the sub-rectangles of the initial grid
+    rectangle<ValueType> bBox;        // the sub-rectangles of the initial grid
 
     bBox.bottom = {0, 0};       //  1, 2, 3
     bBox.top = {2, 2};          //  5, 6, 7
@@ -750,7 +766,8 @@ TEST_F(MultiSectionTest, testGetRectangleWeight) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, test1DProjection) {
+TYPED_TEST(MultiSectionTest, test1DProjection) {
+    using ValueType = TypeParam;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     IndexType sideLen = 5;
@@ -763,7 +780,7 @@ TEST_F(MultiSectionTest, test1DProjection) {
     // test projection in all dimensions
 
     for(int d=0; d<dim; d++) {
-        rectangle bBox;
+        rectangle<ValueType> bBox;
         // for all dimensions i: bottom[i]<top[i]
         // WARNING: this test case throw Point out of bounds exception
         bBox.bottom = {0, 0, 0};
@@ -800,7 +817,8 @@ TEST_F(MultiSectionTest, test1DProjection) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, testGetRectanglesNonUniform) {
+TYPED_TEST(MultiSectionTest, testGetRectanglesNonUniform) {
+    using ValueType = TypeParam;
 
     const IndexType dimensions = 3;
     const std::vector<IndexType> minCoords= {0, 0, 0};
@@ -886,7 +904,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform) {
     ValueType minWeight = LONG_MAX, maxWeight = 0;
 
     for(int r=0; r<settings.numBlocks; r++) {
-        struct rectangle thisRectangle = rectangles[r]->getRect();
+        rectangle<ValueType> thisRectangle = rectangles[r]->getRect();
 
         if( comm->getRank()==0 and settings.numBlocks<20) {
             thisRectangle.print(std::cout);
@@ -917,7 +935,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform) {
         for(int r2=0; r2<settings.numBlocks; r2++) {
             if( r2==r) continue; // do not self-check
 
-            struct rectangle otherRectangle = rectangles[r2]->getRect();
+            rectangle<ValueType> otherRectangle = rectangles[r2]->getRect();
             bool overlap = true;
             for(int d=0; d<dimensions; d++) {
                 if( thisRectangle.bottom[d]>=otherRectangle.top[d] or thisRectangle.top[d]<=otherRectangle.bottom[d] ) {
@@ -947,13 +965,14 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniform) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile) {
+TYPED_TEST(MultiSectionTest, testGetRectanglesNonUniformFile) {
+    using ValueType = TypeParam;
 
     const IndexType dimensions = 2;
     const IndexType k = std::pow( 4, dimensions);
 
     std::string fileName = "trace-00008.graph";
-    std::string file = graphPath + fileName;
+    std::string file = MultiSectionTest<ValueType>::graphPath + fileName;
     std::ifstream f(file);
     IndexType N, edges;
     f >> N >> edges;
@@ -1081,9 +1100,9 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile) {
     ValueType minWeight = LONG_MAX, maxWeight = 0;
 
     for(int r=0; r<settings.numBlocks; r++) {
-        struct rectangle thisRectangle = rectangles[r]->getRect();
+        rectangle<ValueType> thisRectangle = rectangles[r]->getRect();
 
-        ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight<IndexType>( scaledCoords, nodeWeights, thisRectangle, settings);
+        ValueType thisWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( scaledCoords, nodeWeights, thisRectangle, settings);
         /*
         //re-scale rectangle
         for (IndexType d=0; d<dimensions; d++) {
@@ -1107,7 +1126,7 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile) {
         for(int r2=0; r2<settings.numBlocks; r2++) {
             if( r2==r) continue; // do not self-check
 
-            struct rectangle otherRectangle = rectangles[r2]->getRect();
+            rectangle<ValueType> otherRectangle = rectangles[r2]->getRect();
             bool overlap = true;
             for(int d=0; d<dimensions; d++) {
                 if( thisRectangle.bottom[d]>=otherRectangle.top[d] or thisRectangle.top[d]<=otherRectangle.bottom[d] ) {
@@ -1147,7 +1166,8 @@ TEST_F(MultiSectionTest, testGetRectanglesNonUniformFile) {
  *  -----------------
  *
  * */
-TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D) {
+TYPED_TEST(MultiSectionTest, test1DProjectionNonUniform_2D) {
+    using ValueType = TypeParam;
 
     const IndexType dimensions = 2;
     const std::vector<ValueType> maxCoord= {14, 20};
@@ -1200,6 +1220,8 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D) {
     //settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
+
+    using rectangle = rectangle<ValueType>;
 
     rectangle bBox;         //not a leaf => no projection calculated
     // for all dimensions i: bottom[i]<top[i]
@@ -1335,7 +1357,8 @@ TEST_P(MultiSectionTest, test1DProjectionNonUniform_2D) {
 //---------------------------------------------------------------------------------------
 /* same example as in the 2D case
  */
-TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D) {
+TYPED_TEST(MultiSectionTest, test1DProjectionNonUniform_3D) {
+    using ValueType = TypeParam;
 
     const IndexType dimensions = 3;
     const std::vector<ValueType> maxCoord= {10, 15, 20};
@@ -1392,6 +1415,8 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D) {
     struct Settings settings;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
+
+    using rectangle = rectangle<ValueType>;
 
     rectangle bBox;         //not a leaf => no projection calculated
     // for all dimensions i: bottom[i]<top[i]
@@ -1460,7 +1485,8 @@ TEST_F(MultiSectionTest, test1DProjectionNonUniform_3D) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, testInbBox) {
+TYPED_TEST(MultiSectionTest, testInbBox) {
+    using ValueType = TypeParam;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     IndexType sideLen =10;
@@ -1469,7 +1495,7 @@ TEST_F(MultiSectionTest, testInbBox) {
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
 
     // for all dimensions i: first[i]<second[i]
-    rectangle bBox;
+    rectangle<ValueType> bBox;
     bBox.bottom = {2,3,1};
     bBox.top = {6,8,6};
 
@@ -1481,19 +1507,18 @@ TEST_F(MultiSectionTest, testInbBox) {
 
     IndexType numPoints=0;
     for(int i=0; i<N; i++) {
-        std::vector<IndexType> coords = MultiSection<IndexType,ValueType>::indexToCoords<IndexType>(i, sideLen, dim);
+        std::vector<IndexType> coords = MultiSection<IndexType,ValueType>::template indexToCoords<IndexType>(i, sideLen, dim);
         if( MultiSection<IndexType, ValueType>::inBBox(coords, bBox) == true) {
             ++numPoints;
         }
     }
     PRINT0("bBox area= "<< bBoxArea << " , num of points in bBox= "<< numPoints);
     SCAI_ASSERT( numPoints==bBoxArea, "numPoints= " << numPoints << " should equal to bBoxArea= "<< bBoxArea);
-
-
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, testIndexTo) {
+TYPED_TEST(MultiSectionTest, testIndexTo) {
+    using ValueType = TypeParam;
 
     IndexType sideLen=4;
     IndexType gridSize;
@@ -1503,7 +1528,7 @@ TEST_F(MultiSectionTest, testIndexTo) {
     dim = 2;
     gridSize= sideLen*sideLen;
     for(int i=0; i<gridSize; i++) {
-        std::vector<IndexType> p = MultiSection<IndexType, ValueType>::indexToCoords<IndexType>( i, sideLen, dim );
+        std::vector<IndexType> p =  MultiSection<IndexType, ValueType>::template indexToCoords<IndexType>( i, sideLen, dim );
         //PRINT(i<< ": " << p[0] << " , "<< p[1]);
         EXPECT_LE( p[0], sideLen);
         EXPECT_LE( p[1], sideLen);
@@ -1515,7 +1540,7 @@ TEST_F(MultiSectionTest, testIndexTo) {
     dim = 3;
     gridSize= sideLen*sideLen*sideLen;
     for(int i=0; i<gridSize; i++) {
-        std::vector<IndexType> t = MultiSection<IndexType, ValueType>::indexToCoords<IndexType>( i, sideLen, dim );
+        std::vector<IndexType> t = MultiSection<IndexType, ValueType>::template indexToCoords<IndexType>( i, sideLen, dim );
         //PRINT(i<< ": " << t[0] << " , "<< t[1] << " , "<< t[2] );
         EXPECT_LE( t[0], sideLen);
         EXPECT_LE( t[1], sideLen);
@@ -1527,7 +1552,8 @@ TEST_F(MultiSectionTest, testIndexTo) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(MultiSectionTest, testIndexToNonQubic) {
+TYPED_TEST(MultiSectionTest, testIndexToNonQubic) {
+    using ValueType = TypeParam;
 
     std::vector<IndexType> sideLen= { 4, 5, 6 };
 
@@ -1536,9 +1562,9 @@ TEST_F(MultiSectionTest, testIndexToNonQubic) {
 }
 //---------------------------------------------------------------------------------------
 
-
+/*
 INSTANTIATE_TEST_CASE_P(InstantiationName,
                         MultiSectionTest,
                         testing::Values(true,false));
-
+*/
 }//ITI

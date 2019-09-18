@@ -64,7 +64,7 @@ static DenseVector<IndexType> computePartition(
     const DenseVector<IndexType>& prevPartition,\
     std::vector<std::vector< std::vector<ValueType> >> centers, \
     const Settings settings, \
-    struct Metrics &metrics);
+    Metrics<ValueType>& metrics);
 
 /** @brief Minimal wrapper with only the coordinates. Unit weights are assumed and uniform block sizes.
 */
@@ -96,7 +96,7 @@ static DenseVector<IndexType> computePartition(
     const std::vector<DenseVector<ValueType>> &nodeWeights,
     const std::vector<std::vector<ValueType>> &blockSizes,
     const Settings settings,
-    struct Metrics &metrics);
+    Metrics<ValueType>& metrics);
 
 /**
  * Given a tree of the processors graph, computes a partition into a hierarchical fashion.
@@ -113,7 +113,7 @@ static DenseVector<IndexType> computeHierarchicalPartition(
     std::vector<DenseVector<ValueType>> &nodeWeights,
     const CommTree<IndexType,ValueType> &commTree,
     Settings settings,
-    struct Metrics& metrics);
+    Metrics<ValueType>& metrics);
 
 /** Calls computeHierarchicalPartition() with an additional step of repartitioning in order to
 provide a better global cut.
@@ -126,7 +126,7 @@ static DenseVector<IndexType> computeHierPlusRepart(
     std::vector<DenseVector<ValueType>>& nodeWeights,
     const CommTree<IndexType,ValueType>& commTree,
     Settings settings,
-    struct Metrics& metrics);
+    Metrics<ValueType>& metrics);
 
 /**
  * @brief Repartition a point set using balanced k-means.
@@ -153,7 +153,7 @@ static DenseVector<IndexType> computeRepartition(
     const std::vector<DenseVector<ValueType>>& coordinates,
     const std::vector<DenseVector<ValueType>>& nodeWeights,
     const Settings settings,
-    struct Metrics& metrics);
+    Metrics<ValueType>& metrics);
 
 
 /** @brief Version for hierarchical version. The returned centers now are a vector of vectors,
@@ -329,7 +329,7 @@ static DenseVector<IndexType> assignBlocks(
     std::vector<std::vector<ValueType>> &influence,
     std::vector<ValueType> &imbalance,
     Settings settings,
-    Metrics &metrics);
+    Metrics<ValueType>& metrics);
 
 
 /** Reverse the order of the vectors: given a 2D vector of size

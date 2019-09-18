@@ -776,7 +776,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
 
 
 template<typename IndexType, typename ValueType>
-void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<ValueType> >& coordinates, std::vector<DenseVector<ValueType>>& nodeWeights, Settings settings, struct Metrics& metrics) {
+void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<ValueType> >& coordinates, std::vector<DenseVector<ValueType>>& nodeWeights, Settings settings, Metrics<ValueType>& metrics) {
     SCAI_REGION_START("HilbertCurve.redistribute.sfc")
     scai::dmemo::DistributionPtr inputDist = coordinates[0].getDistributionPtr();
     scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();

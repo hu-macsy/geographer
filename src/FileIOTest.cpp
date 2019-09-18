@@ -231,7 +231,7 @@ TYPED_TEST(FileIOTest, testPartitionFromFile_dist_2D) {
     settings.epsilon = epsilon;
     settings.dimensions = dim;
     settings.minGainForNextRound = 10;
-    struct Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
     //partition the graph
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords2D, settings, metrics );

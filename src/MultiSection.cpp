@@ -1153,6 +1153,9 @@ std::vector<T> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType
 
 }
 //---------------------------------------------------------------------------------------
+
+//attention
+
 template<typename IndexType, typename ValueType>
 template<typename T>
 std::vector<T> MultiSection<IndexType, ValueType>::indexToCoords(const IndexType ind, const std::vector<IndexType> sideLen) {
@@ -1447,10 +1450,6 @@ const std::vector<IndexType>& dimensionToProject) {
 
 }//projectionIter
 //---------------------------------------------------------------------------------------
-
-
-
-
 
 
 //

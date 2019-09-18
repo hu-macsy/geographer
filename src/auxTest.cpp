@@ -142,7 +142,7 @@ TYPED_TEST (auxTest, testInitialPartitions) {
     }
     uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
     scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
-    Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, halo, settings, metrics);
     if(dimensions==2) {
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"finalWithPixel");

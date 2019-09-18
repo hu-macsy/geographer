@@ -405,7 +405,7 @@ TYPED_TEST(HilbertCurveTest, testHilbertRedistribution) {
     std::vector<scai::lama::DenseVector<ValueType>> nodeWeightsContainer(1, nodeWeights);
 
     std::vector<DenseVector<ValueType>> coordCopy(coords);
-    Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
     //get sums
     std::vector<ValueType> coordSum(settings.dimensions);

@@ -13,7 +13,7 @@ using scai::hmemo::HArray;
 namespace ITI {
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const HaloExchangePlan& halo, Settings settings, Metrics& metrics) {
+DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const HaloExchangePlan& halo, Settings settings, Metrics<ValueType>& metrics) {
 
     SCAI_REGION( "MultiLevel.multiLevelStep" );
     scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();

@@ -289,7 +289,7 @@ TYPED_TEST(KMeansTest, testHierarchicalPartition) {
     settings.maxKMeansIterations = 5;
     settings.minSamplingNodes = -1;
 
-    Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
     scai::lama::DenseVector<IndexType> partition = KMeans<IndexType,ValueType>::computeHierarchicalPartition( coords, nodeWeights, cTree, settings, metrics);
 
@@ -346,7 +346,7 @@ TYPED_TEST(KMeansTest, testComputePartitionWithMultipleWeights) {
         blockSizes[i].resize(settings.numBlocks, std::ceil(nodeWeightSum[i]/settings.numBlocks));
     }
 
-    Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
     //use hilbert redistribution before?
     scai::lama::DenseVector<IndexType> partition = KMeans<IndexType, ValueType>::computePartition( coords, nodeWeights, blockSizes, settings, metrics);
 
@@ -406,7 +406,7 @@ TYPED_TEST(KMeansTest, testPartitionWithNodeWeights) {
 
 	scai::lama::DenseVector<IndexType> firstPartition = ITI::KMeans::computePartition ( coords, settings.numBlocks, unitNodeWeights, blockSizes, settings);
 
-	struct Metrics metrics(1);
+	Metrics<ValueType> metrics(1);
 	metrics.getEasyMetrics( graph, firstPartition, unitNodeWeights, settings );
 	if(comm->getRank()==0){
 		printMetricsShort( metrics, std::cout);

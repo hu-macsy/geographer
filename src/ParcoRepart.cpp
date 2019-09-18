@@ -43,7 +43,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     CSRSparseMatrix<ValueType> &input,
     std::vector<DenseVector<ValueType>> &coordinates,
     Settings settings,
-    struct Metrics& metrics)
+    Metrics<ValueType>& metrics)
 {
     std::vector<DenseVector<ValueType> > uniformWeights(1);
     uniformWeights[0] = fill<DenseVector<ValueType>>(input.getRowDistributionPtr(), 1);
@@ -57,7 +57,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     std::vector<DenseVector<ValueType>> &coordinates,
     struct Settings settings) {
 
-    struct Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
     assert(settings.storeInfo == false); // Cannot return timing information. Better throw an error than silently drop it.
 
     return partitionGraph(input, coordinates, settings, metrics);
@@ -70,7 +70,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     std::vector<DenseVector<ValueType>> &coordinates,
     std::vector<DenseVector<ValueType>> &nodeWeights,
     struct Settings settings,
-    struct Metrics& metrics) {
+    Metrics<ValueType>& metrics) {
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     if( settings.initialPartition!=ITI::Tool::geoSFC ) {
@@ -106,7 +106,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     std::vector<DenseVector<ValueType>> &coordinates,
     std::vector<DenseVector<ValueType>> &nodeWeights,
     Settings settings,
-    struct Metrics& metrics) {
+    Metrics<ValueType>& metrics) {
 
     DenseVector<IndexType> previous;
     assert(!settings.repartition);
@@ -129,7 +129,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         std::vector<DenseVector<ValueType>> &nodeWeights,
         std::vector<std::vector<ValueType>> &blockSizes,
         Settings settings,
-        struct Metrics& metrics) {
+        Metrics<ValueType>& metrics) {
 
     DenseVector<IndexType> previous;
     assert(!settings.repartition);
@@ -154,7 +154,7 @@ template<typename IndexType, typename ValueType>
 std::vector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
     IndexType *vwgt, IndexType dimensions, ValueType *xyz,
-    Settings  settings, Metrics &metrics ) {
+    Settings  settings, Metrics<ValueType>& metrics ) {
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const IndexType numPEs = comm->getSize();
@@ -244,7 +244,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     DenseVector<IndexType>& previous,
     CommTree<IndexType,ValueType> commTree,
     Settings settings,
-    struct Metrics& metrics)
+    Metrics<ValueType>& metrics)
 {
     IndexType k = settings.numBlocks;
     ValueType epsilon = settings.epsilon;
@@ -338,7 +338,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
     CommTree<IndexType,ValueType> commTree,
     scai::dmemo::CommunicatorPtr comm,
     Settings settings,
-    struct Metrics& metrics){
+    Metrics<ValueType>& metrics){
     
 	SCAI_REGION( "ParcoRepart.initialPartition" )
 	
@@ -480,7 +480,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
     std::vector<DenseVector<ValueType>> &nodeWeights,
 	scai::dmemo::CommunicatorPtr comm,
     Settings settings,
-	struct Metrics& metrics){
+	Metrics<ValueType>& metrics){
 
 	SCAI_REGION("ParcoRepart.doLocalRefinement");		
 	std::chrono::time_point<std::chrono::system_clock> start =  std::chrono::system_clock::now();

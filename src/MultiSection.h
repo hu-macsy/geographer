@@ -679,6 +679,10 @@ public:
      * @param[in] dimensions The dimension of the cube/grid (either 2 or 3).
      * @return A vector containing the index for every dimension. The size of the vector is equal to dimensions.
      */
+    // on how to call templated function see 
+    //https://stackoverflow.com/questions/7397934/calling-template-function-within-template-class
+    //see also MultiSectionTest::testIndexTo
+    
     template<typename T>
     static std::vector<T> indexToCoords(const IndexType ind, const IndexType sideLen, const IndexType dimensions);
 

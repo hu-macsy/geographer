@@ -67,7 +67,7 @@ TYPED_TEST(MappingTest, testTorstenMapping) {
 
         PRINT("torsten mapping");
         //WARNING: if we call it as "Metrics metrics();" it throws an error
-        Metrics metrics(settings);
+        Metrics<ValueType> metrics(settings);
         metrics.getMappingMetrics( blockGraph, PEGraph, mapping );
 
         PRINT("identity mapping");

@@ -420,7 +420,7 @@ int main(int argc, char** argv) {
 
     }
 
-    std::vector<struct Metrics> metricsVec;
+    std::vector<Metrics<ValueType>> metricsVec;
 
     //------------------------------------------------------------
     //
@@ -465,7 +465,7 @@ int main(int argc, char** argv) {
         }
 
         //metricsVec.push_back( Metrics( comm->getSize()) );
-        metricsVec.push_back( Metrics( settings ) );
+        metricsVec.push_back( Metrics<ValueType>( settings ) );
 
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
 
@@ -548,7 +548,7 @@ int main(int argc, char** argv) {
     //
 
     //aggregate metrics in one struct
-    const struct Metrics aggrMetrics = aggregateVectorMetrics( metricsVec );
+    const Metrics<ValueType> aggrMetrics = aggregateVectorMetrics( metricsVec );
 
     if (repeatTimes > 1) {
         if (comm->getRank() == 0) {

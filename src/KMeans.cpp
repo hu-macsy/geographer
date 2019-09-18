@@ -517,7 +517,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
     std::vector<std::vector<ValueType>> &influence,
     std::vector<ValueType> &imbalance,
     Settings settings,
-    Metrics &metrics) {
+    Metrics<ValueType>& metrics) {
     SCAI_REGION("KMeans.assignBlocks");
 
     const IndexType dim = coordinates.size();
@@ -964,7 +964,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeRepartition(
     const std::vector<DenseVector<ValueType>>& coordinates,
     const std::vector<DenseVector<ValueType>>& nodeWeights,
     const Settings settings,
-    struct Metrics& metrics) {
+    Metrics<ValueType>& metrics) {
 
     const IndexType localN = coordinates[0].getLocalValues().size();
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -1049,7 +1049,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeRepartition(
     Settings tmpSettings = settings;
     tmpSettings.repartition = true;
 
-    Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
     return computePartition(coordinates, nodeWeights, blockSizes, previous, groupOfCenters, tmpSettings, metrics);
 }
@@ -1067,7 +1067,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     const DenseVector<IndexType> &partition, // if repartition, this is the partition to be rebalanced
     std::vector<std::vector<point<ValueType>>> centers, \
     const Settings settings, \
-    struct Metrics &metrics) {
+    Metrics<ValueType>& metrics) {
 
     SCAI_REGION("KMeans.computePartition");
     std::chrono::time_point<std::chrono::high_resolution_clock> KMeansStart = std::chrono::high_resolution_clock::now();
@@ -1534,7 +1534,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     const scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>(dist, 1);
     const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = {unitNodeWeights};
     std::vector<std::vector<ValueType>> blockSizes(1, std::vector<ValueType>(settings.numBlocks, std::ceil(globalN/settings.numBlocks)));
-    Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
     return computePartition(coordinates, nodeWeights, blockSizes, settings, metrics);
 }
@@ -1547,7 +1547,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     const std::vector<DenseVector<ValueType>> &nodeWeights,
     const std::vector<std::vector<ValueType>> &blockSizes,
     const Settings settings,
-    struct Metrics &metrics) {
+    Metrics<ValueType>& metrics) {
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
@@ -1574,7 +1574,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierarchicalPartition
     std::vector<DenseVector<ValueType>> &nodeWeights,
     const CommTree<IndexType,ValueType> &commTree,
     Settings settings,
-    struct Metrics& metrics) {
+    Metrics<ValueType>& metrics) {
 
     typedef cNode<IndexType,ValueType> cNode;
 
@@ -1752,7 +1752,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierPlusRepart(
     std::vector<DenseVector<ValueType>> &nodeWeights,
     const CommTree<IndexType,ValueType> &commTree,
     Settings settings,
-    struct Metrics& metrics) {
+    Metrics<ValueType>& metrics) {
 
     // get a hierarchical partition
     DenseVector<IndexType> result = computeHierarchicalPartition(coordinates, nodeWeights, commTree, settings, metrics);

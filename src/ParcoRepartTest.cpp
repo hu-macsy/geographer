@@ -29,6 +29,7 @@ using scai::lama::DenseVector;
 
 namespace ITI {
 
+template<typename T>
 class ParcoRepartTest : public ::testing::Test {
 protected:
     // the directory of all the meshes used
@@ -36,10 +37,17 @@ protected:
     const std::string graphPath = projectRoot+"/meshes/";
 };
 
+using testTypes = ::testing::Types<double,float>;
+TYPED_TEST_SUITE(ParcoRepartTest, testTypes);
 
-TEST_F(ParcoRepartTest, testInitialPartition) {
+//-----------------------------------------------
+
+
+TYPED_TEST(ParcoRepartTest, testInitialPartition) {
+    using ValueType = TypeParam;
+
     std::string fileName = "bigtrace-00000.graph";
-    std::string file = graphPath + fileName;
+    std::string file = ParcoRepartTest<ValueType>::graphPath + fileName;
     std::ifstream f(file);
     IndexType dimensions= 2;
     IndexType N, edges;
@@ -100,10 +108,12 @@ TEST_F(ParcoRepartTest, testInitialPartition) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(ParcoRepartTest, testMetisWrapper) {
+TYPED_TEST(ParcoRepartTest, testMetisWrapper) {
+    using ValueType = TypeParam;
+
     std::string fileName = "bigtrace-00000.graph";
     //std::string fileName = "Grid16x16";
-    std::string file = graphPath + fileName;
+    std::string file = ParcoRepartTest<ValueType>::graphPath + fileName;
     std::ifstream f(file);
     IndexType dimensions= 2;
     IndexType N, edges;
@@ -205,8 +215,8 @@ TEST_F(ParcoRepartTest, testMetisWrapper) {
     settings.noRefinement=  true;  //does not work when we do local refinement
     settings.minSamplingNodes = -1; // used as flag in order to use all local nodes to minimize random behavior
 
-    struct Metrics metrics1(settings);
-    struct Metrics metrics2(settings);
+    Metrics<ValueType> metrics1(settings);
+    Metrics<ValueType> metrics2(settings);
 
     //scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
     std::vector<IndexType> localPartition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
@@ -236,7 +246,9 @@ TEST_F(ParcoRepartTest, testMetisWrapper) {
 
 //---------------------------------------------------------------------------------------
 
-TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
+TYPED_TEST(ParcoRepartTest, testPartitionBalanceDistributed) {
+    using ValueType = TypeParam;
+
     IndexType nroot = 11;
     IndexType n = nroot * nroot * nroot;
     IndexType dimensions = 3;
@@ -266,7 +278,7 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
     settings.epsilon = epsilon;
     settings.dimensions = dimensions;
     settings.minGainForNextRound = 10;
-    struct Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(a, coordinates, settings, metrics);
 
@@ -288,7 +300,9 @@ TEST_F(ParcoRepartTest, testPartitionBalanceDistributed) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(ParcoRepartTest, testImbalance) {
+TYPED_TEST(ParcoRepartTest, testImbalance) {
+    using ValueType = TypeParam;
+
     const IndexType n = 10000;
     const IndexType k = 20;
 
@@ -329,7 +343,9 @@ TEST_F(ParcoRepartTest, testImbalance) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(ParcoRepartTest, testCut) {
+TYPED_TEST(ParcoRepartTest, testCut) {
+    using ValueType = TypeParam;
+
     const IndexType n = 1000;
     const IndexType k = 10;
 
@@ -362,10 +378,12 @@ TEST_F(ParcoRepartTest, testCut) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F(ParcoRepartTest, testTwoWayCut) {
+TYPED_TEST(ParcoRepartTest, testTwoWayCut) {
+    using ValueType = TypeParam;
+
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-    std::string file = graphPath + "Grid32x32";
+    std::string file = ParcoRepartTest<ValueType>::graphPath + "Grid32x32";
     const IndexType k = comm->getSize();
     //const ValueType epsilon = 0.05;
     //const IndexType iterations = 1;
@@ -439,7 +457,9 @@ TEST_F(ParcoRepartTest, testTwoWayCut) {
 }
 //---------------------------------------------------------------------------------------
 //TODO: this test should be merged with some test in GraphUtils?
-TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
+TYPED_TEST(ParcoRepartTest, testCommunicationScheme_local) {
+    using ValueType = TypeParam;
+
     /**
      * Check for:
      * 1. Basic Sanity: All ids are valid
@@ -540,8 +560,10 @@ TEST_F(ParcoRepartTest, testCommunicationScheme_local) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F (ParcoRepartTest, testBorders_Distributed) {
-    std::string file = graphPath + "Grid32x32";
+TYPED_TEST (ParcoRepartTest, testBorders_Distributed) {
+    using ValueType = TypeParam;
+
+    std::string file = ParcoRepartTest<ValueType>::graphPath + "Grid32x32";
     IndexType dimensions= 2;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -569,7 +591,7 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
     settings.multiLevelRounds = 3;
     //settings.initialPartition = InitialPartitioningMethods::Multisection;
     settings.initialPartition = Tool::geoKmeans;
-    struct Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
     // get partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
@@ -636,8 +658,10 @@ TEST_F (ParcoRepartTest, testBorders_Distributed) {
 
 //------------------------------------------------------------------------------
 
-TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
-    std::string file = graphPath + "Grid16x16";
+TYPED_TEST (ParcoRepartTest, testPEGraph_Distributed) {
+    using ValueType = TypeParam;
+
+    std::string file = ParcoRepartTest<ValueType>::graphPath + "Grid16x16";
     IndexType dimensions= 2, k=8;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -665,7 +689,7 @@ TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    struct Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
     scai::lama::DenseVector<IndexType> partition(dist, -1);
     partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
@@ -696,8 +720,10 @@ TEST_F (ParcoRepartTest, testPEGraph_Distributed) {
 
 //------------------------------------------------------------------------------
 
-TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
-    std::string file = graphPath+ "Grid16x16";
+TYPED_TEST (ParcoRepartTest, testGetBlockGraph_2D) {
+    using ValueType = TypeParam;
+
+    std::string file = ParcoRepartTest<ValueType>::graphPath+ "Grid16x16";
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
@@ -726,7 +752,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    struct Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
 
@@ -755,7 +781,8 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_2D) {
 }
 //------------------------------------------------------------------------------
 
-TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
+TYPED_TEST (ParcoRepartTest, testGetBlockGraph_3D) {
+    using ValueType = TypeParam;
 
     std::vector<IndexType> numPoints= { 4, 4, 4};
     std::vector<ValueType> maxCoord= { 42, 11, 160};
@@ -785,7 +812,7 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
     settings.dimensions = 3;
     //settings.debugMode = true;
     //settings.verbose = true;
-    struct Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(adjM, coords, settings, metrics);
 
@@ -834,8 +861,10 @@ TEST_F (ParcoRepartTest, testGetBlockGraph_3D) {
  *  |   |   |   |
  *  0 - 1 - 14- 15
 */
-TEST_F (ParcoRepartTest, testGetLocalWeightedGraphColoring_2D) {
-    std::string file = graphPath+ "Grid8x8";
+TYPED_TEST (ParcoRepartTest, testGetLocalWeightedGraphColoring_2D) {
+    using ValueType = TypeParam;
+
+    std::string file = ParcoRepartTest<ValueType>::graphPath+ "Grid8x8";
     std::ifstream f(file);
     IndexType dimensions= 2, k=16;
     IndexType N, edges;
@@ -865,7 +894,7 @@ TEST_F (ParcoRepartTest, testGetLocalWeightedGraphColoring_2D) {
     settings.numBlocks= k;
     settings.epsilon = 0.2;
     settings.dimensions = dimensions;
-    struct Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
     //get the partition
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
@@ -900,9 +929,11 @@ TEST_F (ParcoRepartTest, testGetLocalWeightedGraphColoring_2D) {
 
 //WARNING: disabled test because the setRawData() seems to not work properly
 
-TEST_F (ParcoRepartTest, DISABLED_testGetLocalCommunicationWithColoring_2D) {
+TYPED_TEST (ParcoRepartTest, 
+    DISABLED_testGetLocalCommunicationWithColoring_2D) {
+    using ValueType = TypeParam;
 
-    std::string file = graphPath + "Grid16x16";
+    std::string file = ParcoRepartTest<ValueType>::graphPath + "Grid16x16";
     std::ifstream f(file);
     IndexType dimensions= 2;
     IndexType N, edges;
@@ -1020,7 +1051,8 @@ TEST_F (ParcoRepartTest, DISABLED_testGetLocalCommunicationWithColoring_2D) {
 }
 //------------------------------------------------------------------------------
 
-TEST_F(ParcoRepartTest, testPixelNeighbours) {
+TYPED_TEST(ParcoRepartTest, testPixelNeighbours) {
+    using ValueType = TypeParam;
 
     srand(time(NULL));
 
@@ -1050,10 +1082,12 @@ TEST_F(ParcoRepartTest, testPixelNeighbours) {
 }
 //------------------------------------------------------------------------------
 
-TEST_F(ParcoRepartTest, testRedistributeFromPartition) {
-//    std::string file = graphPath + "Grid32x32";
+TYPED_TEST(ParcoRepartTest, testRedistributeFromPartition) {
+    using ValueType = TypeParam;
+
+    //std::string file = ParcoRepartTest<ValueType>::graphPath + "Grid32x32";
     std::string fileName = "bigtrace-00000.graph";
-    std::string file = graphPath + fileName;
+    std::string file = ParcoRepartTest<ValueType>::graphPath + fileName;
     IndexType dimensions= 2;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -1083,7 +1117,7 @@ TEST_F(ParcoRepartTest, testRedistributeFromPartition) {
     //settings.initialPartition = InitialPartitioningMethods::Multisection;
     settings.initialPartition = Tool::geoKmeans;
     settings.noRefinement = true;
-    struct Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
     // set uniform weights
     std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, DenseVector<ValueType>(graph.getRowDistributionPtr(), 1));

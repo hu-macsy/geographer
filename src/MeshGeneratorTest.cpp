@@ -31,6 +31,7 @@ using scai::lama::CSRStorage;
 
 namespace ITI {
 
+template<typename T>
 class MeshGeneratorTest : public ::testing::Test {
 protected:
     // the directory of all the meshes used
@@ -38,9 +39,15 @@ protected:
     const std::string graphPath = projectRoot+"/meshes/";
 };
 
+using testTypes = ::testing::Types<double,float>;
+TYPED_TEST_SUITE(MeshGeneratorTest, testTypes);
+
+
 //-----------------------------------------------------------------
 
-TEST_F(MeshGeneratorTest, testCreateStructured3DMeshLocalDegreeSymmetry) {
+TYPED_TEST(MeshGeneratorTest, testCreateStructured3DMeshLocalDegreeSymmetry) {
+    using ValueType = TypeParam;
+
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     IndexType k = comm->getSize();
 
@@ -72,7 +79,9 @@ TEST_F(MeshGeneratorTest, testCreateStructured3DMeshLocalDegreeSymmetry) {
 // Creates the part of a structured mesh in each processor ditributed and checks the matrix and the coordinates.
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
 // less than 6 ones ( every node has 3,4,5, or 6 neighbours).
-TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_3D) {
+TYPED_TEST(MeshGeneratorTest, testCreateStructuredMesh_Distributed_3D) {
+    using ValueType = TypeParam;
+
     std::vector<IndexType> numPoints= { 40, 40, 40};
     std::vector<ValueType> maxCoord= {441, 711, 1160};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
@@ -172,7 +181,9 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_3D) {
 // Creates the part of a structured mesh in each processor ditributed and checks the matrix and the coordinates.
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
 // less than 6 ones ( every node has 3,4,5, or 6 neighbours).
-TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_2D) {
+TYPED_TEST(MeshGeneratorTest, testCreateStructuredMesh_Distributed_2D) {
+    using ValueType = TypeParam;
+
     std::vector<IndexType> numPoints= { 31, 45};
     std::vector<ValueType> maxCoord= {441, 711};
     IndexType N= numPoints[0]*numPoints[1];
@@ -270,7 +281,9 @@ TEST_F(MeshGeneratorTest, testCreateStructuredMesh_Distributed_2D) {
 // Creates the part of a structured mesh in each processor ditributed and checks the matrix and the coordinates.
 // For the coordinates checks if there are between min and max and for the matrix if every row has more than 3 and
 // less than 6 ones ( every node has 3,4,5, or 6 neighbours).
-TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
+TYPED_TEST(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
+    using ValueType = TypeParam;
+
     std::vector<IndexType> numPoints= { 140, 24, 190};
     std::vector<ValueType> maxCoord= {441, 711, 1160};
     IndexType N= numPoints[0]*numPoints[1]*numPoints[2];
@@ -334,7 +347,8 @@ TEST_F(MeshGeneratorTest, testCreateRandomStructuredMesh_Distributed_3D) {
 }
 
 //-----------------------------------------------------------------
-TEST_F(MeshGeneratorTest, testWriteMetis_Dist_3D) {
+TYPED_TEST(MeshGeneratorTest, testWriteMetis_Dist_3D) {
+    using ValueType = TypeParam;
 
     std::vector<IndexType> numPoints= { 10, 10, 10};
     std::vector<ValueType> maxCoord= { 10, 20, 30};
@@ -358,12 +372,13 @@ TEST_F(MeshGeneratorTest, testWriteMetis_Dist_3D) {
     MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist(adjM, coords, maxCoord, numPoints, 3);
 
     // write the mesh in p(=number of PEs) files
-    FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, graphPath+"/dist3D_");
+    FileIO<IndexType, ValueType>::writeGraphDistributed( adjM, MeshGeneratorTest<ValueType>::graphPath+"/dist3D_");
 
 }
 
 //-----------------------------------------------------------------
-TEST_F(MeshGeneratorTest, testMeshFromQuadTree_local) {
+TYPED_TEST(MeshGeneratorTest, testMeshFromQuadTree_local) {
+    using ValueType = TypeParam;
 
     const IndexType numberOfAreas= 4;
     const IndexType pointsPerArea= 1000;
@@ -411,7 +426,7 @@ TEST_F(MeshGeneratorTest, testMeshFromQuadTree_local) {
     PRINT0("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);
 
     if(comm->getRank()==0) {
-        std::string outFile = graphPath + "quadTreeGraph3D_"+std::to_string(numberOfAreas)+".graph";
+        std::string outFile = MeshGeneratorTest<ValueType>::graphPath + "quadTreeGraph3D_"+std::to_string(numberOfAreas)+".graph";
         ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
 
         std::string outCoords = outFile + ".xyz";
@@ -420,7 +435,8 @@ TEST_F(MeshGeneratorTest, testMeshFromQuadTree_local) {
 }
 //-----------------------------------------------------------------
 
-TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D) {
+TYPED_TEST(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D) {
+    using ValueType = TypeParam;
 
     const IndexType numberOfAreas= 3;
     const IndexType dimension = 2;
@@ -468,7 +484,7 @@ TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D) {
     PRINT0("num edges= "<< graph.getNumValues() << " , num nodes= " << graph.getNumRows() << ", average degree= "<< averageDegree << ", max degree= "<< maxDegree);
 
     if(comm->getRank()==0) {
-        std::string outFile = graphPath+ "graphFromQuad_2D.graph";
+        std::string outFile = MeshGeneratorTest<ValueType>::graphPath+ "graphFromQuad_2D.graph";
         ITI::FileIO<IndexType, ValueType>::writeGraph( graph, outFile);
 
         std::string outCoords = outFile + ".xyz";
@@ -477,7 +493,8 @@ TEST_F(MeshGeneratorTest, testSimpleMeshFromQuadTree_2D) {
 }
 //-----------------------------------------------------------------
 
-TEST_F(MeshGeneratorTest, testDistSquared) {
+TYPED_TEST(MeshGeneratorTest, testDistSquared) {
+    using ValueType = TypeParam;
 
     EXPECT_EQ( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<IndexType>({1,1}),std::vector<IndexType>({2,2}) )), 2 );
     EXPECT_NEAR( (MeshGenerator<IndexType,ValueType>::distSquared( std::vector<ValueType>({0.5,1.2}),std::vector<ValueType>({1.1,2.1}) )), 1.17, 1e-5);

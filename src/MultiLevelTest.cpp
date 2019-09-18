@@ -27,6 +27,7 @@ using namespace scai;
 
 namespace ITI {
 
+template<typename T>
 class MultiLevelTest : public ::testing::Test {
 protected:
     // the directory of all the meshes used
@@ -34,9 +35,15 @@ protected:
     const std::string graphPath = projectRoot+"/meshes/";
 };
 
+using testTypes = ::testing::Types<double,float>;
+TYPED_TEST_SUITE(MultiLevelTest, testTypes);
 
-TEST_F (MultiLevelTest, testCoarseningGrid_2D) {
-    std::string file = graphPath + "Grid8x8";
+//-----------------------------------------------
+
+TYPED_TEST (MultiLevelTest, testCoarseningGrid_2D) {
+    using ValueType = TypeParam;
+
+    std::string file = MultiLevelTest<ValueType>::graphPath + "Grid8x8";
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
@@ -91,9 +98,11 @@ TEST_F (MultiLevelTest, testCoarseningGrid_2D) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F (MultiLevelTest, testGetMatchingGrid_2D) {
+TYPED_TEST (MultiLevelTest, testGetMatchingGrid_2D) {
+    using ValueType = TypeParam;
+
     //std::string file = graphPath+ "Grid8x8";                         // the easy case
-    std::string file = graphPath+ "rotation-00000.graph";     // a harder instance
+    std::string file = MultiLevelTest<ValueType>::graphPath+ "rotation-00000.graph";     // a harder instance
     std::ifstream f(file);
     IndexType dimensions= 2, k=8;
     IndexType N, edges;
@@ -154,7 +163,9 @@ TEST_F (MultiLevelTest, testGetMatchingGrid_2D) {
 }
 //------------------------------------------------------------------------------
 
-TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
+TYPED_TEST (MultiLevelTest, testComputeGlobalPrefixSum) {
+    using ValueType = TypeParam;
+
     const IndexType globalN = 14764;
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -163,7 +174,7 @@ TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
     const IndexType localN = dist->getLocalSize();
 
     DenseVector<IndexType> vector(dist, 1);
-    DenseVector<IndexType> prefixSum = MultiLevel<IndexType, ValueType>::computeGlobalPrefixSum<IndexType>(vector);
+    DenseVector<IndexType> prefixSum = MultiLevel<IndexType, ValueType>::computeGlobalPrefixSum(vector);
 
     ASSERT_EQ(localN, prefixSum.getDistributionPtr()->getLocalSize());
     if (comm->getRank() == 0) {
@@ -186,7 +197,7 @@ TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
         }
     }
 
-    prefixSum = MultiLevel<IndexType, ValueType>::computeGlobalPrefixSum<IndexType>(mixedVector);
+    prefixSum = MultiLevel<IndexType, ValueType>::computeGlobalPrefixSum(mixedVector);
 
     //test for equality with std::partial_sum
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(globalN));
@@ -208,12 +219,13 @@ TEST_F (MultiLevelTest, testComputeGlobalPrefixSum) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
+TYPED_TEST (MultiLevelTest, testMultiLevelStep_dist) {
+    using ValueType = TypeParam;
 
     //std::string file = graphPath+ "rotation-00000.graph";
     //std::string coordFile = graphPath+ "rotation-00000.graph.xyz";
-    std::string file = graphPath+ "trace-00008.graph";
-    std::string coordFile = graphPath+ "trace-00008.graph.xyz";
+    std::string file = MultiLevelTest<ValueType>::graphPath+ "trace-00008.graph";
+    std::string coordFile = file + ".xyz";
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     const IndexType globalN = graph.getNumRows();
 
@@ -275,7 +287,7 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
     settings.minGainForNextRound = 100;
     settings.minBorderNodes=100;
     settings.nnCoarsening = false;
-    Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
 
     scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, settings, metrics);
@@ -288,12 +300,10 @@ TEST_F (MultiLevelTest, testMultiLevelStep_dist) {
 }
 //---------------------------------------------------------------------------------------
 
-TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
+TYPED_TEST (MultiLevelTest, testPixeledCoarsen_2D) {
+    using ValueType = TypeParam;
 
-    for( int dim : {
-                2,3
-            } ) {
-
+    for( int dim : { 2, 3 } ) {
 
         std::string file; // = graphPath + "trace-00008.bgf";
         std::string coordFile; // = graphPath + "trace-00008.graph.xyz";
@@ -301,13 +311,11 @@ TEST_F (MultiLevelTest, testPixeledCoarsen_2D) {
         IndexType k=8;
 
         if( dim==2 ) {
-            file = graphPath + "trace-00008.graph";
-            coordFile = graphPath + "trace-00008.graph.xyz";
+            file = MultiLevelTest<ValueType>::graphPath + "trace-00008.graph";
         } else if( dim==3 ) {
-            file = graphPath + "quadTreeGraph3D_4.graph";
-            //coordFile = graphPath + "353off.graph.xyz";
-            coordFile = file + ".xyz";
+            file = MultiLevelTest<ValueType>::graphPath + "quadTreeGraph3D_4.graph";
         }
+        coordFile = file + ".xyz";
 
         IndexType N, edges;
         std::ifstream f(file);
