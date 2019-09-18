@@ -9,6 +9,7 @@
 
 #include <set>
 #include <tuple>
+#include <vector>
 
 #include <scai/lama/matrix/CSRSparseMatrix.hpp>
 #include <scai/dmemo/Distribution.hpp>

@@ -1,5 +1,5 @@
 #include <scai/lama.hpp>
-
+#include <scai/lama/Vector.hpp>
 #include <scai/lama/matrix/all.hpp>
 #include <scai/lama/matutils/MatrixCreator.hpp>
 
@@ -9,13 +9,12 @@
 #include <scai/hmemo/Context.hpp>
 #include <scai/hmemo/HArray.hpp>
 
-#include <scai/lama/Vector.hpp>
-
 #include <algorithm>
 #include <memory>
 #include <cstdlib>
 #include <numeric>
 #include <chrono>
+#include <vector>
 
 #include "FileIO.h"
 #include "MultiLevel.h"
@@ -391,8 +390,8 @@ TYPED_TEST(auxTest, testRedistributeFromPartition) {
     Settings settings;
     settings.numBlocks = comm->getSize();
 
-    for( bool useRedistributor: vector<bool>({true, false}) ){
-        for( bool renumberPEs: vector<bool>({false, true}) ){
+    for( bool useRedistributor: std::vector<bool>({true, false}) ){
+        for( bool renumberPEs: std::vector<bool>({false, true}) ){
 
             //get some metrics of the current partition to verify that it does not change after renumbering
             std::pair<std::vector<IndexType>,std::vector<IndexType>> borderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
@@ -506,8 +505,8 @@ TYPED_TEST(auxTest, benchmarkRedistributeFromPartition) {
     scai::dmemo::DistributionPtr intermediateDist = initPartition.getDistributionPtr();
 
 
-    for( bool useRedistributor: vector<bool>({true, false}) ){
-        for( bool renumberPEs: vector<bool>({false, true}) ){
+    for( bool useRedistributor: std::vector<bool>({true, false}) ){
+        for( bool renumberPEs: std::vector<bool>({false, true}) ){
 
             DenseVector<IndexType> partition = initPartition;
 

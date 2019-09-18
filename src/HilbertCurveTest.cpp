@@ -45,7 +45,7 @@ TYPED_TEST_SUITE(HilbertCurveTest, testTypes);
 TYPED_TEST(HilbertCurveTest, testHilbertIndexUnitSquare_Local) {
     using ValueType = TypeParam;
 
-    for( IndexType dimensions: vector<int>{2, 3} ){
+    for( IndexType dimensions: std::vector<int>{2, 3} ){
         const IndexType recursionDepth = 10;
         IndexType N;
 
@@ -117,7 +117,7 @@ TYPED_TEST(HilbertCurveTest, testHilbertIndexUnitSquare_Local) {
 TYPED_TEST(HilbertCurveTest, testInverseHilbertIndex_Local) {
     using ValueType = TypeParam;
 
-    for( IndexType dimensions: vector<int>{2, 3} ){
+    for( IndexType dimensions: std::vector<int>{2, 3} ){
 
         const IndexType recursionDepth = 7;
 
@@ -226,7 +226,7 @@ TYPED_TEST(HilbertCurveTest, testHilbertIndexRandom_Distributed) {
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     const IndexType localN = dist->getLocalSize();
 
-    for( IndexType dimensions: vector<int>{2, 3} ){
+    for( IndexType dimensions: std::vector<int>{2, 3} ){
 
         std::vector<DenseVector<ValueType>> coordinates(dimensions);
         for(IndexType i=0; i<dimensions; i++) {

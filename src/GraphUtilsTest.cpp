@@ -433,7 +433,7 @@ TYPED_TEST(GraphUtilsTest, testMEColoring_local) {
 
     //Check that it is a valid coloring
     for(int col=0; col<colors; col++) {
-        vector<int> alreadyColored(N, 0);
+        std::vector<int> alreadyColored(N, 0);
         for(int i=0; i<coloring[2].size(); i++) {
             if( coloring[2][i]== col ) {
                 IndexType v0 = coloring[0][i];
