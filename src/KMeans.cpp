@@ -1599,7 +1599,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierarchicalPartition
     // redistribute points based on their hilbert curve index
     // warning: this functions redistributes the coordinates and the node weights.
     // TODO: is this supposed to be here? it is also in ParcoRepart::partitionGraph
-PRINT( comm->getRank() );
+
     HilbertCurve<IndexType,ValueType>::redistribute(coordinates, nodeWeights, settings, metrics);
 
     if (settings.debugMode) {
@@ -1611,7 +1611,7 @@ PRINT( comm->getRank() );
             SCAI_ASSERT_EQ_ERROR(hasHilbertDist, true, "Input must be distributed according to a hilbert curve distribution");
         }
     }
-PRINT( comm->getRank() );
+
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
     std::tie(minCoords, maxCoords) = getLocalMinMaxCoords(coordinates);
@@ -1641,7 +1641,7 @@ PRINT( comm->getRank() );
     // skip root. If we start from the root, we will know the number
     // of blocks but not the memory and speed per block
     for (unsigned int h=1; h<commTree.getNumHierLevels(); h++) {
-PRINT( comm->getRank() << " -- " << h );
+
         /*
         There are already as many blocks as the number of leaves
         of the previous hierarchy level. The new number of blocks per

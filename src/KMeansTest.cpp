@@ -257,7 +257,8 @@ TYPED_TEST(KMeansTest, testHierarchicalPartition) {
 
     PRINT0( "Sum of node weights are: " );
     for( unsigned int i=0; i<nodeWeights.size(); i++ ) {
-        PRINT0( "weight " << i << ": " << nodeWeights[i].sum());
+        ValueType weightSum =  nodeWeights[i].sum();
+        PRINT0( "weight " << i << ": " << weightSum );
     }
 
     typedef typename CommTree<IndexType,ValueType>::commNode cNode;

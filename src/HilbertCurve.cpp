@@ -344,10 +344,7 @@ std::vector<double> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector 
         PRINT0("In HilbertCurve.getHilbertIndex2DVector but dimensions is " << dimensions << " and not 2");
         throw std::runtime_error("Wrong dimensions given");
     }
-SCAI_ASSERT( coordinates[0].getDistributionPtr()->isEqual( coordinates[1].getDistribution()), "Distribution mismatch" );
 
-const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();    
-PRINT( comm->getRank() );
     /*
      * get minimum / maximum of coordinates
      */
@@ -356,12 +353,9 @@ PRINT( comm->getRank() );
 
     {
         SCAI_REGION( "HilbertCurve.getHilbertIndex2DVector.minMax" )   
-        for (IndexType dim = 0; dim < 2; dim++) {
-PRINT( comm->getRank() << " -- " << dim );            
-            minCoords[dim] = coordinates[dim].min();
-PRINT( comm->getRank() << " -- " << minCoords[dim]);                 
-            maxCoords[dim] = coordinates[dim].max();
-PRINT( comm->getRank() << " ** " << maxCoords[dim]);            
+        for (IndexType dim = 0; dim < 2; dim++) {  
+            minCoords[dim] = coordinates[dim].min();                 
+            maxCoords[dim] = coordinates[dim].max();           
             assert(std::isfinite(minCoords[dim]));
             assert(std::isfinite(maxCoords[dim]));
             SCAI_ASSERT_GE_ERROR(maxCoords[dim], minCoords[dim], "Wrong coordinates for dimension " << dim);
@@ -373,7 +367,7 @@ PRINT( comm->getRank() << " ** " << maxCoords[dim]);
 
     ValueType dim0Extent = maxCoords[0] - minCoords[0];
     ValueType dim1Extent = maxCoords[1] - minCoords[1];
-PRINT( comm->getRank() << " ++ " << dim0Extent );
+
     ValueType scaledPoint[2];
     unsigned long integerIndex = 0;//TODO: also check whether this data type is long enough
     const IndexType localN = coordinates[0].getLocalValues().size();
@@ -793,7 +787,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     if (comm->getSize() == 1) {
         return;
     }
-PRINT( rank );
+
     std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
     const IndexType numNodeWeights = nodeWeights.size();
 
@@ -803,14 +797,14 @@ PRINT( rank );
     }
 
     std::chrono::duration<double> migrationCalculation, migrationTime;
-PRINT( rank );
+
     std::vector<double> hilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
     SCAI_REGION_END("HilbertCurve.redistribute.sfc")
     SCAI_REGION_START("HilbertCurve.redistribute.sort")
     /*
      * fill sort pair
      */
-PRINT( rank );
+
     scai::hmemo::HArray<IndexType> myGlobalIndices(localN, IndexType(0) );
     inputDist->getOwnedIndexes(myGlobalIndices);
     std::vector<sort_pair> localPairs(localN);
@@ -821,11 +815,11 @@ PRINT( rank );
             localPairs[i].index = rIndices[i];
         }
     }
-PRINT( rank );
+
     MPI_Comm mpi_comm = MPI_COMM_WORLD; //TODO: cast the communicator ptr to a MPI communicator and get getMPIComm()?
     JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
     //JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>() );
-PRINT( rank );    
+
     migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
     metrics.MM["timeMigrationAlgo"] = migrationCalculation.count();
     std::chrono::time_point < std::chrono::system_clock > beforeMigration = std::chrono::system_clock::now();
