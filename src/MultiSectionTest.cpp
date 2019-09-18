@@ -22,6 +22,12 @@
 #include "FileIO.h"
 #include "MultiSection.h"
 
+//this is needed to avoid linking errors. Another solution would be to
+//move some function definitions inside MultiSection.h. See:
+// https://isocpp.org/wiki/faq/templates#separate-template-fn-defn-from-decl
+//and
+//https://stackoverflow.com/questions/115703/storing-c-template-function-definitions-in-a-cpp-file
+#include "MultiSection.cpp"
 
 using namespace scai;
 
@@ -748,7 +754,7 @@ TYPED_TEST(MultiSectionTest, testGetRectangleWeight) {
     //  9, 0, 1
 
     ValueType bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( nodeWeights, bBox, sideLen, settings);
-    SCAI_ASSERT( bBoxWeight==34, "Weight of the bounding box not correct, should be 14 but it is "<< bBoxWeight);
+    SCAI_ASSERT( bBoxWeight==34, "Weight of the bounding box not correct, should be 34 but it is "<< bBoxWeight);
 
     bBox.bottom = {2, 0};       //  9, 0, 1, 5      rows 2 and 3
     bBox.top = {3, 3};          //  3, 4, 5, 6
@@ -762,7 +768,7 @@ TYPED_TEST(MultiSectionTest, testGetRectangleWeight) {
     //  5, 6
 
     bBoxWeight = MultiSection<IndexType, ValueType>::getRectangleWeight( nodeWeights, bBox, sideLen, settings);
-    SCAI_ASSERT( bBoxWeight==39, "Weight of the bounding box not correct, should be 16 but it is "<< bBoxWeight);
+    SCAI_ASSERT( bBoxWeight==39, "Weight of the bounding box not correct, should be 39 but it is "<< bBoxWeight);
 }
 //---------------------------------------------------------------------------------------
 

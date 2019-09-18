@@ -389,9 +389,9 @@ IndexType MultiSection<IndexType, ValueType>::projectAnd1Dpartition(
 template<typename IndexType, typename ValueType>
 template<typename T>
 std::vector<std::vector<ValueType>> MultiSection<IndexType, ValueType>::projectionNonUniform(
-                                     const std::vector<std::vector<T>>& coordinates,
-                                     const scai::lama::DenseVector<ValueType>& nodeWeights,
-                                     const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
+     const std::vector<std::vector<T>>& coordinates,
+     const scai::lama::DenseVector<ValueType>& nodeWeights,
+     const std::shared_ptr<rectCell<IndexType,ValueType>> treeRoot,
 const std::vector<IndexType>& dimensionToProject) {
     SCAI_REGION("MultiSection.projectionNonUniform");
 
@@ -1000,7 +1000,11 @@ bool MultiSection<IndexType, ValueType>::inBBox( const std::vector<T>& coords, c
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle<ValueType>& bBox, const IndexType sideLen, Settings settings) {
+ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( 
+    const scai::lama::DenseVector<ValueType>& nodeWeights, 
+    const struct rectangle<ValueType>& bBox, 
+    const IndexType sideLen, 
+    Settings settings) {
     SCAI_REGION("MultiSection.getRectangleWeight");
 
     const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
@@ -1066,7 +1070,11 @@ ValueType MultiSection<IndexType, ValueType>::getRectangleWeight(
 
 template<typename IndexType, typename ValueType>
 template<typename T>
-ValueType MultiSection<IndexType, ValueType>::getRectangleWeight( const std::vector<std::vector<T>>& coordinates, const scai::lama::DenseVector<ValueType>& nodeWeights, const  struct rectangle<ValueType>& bBox, Settings settings) {
+ValueType MultiSection<IndexType, ValueType>::getRectangleWeight(
+    const std::vector<std::vector<T>>& coordinates, 
+    const scai::lama::DenseVector<ValueType>& nodeWeights, 
+    const struct rectangle<ValueType>& bBox, 
+    Settings settings) {
     SCAI_REGION("MultiSection.getRectangleWeight");
 
     const scai::dmemo::DistributionPtr inputDist = nodeWeights.getDistributionPtr();
