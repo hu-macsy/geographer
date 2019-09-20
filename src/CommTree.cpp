@@ -117,7 +117,7 @@ IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vecto
         levelBelow = levelAbove;
         //PRINT("Size of level above (lvl " << h << ") is " << levelAbove.size() );
     }
-PRINT( size );
+
     return size;
 }//createTreeFromLeaves
 //------------------------------------------------------------------------

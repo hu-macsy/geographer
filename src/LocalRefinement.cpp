@@ -1219,14 +1219,12 @@ std::vector<ValueType> LocalRefinement<IndexType, ValueType>::computeInitialGain
     const std::vector<ValueType>& tieBreakingKeys,
     const bool edgesWeighted,
     PrioQueue<std::pair<IndexType, ValueType>, IndexType> firstQueue,
-    PrioQueue<std::pair<IndexType, ValueType>, IndexType> secondQueue
-    ) {
+    PrioQueue<std::pair<IndexType, ValueType>, IndexType> secondQueue) {
     SCAI_REGION( "LocalRefinement.computeInitialGain" )
 
     /*
      * neighborhood information is either in local matrix or halo.
      */
-    //const CSRStorage<ValueType>& storage = inputDist->isLocal(globalID) ? input.getLocalStorage() : haloStorage;
     
     //the size of this border region
     const IndexType veryLocalN = borderRegionIDs.size();
@@ -1246,7 +1244,7 @@ std::vector<ValueType> LocalRefinement<IndexType, ValueType>::computeInitialGain
 
     const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
 
-    for (IndexType i = 0; i < veryLocalN; i++) {
+    for (IndexType i = 0; i < veryLocalN; i++) {    
         const IndexType globalID = borderRegionIDs[i];
         //true if i is in local in this PEs
         bool isLocal = inputDist->isLocal(globalID);
@@ -1255,15 +1253,15 @@ std::vector<ValueType> LocalRefinement<IndexType, ValueType>::computeInitialGain
         assert(localID != scai::invalidIndex);
         bool isInSecondBlock = assignedToSecondBlock[i];
 
-
         //get indices for CSR structure depending if this node is local
         //or in the halo. Initialize with local and change if is not local
         IndexType beginCols = localIa[localID];
         IndexType endCols = localIa[localID+1];
+
         const scai::hmemo::ReadAccess<IndexType>* ja = &localJa;
         const scai::hmemo::ReadAccess<ValueType>* values = &localVal;
 
-        if( not isLocal ){
+        if( not isLocal ){         
             beginCols= haloIa[localID];
             endCols = haloIa[localID+1];
             ja = &haloJa;
@@ -1271,13 +1269,13 @@ std::vector<ValueType> LocalRefinement<IndexType, ValueType>::computeInitialGain
         }
 
         for (IndexType j = beginCols; j < endCols; j++) {
-            IndexType globalNeighbor = *ja[j];
+            IndexType globalNeighbor = (*ja)[j];      
             if (globalNeighbor == globalID) {
                 //self-loop, not counted
                 continue;
             }
 
-            const ValueType weight = edgesWeighted ? *values[j] : 1;
+            const ValueType weight = edgesWeighted ? (*values)[j] : 1;
 
             if (inputDist->isLocal(globalNeighbor)) {
                 //neighbor is in local block,
@@ -1287,7 +1285,7 @@ std::vector<ValueType> LocalRefinement<IndexType, ValueType>::computeInitialGain
                 gain[i] += !isInSecondBlock ? weight : -weight;
             } else {
                 //neighbor is from somewhere else, no effect on gain.
-            }
+            }          
         }
 
         const ValueType tieBreakingKey = tieBreakingKeys[i];
