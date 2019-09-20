@@ -204,8 +204,8 @@ private:
         const std::vector<bool>& assignedToSecondBlock,
         const std::vector<ValueType>& tieBreakingKeys,
         const bool edgesWeighted,
-        PrioQueue<std::pair<IndexType, ValueType>, IndexType> firstQueue,
-        PrioQueue<std::pair<IndexType, ValueType>, IndexType> secondQueue
+        PrioQueue<std::pair<IndexType, ValueType>, IndexType>& firstQueue,
+        PrioQueue<std::pair<IndexType, ValueType>, IndexType>& secondQueue
     );
     /**
      * @brief Count local nodes in block blockID

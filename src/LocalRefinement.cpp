@@ -1218,8 +1218,8 @@ std::vector<ValueType> LocalRefinement<IndexType, ValueType>::computeInitialGain
     const std::vector<bool>& assignedToSecondBlock,
     const std::vector<ValueType>& tieBreakingKeys,
     const bool edgesWeighted,
-    PrioQueue<std::pair<IndexType, ValueType>, IndexType> firstQueue,
-    PrioQueue<std::pair<IndexType, ValueType>, IndexType> secondQueue) {
+    PrioQueue<std::pair<IndexType, ValueType>, IndexType>& firstQueue,
+    PrioQueue<std::pair<IndexType, ValueType>, IndexType>& secondQueue) {
     SCAI_REGION( "LocalRefinement.computeInitialGain" )
 
     /*
