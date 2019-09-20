@@ -54,8 +54,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
         throw std::runtime_error("Called with " + std::to_string(comm->getSize()) + " processors, but " + std::to_string(settings.numBlocks) + " blocks.");
     }
 
-    //TODO: opt size
-    //const IndexType optSize_old = ceil(double(globalN) / settings.numBlocks);
+//TODO: turn to vectors, one for each vertex weight
     const IndexType optSize =  nodeWeights.sum() / settings.numBlocks;
     const IndexType maxAllowableBlockSize = optSize*(1+settings.epsilon);
 
@@ -64,8 +63,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
 
     const bool nodesWeighted = nodeWeights.getDistributionPtr()->getGlobalSize() > 0;
     if (nodesWeighted && nodeWeights.getDistributionPtr()->getLocalSize() != input.getRowDistributionPtr()->getLocalSize()) {
-        throw std::runtime_error("Node weights have " + std::to_string(nodeWeights.getDistributionPtr()->getLocalSize()) + " local values, should be "
-                                 + std::to_string(input.getRowDistributionPtr()->getLocalSize()));
+        throw std::runtime_error("Node weights have " + std::to_string(nodeWeights.getDistributionPtr()->getLocalSize()) + " local values, should be " + std::to_string(input.getRowDistributionPtr()->getLocalSize()));
     }
 
     ValueType gainSum = 0;
@@ -114,8 +112,7 @@ SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.intro" )
         if (commDist->isLocal(partner)) {
             IndexType partnerOfPartner = commAccess[commDist->global2Local(partner)];
             if (partnerOfPartner != comm->getRank()) {
-                throw std::runtime_error("Process " + std::to_string(comm->getRank()) + ": Partner " + std::to_string(partner) + " has partner "
-                                         + std::to_string(partnerOfPartner) + ".");
+                throw std::runtime_error("Process " + std::to_string(comm->getRank()) + ": Partner " + std::to_string(partner) + " has partner " + std::to_string(partnerOfPartner) + ".");
             }
         }
 SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.intro" )
@@ -565,53 +562,6 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
         return globalToVeryLocal.count(globalID) > 0;
     };
 
-    /*
-     * This lambda computes the initial gain of each node.
-     * Inlining to reduce the overhead of read access locks didn't give any performance benefit.
-     */
-    auto computeInitialGain = [&](IndexType veryLocalID) {
-        SCAI_REGION( "LocalRefinement.twoWayLocalFM.computeGain" )
-        ValueType result = 0;
-        IndexType globalID = borderRegionIDs[veryLocalID];
-        IndexType isInSecondBlock = assignedToSecondBlock[veryLocalID];
-        /*
-         * neighborhood information is either in local matrix or halo.
-         */
-        const CSRStorage<ValueType>& storage = inputDist->isLocal(globalID) ? input.getLocalStorage() : haloStorage;
-        const IndexType localID = inputDist->isLocal(globalID) ? inputDist->global2Local(globalID) : matrixHalo.global2Halo(globalID);
-        assert(localID != scai::invalidIndex);
-
-        //get locks
-        const scai::hmemo::ReadAccess<IndexType> localIa(storage.getIA());
-        const scai::hmemo::ReadAccess<IndexType> localJa(storage.getJA());
-        const scai::hmemo::ReadAccess<ValueType> values(storage.getValues());
-
-        //get indices for CSR structure
-        const IndexType beginCols = localIa[localID];
-        const IndexType endCols = localIa[localID+1];
-
-        for (IndexType j = beginCols; j < endCols; j++) {
-            IndexType globalNeighbor = localJa[j];
-            if (globalNeighbor == globalID) {
-                //self-loop, not counted
-                continue;
-            }
-
-            const ValueType weight = edgesWeighted ? values[j] : 1;
-
-            if (inputDist->isLocal(globalNeighbor)) {
-                //neighbor is in local block,
-                result += isInSecondBlock ? weight : -weight;
-            } else if (matrixHalo.global2Halo(globalNeighbor) != scai::invalidIndex) {
-                //neighbor is in partner block
-                result += !isInSecondBlock ? weight : -weight;
-            } else {
-                //neighbor is from somewhere else, no effect on gain.
-            }
-        }
-
-        return result;
-    };
 
     /*
      * construct and fill gain table and priority queues. Since only one target block is possible, gain table is one-dimensional.
@@ -620,18 +570,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
     PrioQueue<std::pair<IndexType, ValueType>, IndexType> firstQueue(veryLocalN);
     PrioQueue<std::pair<IndexType, ValueType>, IndexType> secondQueue(veryLocalN);
 
-    std::vector<ValueType> gain(veryLocalN);
-
-    for (IndexType i = 0; i < veryLocalN; i++) {
-        gain[i] = computeInitialGain(i);
-        const ValueType tieBreakingKey = tieBreakingKeys[i];
-        if (assignedToSecondBlock[i]) {
-            //the queues only support extractMin, since we want the maximum gain each round, we multiply it with -1
-            secondQueue.insert(std::make_pair(-gain[i], tieBreakingKey), i);
-        } else {
-            firstQueue.insert(std::make_pair(-gain[i], tieBreakingKey), i);
-        }
-    }
+    std::vector<ValueType> gain = computeInitialGain( input, haloStorage, matrixHalo, borderRegionIDs, assignedToSecondBlock, tieBreakingKeys, edgesWeighted, firstQueue, secondQueue );
 
     //whether a node was already moved
     std::vector<bool> moved(veryLocalN, false);
@@ -1266,7 +1205,104 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
     return {interfaceNodes, roundMarkers};
 }
 //---------------------------------------------------------------------------------------
+/*
+ * This lambda computes the initial gain of each node.
+ * Inlining to reduce the overhead of read access locks didn't give any performance benefit.
+ */
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> LocalRefinement<IndexType, ValueType>::computeInitialGain(
+    const CSRSparseMatrix<ValueType>& input,
+    const CSRStorage<ValueType>& haloStorage,
+    const scai::dmemo::HaloExchangePlan& matrixHalo,
+    const std::vector<IndexType>& borderRegionIDs,
+    const std::vector<bool>& assignedToSecondBlock,
+    const std::vector<ValueType>& tieBreakingKeys,
+    const bool edgesWeighted,
+    PrioQueue<std::pair<IndexType, ValueType>, IndexType> firstQueue,
+    PrioQueue<std::pair<IndexType, ValueType>, IndexType> secondQueue
+    ) {
+    SCAI_REGION( "LocalRefinement.computeInitialGain" )
 
+    /*
+     * neighborhood information is either in local matrix or halo.
+     */
+    //const CSRStorage<ValueType>& storage = inputDist->isLocal(globalID) ? input.getLocalStorage() : haloStorage;
+    
+    //the size of this border region
+    const IndexType veryLocalN = borderRegionIDs.size();
+
+    //to be returned
+    std::vector<ValueType> gain(veryLocalN);
+
+    //get locks if point is local
+    const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
+    const scai::hmemo::ReadAccess<IndexType> localIa(localStorage.getIA());
+    const scai::hmemo::ReadAccess<IndexType> localJa(localStorage.getJA());
+    const scai::hmemo::ReadAccess<ValueType> localVal(localStorage.getValues());
+     //get locks if point in halo
+    const scai::hmemo::ReadAccess<IndexType> haloIa(haloStorage.getIA());
+    const scai::hmemo::ReadAccess<IndexType> haloJa(haloStorage.getJA());
+    const scai::hmemo::ReadAccess<ValueType> haloVal(haloStorage.getValues());
+
+    const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+
+    for (IndexType i = 0; i < veryLocalN; i++) {
+        const IndexType globalID = borderRegionIDs[i];
+        //true if i is in local in this PEs
+        bool isLocal = inputDist->isLocal(globalID);
+
+        const IndexType localID = isLocal ? inputDist->global2Local(globalID) : matrixHalo.global2Halo(globalID);
+        assert(localID != scai::invalidIndex);
+        bool isInSecondBlock = assignedToSecondBlock[i];
+
+
+        //get indices for CSR structure depending if this node is local
+        //or in the halo. Initialize with local and change if is not local
+        IndexType beginCols = localIa[localID];
+        IndexType endCols = localIa[localID+1];
+        const scai::hmemo::ReadAccess<IndexType>* ja = &localJa;
+        const scai::hmemo::ReadAccess<ValueType>* values = &localVal;
+
+        if( not isLocal ){
+            beginCols= haloIa[localID];
+            endCols = haloIa[localID+1];
+            ja = &haloJa;
+            values = &haloVal;
+        }
+
+        for (IndexType j = beginCols; j < endCols; j++) {
+            IndexType globalNeighbor = *ja[j];
+            if (globalNeighbor == globalID) {
+                //self-loop, not counted
+                continue;
+            }
+
+            const ValueType weight = edgesWeighted ? *values[j] : 1;
+
+            if (inputDist->isLocal(globalNeighbor)) {
+                //neighbor is in local block,
+                gain[i] += isInSecondBlock ? weight : -weight;
+            } else if (matrixHalo.global2Halo(globalNeighbor) != scai::invalidIndex) {
+                //neighbor is in partner block
+                gain[i] += !isInSecondBlock ? weight : -weight;
+            } else {
+                //neighbor is from somewhere else, no effect on gain.
+            }
+        }
+
+        const ValueType tieBreakingKey = tieBreakingKeys[i];
+        if ( isInSecondBlock ) {
+            //the queues only support extractMin, since we want the maximum gain each round, we multiply it with -1
+            secondQueue.insert(std::make_pair(-gain[i], tieBreakingKey), i);
+        } else {
+            firstQueue.insert(std::make_pair(-gain[i], tieBreakingKey), i);
+        }
+    }
+
+    return gain;
+};
+//---------------------------------------------------------------------------------------
+    
 template<typename IndexType, typename ValueType>
 IndexType LocalRefinement<IndexType, ValueType>::localBlockSize(const DenseVector<IndexType> &part, IndexType blockID) {
     SCAI_REGION( "LocalRefinement.localBlockSize" )

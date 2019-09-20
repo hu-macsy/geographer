@@ -188,6 +188,25 @@ private:
         Settings settings
     );
 
+    /** Compute the gain vector for every vertex move.
+
+        Other input parameters are as in twoWayLocalFM
+
+        @param[out] firstQueue
+        @param[out] secondQueue
+        @return The gain for moving a vertex. Size is equal to borderRegionIDs.size()
+    */
+    static std::vector<ValueType> computeInitialGain(
+        const CSRSparseMatrix<ValueType>& input,
+        const CSRStorage<ValueType> &haloStorage,
+        const scai::dmemo::HaloExchangePlan& matrixHalo,
+        const std::vector<IndexType>& borderRegionIDs,
+        const std::vector<bool>& assignedToSecondBlock,
+        const std::vector<ValueType>& tieBreakingKeys,
+        const bool edgesWeighted,
+        PrioQueue<std::pair<IndexType, ValueType>, IndexType> firstQueue,
+        PrioQueue<std::pair<IndexType, ValueType>, IndexType> secondQueue
+    );
     /**
      * @brief Count local nodes in block blockID
      *

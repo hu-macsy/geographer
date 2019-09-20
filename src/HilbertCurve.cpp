@@ -423,7 +423,7 @@ std::vector<double> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector 
             hilbertIndices[i] = double(integerIndex) / double(divisor);
         }
     }
-PRINT( comm->getRank() );
+
     return hilbertIndices;
 
 }
