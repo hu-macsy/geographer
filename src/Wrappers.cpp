@@ -149,6 +149,18 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::repartition (
 }
 //-----------------------------------------------------------------------------------------
 
+template<typename IndexType, typename ValueType>
+void Wrappers<IndexType, ValueType>::refine(
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        const scai::lama::DenseVector<IndexType> partition,
+        struct Settings &settings,
+    ){
+
+
+}
+//-----------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartition (

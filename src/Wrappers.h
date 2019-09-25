@@ -67,12 +67,12 @@ public:
      * @param[in] graph The adjacency matrix of the graph of size NxN
      * @param[in] coordinates The coordinates of the mesh. Not always needed by all tools
      * @param[in] nodeWeights Weights for every node, used only is nodeWeightFlag is true
-     * @param[in] nodeWeightsFlag If true the node weigts are used, if false they are ignored
+     * @param[in] nodeWeightsFlag If true the node weights are used, if false they are ignored
      * @param[in] tool One of the supported tools.
      * @param[in] settings A Settings structure to pass various settings
      * @param[out] metrics Structure to store/return timing info
      *
-     * @return A DenseVector of size N with the partition calcualted: 0<= return[i] < k with the block that point i belongs to
+     * @return A DenseVector of size N with the partition calculated: 0<= return[i] < k with the block that point i belongs to
      */
     static scai::lama::DenseVector<IndexType> repartition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
@@ -84,6 +84,18 @@ public:
         struct Metrics &metrics
     );
 
+    /** Given the input (graph, coordinates, node weights) and a partition
+    of the input, apply local refinement.
+
+    The input and the partition DenseVector should have the same distribution.
+    */
+    static refine(
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        const scai::lama::DenseVector<IndexType> partition,
+        struct Settings &settings,
+    );
 
 private:
 
