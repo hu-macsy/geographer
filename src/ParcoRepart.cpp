@@ -33,8 +33,6 @@
 #include "MultiSection.h"
 #include "GraphUtils.h"
 #include "Mapping.h"
-#include "MyAlgo.h"
-
 
 
 namespace ITI {
@@ -44,7 +42,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     CSRSparseMatrix<ValueType> &input,
     std::vector<DenseVector<ValueType>> &coordinates,
     Settings settings,
-    struct Metrics& metrics)
+    Metrics<ValueType>& metrics)
 {
     std::vector<DenseVector<ValueType> > uniformWeights(1);
     uniformWeights[0] = fill<DenseVector<ValueType>>(input.getRowDistributionPtr(), 1);
@@ -58,7 +56,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     std::vector<DenseVector<ValueType>> &coordinates,
     struct Settings settings) {
 
-    struct Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
     assert(settings.storeInfo == false); // Cannot return timing information. Better throw an error than silently drop it.
 
     return partitionGraph(input, coordinates, settings, metrics);
@@ -71,7 +69,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     std::vector<DenseVector<ValueType>> &coordinates,
     std::vector<DenseVector<ValueType>> &nodeWeights,
     struct Settings settings,
-    struct Metrics& metrics) {
+    Metrics<ValueType>& metrics) {
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     if( settings.initialPartition!=ITI::Tool::geoSFC ) {
@@ -107,7 +105,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     std::vector<DenseVector<ValueType>> &coordinates,
     std::vector<DenseVector<ValueType>> &nodeWeights,
     Settings settings,
-    struct Metrics& metrics) {
+    Metrics<ValueType>& metrics) {
 
     DenseVector<IndexType> previous;
     assert(!settings.repartition);
@@ -130,7 +128,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
         std::vector<DenseVector<ValueType>> &nodeWeights,
         std::vector<std::vector<ValueType>> &blockSizes,
         Settings settings,
-        struct Metrics& metrics) {
+        Metrics<ValueType>& metrics) {
 
     DenseVector<IndexType> previous;
     assert(!settings.repartition);
@@ -154,16 +152,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
-    IndexType *vwgt, IndexType dimensions, ValueType *xyz,
-    Settings  settings, Metrics &metrics ) {
+    IndexType *vwgt, ValueType *xyz,
+    Settings  settings, Metrics<ValueType>& metrics ) {
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const IndexType numPEs = comm->getSize();
     const IndexType thisPE = comm->getRank();
 
-    //SCAI_ASSERT_EQ_ERROR(numPEs+1, sizeof(vtxDist)/sizeof(IndexType), "wrong size for array vtxDist" );
-    // ^^ this is wrong,  sizeof(vtxDist)=size of a pointer. How to check if size is correct?
     const IndexType N = vtxDist[numPEs];
+    const IndexType dimensions = settings.dimensions;
 
     // how to check if array has the correct size?
     const IndexType localN = vtxDist[thisPE+1]-vtxDist[thisPE];
@@ -245,7 +242,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     DenseVector<IndexType>& previous,
     CommTree<IndexType,ValueType> commTree,
     Settings settings,
-    struct Metrics& metrics)
+    Metrics<ValueType>& metrics)
 {
     IndexType k = settings.numBlocks;
     ValueType epsilon = settings.epsilon;
@@ -342,7 +339,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
     CommTree<IndexType,ValueType> commTree,
     scai::dmemo::CommunicatorPtr comm,
     Settings settings,
-    struct Metrics& metrics){
+    Metrics<ValueType>& metrics){
     
 	SCAI_REGION( "ParcoRepart.initialPartition" )
 
@@ -403,9 +400,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
 
         if (settings.repartition) {
-            result = ITI::KMeans::computeRepartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
+            result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
         } else if (settings.initialPartition == ITI::Tool::geoKmeans) {
-            result = ITI::KMeans::computePartition<IndexType, ValueType>(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
+            result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
         } else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart) {
             const IndexType numWeights = nodeWeightCopy.size();
             SCAI_ASSERT_GT_ERROR( settings.hierLevels.size(), 0, "Must provide the tree level sizes in order to call hierarchical KMeans" );
@@ -419,11 +416,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
             commTree.adaptWeights( nodeWeightCopy );
 
             if (settings.initialPartition == ITI::Tool::geoHierKM) {
-                result = ITI::KMeans::computeHierarchicalPartition<IndexType, ValueType>( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
+                result = ITI::KMeans<IndexType,ValueType>::computeHierarchicalPartition( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
             }
             if (settings.initialPartition == ITI::Tool::geoHierRepart) {
                 //settings.debugMode = true;
-                result = ITI::KMeans::computeHierPlusRepart<IndexType, ValueType>( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
+                result = ITI::KMeans<IndexType,ValueType>::computeHierPlusRepart( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
             }
             SCAI_ASSERT_EQ_ERROR( nodeWeightCopy[0].getDistributionPtr()->getLocalSize(),\
                                   result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
@@ -477,9 +474,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         //no need to explicitly check for repartitioning mode or not.
         assert(comm->getSize() == settings.numBlocks);
         result = DenseVector<IndexType>(input.getRowDistributionPtr(), comm->getRank());
-    }else if( settings.initialPartition==ITI::Tool::myAlgo ){
-		result = ITI::MyAlgo<IndexType, ValueType>::partitionGraph( input, coordinates, nodeWeights, settings, metrics);
-	}else {
+    }else {
         throw std::runtime_error("Initial Partitioning mode unsupported.");
     }
 /*    
@@ -510,7 +505,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
     std::vector<DenseVector<ValueType>> &nodeWeights,
 	scai::dmemo::CommunicatorPtr comm,
     Settings settings,
-	struct Metrics& metrics){
+	Metrics<ValueType>& metrics){
 
 	SCAI_REGION("ParcoRepart.doLocalRefinement");		
 	std::chrono::time_point<std::chrono::system_clock> start =  std::chrono::system_clock::now();
@@ -1028,7 +1023,8 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 //---------------------------------------------------------------------------------------
 
 //to force instantiation
-template class ParcoRepart<IndexType, ValueType>;
+template class ParcoRepart<IndexType, double>;
+template class ParcoRepart<IndexType, float>;
 
 
 } //namespace ITI

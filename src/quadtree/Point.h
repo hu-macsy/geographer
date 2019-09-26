@@ -281,4 +281,5 @@ inline void Point<T>::print() const {
     std::cout<<"\b\b)";//<< std::endl;
 }
 
+
 } /* namespace ITI */

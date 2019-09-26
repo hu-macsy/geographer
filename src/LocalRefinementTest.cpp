@@ -28,6 +28,7 @@ using namespace scai;
 
 namespace ITI {
 
+template<typename T>
 class LocalRefinementTest : public ::testing::Test {
 protected:
     // the directory of all the meshes used
@@ -35,9 +36,14 @@ protected:
     const std::string graphPath = projectRoot+"/meshes/";
 };
 
+using testTypes = ::testing::Types<double,float>;
+TYPED_TEST_SUITE(LocalRefinementTest, testTypes);
+
 //---------------------------------------------------------------------------------------
 
-TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
+TYPED_TEST(LocalRefinementTest, testFiducciaMattheysesDistributed) {
+    using ValueType = TypeParam;
+
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const IndexType k = comm->getSize();
     ValueType epsilon = 0.1;
@@ -178,9 +184,11 @@ TEST_F(LocalRefinementTest, testFiducciaMattheysesDistributed) {
 }
 
 //---------------------------------------------------------------------------------------
-TEST_F(LocalRefinementTest, testOriginArray) {
+TYPED_TEST(LocalRefinementTest, testOriginArray) {
+    using ValueType = TypeParam;
+
     std::string fileName = "bubbles-00010.graph";
-    std::string file = graphPath + fileName;
+    std::string file = LocalRefinementTest<ValueType>::graphPath + fileName;
 
     scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file);
     std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords(std::string(file + ".xyz"), graph.getNumRows(), 2);
@@ -221,7 +229,9 @@ TEST_F(LocalRefinementTest, testOriginArray) {
 
 //---------------------------------------------------------------------------------------
 
-TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
+TYPED_TEST(LocalRefinementTest, testGetInterfaceNodesDistributed) {
+    using ValueType = TypeParam;
+
     const IndexType dimX = 10;
     const IndexType dimY = 10;
     const IndexType dimZ = 10;
@@ -361,7 +371,9 @@ TEST_F(LocalRefinementTest, testGetInterfaceNodesDistributed) {
 }
 //----------------------------------------------------------
 
-TEST_F(LocalRefinementTest, testDistancesFromBlockCenter) {
+TYPED_TEST(LocalRefinementTest, testDistancesFromBlockCenter) {
+    using ValueType = TypeParam;
+
     const IndexType nroot = 16;
     const IndexType n = nroot * nroot * nroot;
     const IndexType dimensions = 3;

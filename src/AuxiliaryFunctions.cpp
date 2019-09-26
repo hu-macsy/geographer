@@ -254,6 +254,185 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
+IndexType aux<IndexType, ValueType>::toMetisInterface(
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const std::vector<scai::lama::DenseVector<ValueType>> &coords,
+    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+    const struct Settings &settings,
+    std::vector<IndexType>& vtxDist, 
+    std::vector<IndexType>& xadj,
+    std::vector<IndexType>& adjncy,
+    std::vector<ValueType>& vwgt,
+    std::vector<ValueType>& tpwgts,
+    IndexType &wgtFlag,
+    IndexType &numWeights,
+    std::vector<ValueType>& ubvec,
+    std::vector<ValueType>& xyzLocal,
+    std::vector<IndexType>& options){
+    SCAI_REGION( "aux.toMetisInterface");
+
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    const IndexType N = graph.getNumRows();
+    const IndexType localN= dist->getLocalSize();    
+    const IndexType size = comm->getSize();
+    
+    if( not checkConsistency( graph, coords, nodeWeights, settings)){
+        PRINT0("Input not consistent.\nAborting...");
+        return -1;
+    }
+    // get local range of indices
+
+    IndexType lb2=N+1, ub2=-1;
+    {
+        scai::hmemo::HArray<IndexType> myGlobalIndexes;
+        dist->getOwnedIndexes( myGlobalIndexes );
+        scai::hmemo::ReadAccess<IndexType> rIndices( myGlobalIndexes );
+        SCAI_ASSERT_EQ_ERROR( localN, myGlobalIndexes.size(), "Local size mismatch" );
+
+        for( int i=0; i<localN; i++) {
+            if( rIndices[i]<lb2 ) lb2=rIndices[i];
+            if( rIndices[i]>ub2 ) ub2=rIndices[i];
+        }
+        ++ub2;  // we need max+1
+    }
+    //PRINT(*comm<< ": "<< lb2 << " - "<< ub2);    
+
+    scai::hmemo::HArray<IndexType> sendVtx(size+1, static_cast<ValueType>( 0 ));
+    scai::hmemo::HArray<IndexType> recvVtx(size+1);
+
+    //TODO: use a sumArray instead of shiftArray
+    for(IndexType round=0; round<comm->getSize(); round++) {
+        SCAI_REGION("ParcoRepart.getBlockGraph.shiftArray");
+        {   // write your part
+            scai::hmemo::WriteAccess<IndexType> sendPartWrite( sendVtx );
+            sendPartWrite[0]=0;
+            sendPartWrite[comm->getRank()+1]=ub2;
+        }
+        comm->shiftArray(recvVtx, sendVtx, 1);
+        sendVtx.swap(recvVtx);
+    }
+
+    scai::hmemo::ReadAccess<IndexType> recvPartRead( recvVtx );
+
+    // vtxDist is an array of size numPEs and is replicated in every processor
+    //IndexType* tmpVtxDist = new IndexType[ size+1 ];
+    vtxDist.resize( size+1 );
+    vtxDist[0]= 0;
+
+    for(int i=0; i<recvPartRead.size()-1; i++) {
+        vtxDist[i+1]= recvPartRead[i+1];
+    }
+
+    //for(IndexType i=0; i<recvPartRead.size(); i++){
+    //  PRINT(*comm<< " , " << i <<": " << vtxDist[i]);
+    //}
+    
+    recvPartRead.release();
+
+    //
+    // set the input parameters for parmetis
+    //
+
+    // ndims: the number of dimensions
+    IndexType ndims = settings.dimensions;
+
+    // setting xadj=ia and adjncy=ja values, these are the local values of every processor
+    const scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
+
+    scai::hmemo::ReadAccess<IndexType> ia( localMatrix.getIA() );
+    scai::hmemo::ReadAccess<IndexType> ja( localMatrix.getJA() );
+    IndexType iaSize= ia.size();
+
+    xadj.resize( iaSize ); 
+    adjncy.resize( ja.size() );
+
+    for(int i=0; i<iaSize ; i++) {
+        xadj[i]= ia[i];
+        SCAI_ASSERT( xadj[i] >=0, "negative value for i= "<< i << " , val= "<< xadj[i]);
+    }
+
+    for(int i=0; i<ja.size(); i++) {
+        adjncy[i]= ja[i];
+        SCAI_ASSERT( adjncy[i] >=0, "negative value for i= "<< i << " , val= "<< adjncy[i]);
+        SCAI_ASSERT( adjncy[i] <N, "too large value for i= "<< i << " , val= "<< adjncy[i]);
+    }
+    ia.release();
+    ja.release();
+
+    // wgtflag is for the weight and can take 4 values. Here, 0 is for no weights.
+    wgtFlag= 0;
+
+    // the numbers of weights each vertex has.
+    numWeights = 1;
+
+    // if node weights are given
+
+    if( nodeWeights[0].getLocalValues().size()!=0  ) {
+        numWeights = nodeWeights.size();
+        vwgt.resize( localN*numWeights );
+
+        for( unsigned int w=0; w<numWeights; w++ ) {
+            scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights[w].getLocalValues() );
+            SCAI_ASSERT_EQ_ERROR( localN, localWeights.size(), "Local weights size mismatch. Are node weights distributed correctly?");
+
+            //all weights for each vertex are stored contiguously
+            for(unsigned int i=0; i<localN; i++) {
+                int index = i*numWeights + w;
+                vwgt[index] = localWeights[i];
+            }
+        }
+        wgtFlag = 2;    //weights only in vertices
+    }
+
+    // ubvec: array of size ncon to specify imbalance for every vertex weight.
+    // 1 is perfect balance and nparts perfect imbalance. Here 1 for now
+    ubvec.resize( numWeights );
+    for(unsigned int i=0; i<numWeights; i++) {
+        ubvec[i] = ValueType(settings.epsilon + 1); //same balance for all constraints
+    }
+
+    // nparts: the number of parts to partition (=k)
+    IndexType nparts= settings.numBlocks;
+
+    // tpwgts: array of size ncons*nparts, that is used to specify the fraction of
+    // vertex weight that should be distributed to each sub-domain for each balance
+    // constraint. Here we want equal sizes, so every value is 1/nparts.
+    tpwgts.resize( nparts*numWeights );
+
+    ValueType total = 0.0;
+    for(int i=0; i<tpwgts.size(); i++) {
+        tpwgts[i] = ValueType(1.0)/nparts;
+        total += tpwgts[i];
+    }
+    SCAI_ASSERT_LT_ERROR( std::abs(total-numWeights), 1e-6, "Wrong tpwgts assignment");    
+
+
+    // the xyz array for coordinates of size dim*localN contains the local coords
+    xyzLocal.resize( ndims*localN );
+
+    std::vector<scai::hmemo::HArray<ValueType>> localPartOfCoords( ndims );
+    for(int d=0; d<ndims; d++) {
+        localPartOfCoords[d] = coords[d].getLocalValues();
+    }
+    for(unsigned int i=0; i<localN; i++) {
+        SCAI_ASSERT_LE_ERROR( ndims*(i+1), ndims*localN, "Too large index, localN= " << localN );
+        for(int d=0; d<ndims; d++) {
+            xyzLocal[ndims*i+d] = ValueType(localPartOfCoords[d][i]);
+        }
+    }
+
+    // options: array of integers for passing arguments.
+    // Here, options[0]=0 for the default values.
+    options.resize(2, 0);
+
+    return localN;
+
+}//toMetisInterface
+//---------------------------------------------------------------------------------------
+
+
+template<typename IndexType, typename ValueType>
 void ITI::aux<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input) {
     SCAI_REGION( "aux.checkLocalDegreeSymmetry" )
 
@@ -382,6 +561,8 @@ bool ITI::aux<IndexType, ValueType>::checkConsistency(
 	return true;
 }
 
-template class aux<IndexType, ValueType>;
+
+template class aux<IndexType, double>;
+template class aux<IndexType, float>;
 
 }//namespace ITI

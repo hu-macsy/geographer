@@ -24,8 +24,8 @@ Options populateOptions() {
     ("numBlocks", "Number of blocks, default is number of processes", value<IndexType>())
     ("epsilon", "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.", value<double>()->default_value(std::to_string(settings.epsilon)))
     // other input specification
-    ("fileFormat", "Format of graph file, available are AUTO, METIS, ADCRIC and MatrixMarket format. See Readme.md for more details.", value<ITI::Format>())
-    ("coordFormat", "format of coordinate file: AUTO, METIS, ADCIRC and MATRIXMARKET", value<ITI::Format>())
+    ("fileFormat", "Format of graph file, available are AUTO, METIS, ADCRIC and MatrixMarket format. See Readme.md and src/Settings.h for more details.", value<ITI::Format>())
+    ("coordFormat", "format of coordinate file: AUTO, METIS, ADCIRC and MATRIXMARKET. See src/Settings.h for more details.", value<ITI::Format>())
     ("numNodeWeights", "Number of node weights to use. If the input graph contains more node weights, only the first ones are used.", value<IndexType>())
     ("seed", "random seed, default is current time", value<double>()->default_value(std::to_string(time(NULL))))
     //mapping
@@ -34,7 +34,7 @@ Options populateOptions() {
     //repartitioning
     ("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
     //multi-level and local refinement
-    ("initialPartition", "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.", value<Tool>())
+    ("initialPartition", "Choose initial partitioning method between space-filling curves (geoSFC), balanced k-means (geoKmeans) or the hierarchical version (geoHierKM) and MultiJagged (geoMS). If parmetis or zoltan are installed, you can also choose to partition with them using for example, parMetisGraph or zoltanMJ. For more information, see src/Settings.h file.", value<Tool>())
     ("noRefinement", "skip local refinement steps")
     ("multiLevelRounds", "Tuning Parameter: How many multi-level rounds with coarsening to perform", value<IndexType>()->default_value(std::to_string(settings.multiLevelRounds)))
     ("minBorderNodes", "Tuning parameter: Minimum number of border nodes used in each refinement step", value<IndexType>())
@@ -51,8 +51,8 @@ Options populateOptions() {
     ("pixeledSideLen", "The resolution for the pixeled partition or the spectral", value<IndexType>())
     // K-Means
     ("minSamplingNodes", "Tuning parameter for K-Means", value<IndexType>())
-    ("influenceExponent", "Tuning parameter for K-Means, default is ", value<ValueType>()->default_value(std::to_string(settings.influenceExponent)))
-    ("influenceChangeCap", "Tuning parameter for K-Means", value<ValueType>())
+    ("influenceExponent", "Tuning parameter for K-Means, default is ", value<double>()->default_value(std::to_string(settings.influenceExponent)))
+    ("influenceChangeCap", "Tuning parameter for K-Means", value<double>())
     ("balanceIterations", "Tuning parameter for K-Means", value<IndexType>())
     ("maxKMeansIterations", "Tuning parameter for K-Means", value<IndexType>())
     ("tightenBounds", "Tuning parameter for K-Means")
@@ -72,7 +72,7 @@ Options populateOptions() {
     ("maxDiameterRounds", "abort diameter algorithm after that many BFS rounds", value<IndexType>())
     ("metricsDetail", "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV", value<std::string>())
     //used for the competitors main
-    // ("outDir", "write result partition into file", value<std::string>())
+    ("outDir", "write result partition into folder", value<std::string>())
     //mesh generation
     ("generate", "generate uniform mesh as input graph")
     ("numX", "Number of points in x dimension of generated graph", value<IndexType>())
@@ -251,10 +251,10 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         settings.minSamplingNodes = vm["minSamplingNodes"].as<IndexType>();
     }
     if (vm.count("influenceExponent")) {
-        settings.influenceExponent = vm["influenceExponent"].as<ValueType>();
+        settings.influenceExponent = vm["influenceExponent"].as<double>();
     }
     if (vm.count("influenceChangeCap")) {
-        settings.influenceChangeCap = vm["influenceChangeCap"].as<ValueType>();
+        settings.influenceChangeCap = vm["influenceChangeCap"].as<double>();
     }
     if (vm.count("balanceIterations")) {
         settings.balanceIterations = vm["balanceIterations"].as<IndexType>();

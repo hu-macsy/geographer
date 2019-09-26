@@ -47,7 +47,7 @@ public:
         bool nodeWeightsFlag,
         Tool tool,
         struct Settings &settings,
-        struct Metrics &metrics
+        Metrics<ValueType> &metrics
     );
 
 
@@ -59,7 +59,7 @@ public:
         bool nodeWeightsFlag,
         Tool tool,
         struct Settings &settings,
-        struct Metrics &metrics
+        Metrics<ValueType> &metrics
     );
 
     /** Returns a partition with one of the supported tools based on the current distribution of the data.
@@ -81,7 +81,7 @@ public:
         bool nodeWeightsFlag,
         Tool tool,
         struct Settings &settings,
-        struct Metrics &metrics
+        Metrics<ValueType> &metrics
     );
 
     /** Given the input (graph, coordinates, node weights) and a partition
@@ -89,12 +89,12 @@ public:
 
     The input and the partition DenseVector should have the same distribution.
     */
-    static refine(
+    static void refine(
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
         const scai::lama::DenseVector<IndexType> partition,
-        struct Settings &settings,
+        struct Settings &settings
     );
 
 private:
@@ -122,7 +122,7 @@ private:
         bool nodeWeightsFlag,
         int parMetisGeom,
         struct Settings &settings,
-        struct Metrics &metrics);
+        Metrics<ValueType> &metrics);
 
 //
 //TODO: parMetis assumes that vertices are stores in a consecutive manner. This is not true for a
@@ -134,7 +134,7 @@ private:
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
         bool nodeWeightsFlag,
         struct Settings &settings,
-        struct Metrics &metrics);
+        Metrics<ValueType> &metrics);
 
 
     // zoltan wrappers
@@ -146,7 +146,7 @@ private:
         bool nodeWeightsFlag,
         std::string algo,
         struct Settings &settings,
-        struct Metrics &metrics);
+        Metrics<ValueType> &metrics);
 
     static scai::lama::DenseVector<IndexType> zoltanRepartition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
@@ -155,7 +155,7 @@ private:
         bool nodeWeightsFlag,
         std::string algo,
         struct Settings &settings,
-        struct Metrics &metrics);
+        Metrics<ValueType> &metrics);
 
     static scai::lama::DenseVector<IndexType> zoltanCore (
         const std::vector<scai::lama::DenseVector<ValueType>> &coords,
@@ -164,7 +164,7 @@ private:
         std::string algo,
         bool repart,
         struct Settings &settings,
-        struct Metrics &metrics);
+        Metrics<ValueType> &metrics);
 
 };
 } /* namespace ITI */

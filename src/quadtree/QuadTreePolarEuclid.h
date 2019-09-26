@@ -18,7 +18,8 @@
 
 namespace ITI {
 
-class QuadTreePolarEuclid : public SpatialTree {
+template<typename ValueType>
+class QuadTreePolarEuclid : public SpatialTree<ValueType> {
 
 public:
     ~QuadTreePolarEuclid() = default;
@@ -32,7 +33,7 @@ public:
      */
     QuadTreePolarEuclid(Point<ValueType> minCoords = {0,0}, Point<ValueType> maxCoords = {2*M_PI, 1}, bool theoreticalSplit=false, count capacity=1000, ValueType balance = 0.5)
     {
-        this->root = std::shared_ptr<QuadNodePolarEuclid>(new QuadNodePolarEuclid(minCoords, maxCoords, capacity, theoreticalSplit, balance));
+        this->root = std::shared_ptr<QuadNodePolarEuclid<ValueType>>(new QuadNodePolarEuclid<ValueType>(minCoords, maxCoords, capacity, theoreticalSplit, balance));
     }
 
     QuadTreePolarEuclid(const std::vector<ValueType> &angles, const std::vector<ValueType> &radii, const std::vector<index > &content, bool theoreticalSplit=false, count capacity=1000, ValueType balance = 0.5) {
@@ -47,7 +48,7 @@ public:
         minRadius = *radiiMinMax.first;
         maxAngle = std::nextafter(*angleMinMax.second, std::numeric_limits<ValueType>::max());
         maxRadius = std::nextafter(*radiiMinMax.second, std::numeric_limits<ValueType>::max());
-        this->root = std::shared_ptr<QuadNodePolarEuclid>(new QuadNodePolarEuclid({minAngle, minRadius}, {maxAngle, maxRadius}, capacity, theoreticalSplit, balance));
+        this->root = std::shared_ptr<QuadNodePolarEuclid<ValueType>>(new QuadNodePolarEuclid<ValueType>({minAngle, minRadius}, {maxAngle, maxRadius}, capacity, theoreticalSplit, balance));
 
         for (index i = 0; i < n; i++) {
             assert(content[i] < n);

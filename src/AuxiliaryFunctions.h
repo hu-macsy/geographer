@@ -332,6 +332,30 @@ public:
         bool useRedistributor = true,
         bool renumberPEs = true );
 
+    /** Function to convert lama data structures to raw pointers as used
+        by the metis and parmetis interface. All const arguments are the
+        input and the rest are output parameters. Returns the number of
+        local vertices/rows.
+
+        \warning Edge weights not supported.
+    **/
+    static IndexType toMetisInterface(
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const std::vector<scai::lama::DenseVector<ValueType>> &coords,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        const struct Settings &settings,
+        std::vector<IndexType>& vtxDist, 
+        std::vector<IndexType>& xadj,
+        std::vector<IndexType>& adjncy,
+        std::vector<ValueType>& vwgt,
+        std::vector<ValueType>& tpwgts,
+        IndexType &wgtFlag,
+        IndexType &numWeights,
+        std::vector<ValueType>& ubvec,
+        std::vector<ValueType>& xyzLocal,
+        std::vector<IndexType>& options);
+
+
     /**
      * Iterates over the local part of the adjacency matrix and counts local edges.
      * If an inconsistency in the graph is detected, it tries to find the inconsistent edge and throw a runtime error.

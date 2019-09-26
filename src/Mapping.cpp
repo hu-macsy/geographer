@@ -392,7 +392,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::getSfcRenumber(
     using point = std::vector<ValueType>;
 
     //the center for each block
-    std::vector<point> blockCenters = KMeans::findCenters(coordinates, partition, k, firstIndex, lastIndex, nodeWeights[0]);
+    std::vector<point> blockCenters = KMeans<IndexType,ValueType>::findCenters(coordinates, partition, k, firstIndex, lastIndex, nodeWeights[0]);
 
     //remember: blockCenters.size()=dim, blockCenters[i].size()=numBlocks
     SCAI_ASSERT_EQ_ERROR( blockCenters.size(), dim, "Wrong size of centers vector." );
@@ -409,7 +409,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::getSfcRenumber(
     //get the sfc index of the centers
     //
 
-    std::vector<ValueType> centerSFC;
+    std::vector<double> centerSFC;
 
     //convert to vector<DenseVector> in order to call getHilbertIndexVector
     {
@@ -483,5 +483,6 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::applySfcRenumber(
 }//applySfcRenumber
 
 //to force instantiation
-template class Mapping<IndexType, ValueType>;
+template class Mapping<IndexType, double>;
+template class Mapping<IndexType, float>;
 }

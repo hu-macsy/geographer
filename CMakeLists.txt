@@ -121,7 +121,6 @@ add_subdirectory(external/KaDiS EXCLUDE_FROM_ALL)
 set(RBC_LIBRARY rbcsorting)
 
 ### set value type ###
-set(Geographer_VALUE_TYPE "double" CACHE STRING "variable type used for values")
 configure_file("src/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/config.h" DESTINATION "${HEADER_DEST}")

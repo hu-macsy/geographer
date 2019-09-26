@@ -70,15 +70,15 @@ DenseVector<IndexType> HilbertCurve<IndexType, ValueType>::computePartition(cons
      * Several possibilities exist for choosing the recursion depth.
      * Either by user choice, or by the maximum fitting into the datatype, or by the minimum distance between adjacent points.
      */
-    const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
+    const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(ValueType(std::log2(globalN)), ValueType(21));
 
     /*
      *	create space filling curve indices.
      */
 
-    scai::lama::DenseVector<ValueType> hilbertIndices(coordDist, 0);
-    std::vector<ValueType> localHilberIndices = HilbertCurve<IndexType,ValueType>::getHilbertIndexVector(coordinates, recursionDepth, dimensions);
-    hilbertIndices.assign( scai::hmemo::HArray<ValueType>( localHilberIndices.size(), localHilberIndices.data()), coordDist);
+    scai::lama::DenseVector<double> hilbertIndices(coordDist, 0);
+    std::vector<double> localHilberIndices = HilbertCurve<IndexType,ValueType>::getHilbertIndexVector(coordinates, recursionDepth, dimensions);
+    hilbertIndices.assign( scai::hmemo::HArray<double>( localHilberIndices.size(), localHilberIndices.data()), coordDist);
 
     //TODO: use the blockSizes vector
     //TODO: take into account node weights: just sorting will create imbalanced blocks, not in number of node but in the total weight of each block
@@ -87,67 +87,27 @@ DenseVector<IndexType> HilbertCurve<IndexType, ValueType>::computePartition(cons
      * now sort the global indices by where they are on the space-filling curve.
      */
 
-    std::vector<IndexType> newLocalIndices;
+    std::vector<sort_pair> localPairs= getSortedHilbertIndices( coordinates, settings );
 
-    {
-        SCAI_REGION( "HilbertCurve.computePartition.sorting" );
-        //TODO: maybe call getSortedHilbertIndices here?
-        int typesize;
-        MPI_Type_size(MPI_DOUBLE_INT, &typesize);
-        //assert(typesize == sizeof(sort_pair)); //not valid for int_double, presumably due to padding
+    //copy indices into array
+    const IndexType newLocalN = localPairs.size();
+    std::vector<IndexType> newLocalIndices(newLocalN);
 
-        std::vector<sort_pair> localPairs(localN);
-
-        //fill with local values
-        long indexSum = 0;//for sanity checks
-        scai::hmemo::ReadAccess<ValueType> localIndices(hilbertIndices.getLocalValues());//Segfault happening here, likely due to stack overflow. TODO: fix
-        for (IndexType i = 0; i < localN; i++) {
-            localPairs[i].value = localIndices[i];
-            localPairs[i].index = coordDist->local2Global(i);
-            indexSum += localPairs[i].index;
-        }
-
-        //create checksum
-        const long checkSum = comm->sum(indexSum);
-        //TODO: int overflow?
-        SCAI_ASSERT_EQ_ERROR(checkSum, (long(globalN)*(long(globalN)-1))/2, "Sorting checksum is wrong (possible IndexType overflow?).");
-
-        //call distributed sort
-        //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
-        MPI_Comm mpi_comm = MPI_COMM_WORLD;
-        JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
-
-        //copy indices into array
-        const IndexType newLocalN = localPairs.size();
-        newLocalIndices.resize(newLocalN);
-
-        for (IndexType i = 0; i < newLocalN; i++) {
-            newLocalIndices[i] = localPairs[i].index;
-        }
-
-        //sort local indices for general distribution
-        std::sort(newLocalIndices.begin(), newLocalIndices.end());
-
-        //check size and sanity
-        SCAI_ASSERT_LT_ERROR( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()), globalN, "Too large index (possible IndexType overflow?).");
-        SCAI_ASSERT_EQ_ERROR( comm->sum(newLocalIndices.size()), globalN, "distribution mismatch");
-
-        //more expensive checks
-        if( settings.debugMode ) {
-            SCAI_ASSERT_EQ_ERROR( comm->sum(newLocalIndices.size()), globalN, "distribution mismatch");
-
-            //check checksum
-            long indexSumAfter = 0;
-            for (IndexType i = 0; i < newLocalN; i++) {
-                indexSumAfter += newLocalIndices[i];
-            }
-
-            const long newCheckSum = comm->sum(indexSumAfter);
-            SCAI_ASSERT( newCheckSum == checkSum, "Old checksum: " << checkSum << ", new checksum: " << newCheckSum );
-        }
-
-        //possible optimization: remove dummy values during first copy, then directly copy into HArray and sort with pointers. Would save one copy.
+    for (IndexType i = 0; i < newLocalN; i++) {
+        newLocalIndices[i] = localPairs[i].index;
     }
+
+    //sort local indices for general distribution
+    std::sort(newLocalIndices.begin(), newLocalIndices.end());
+
+    //check size and sanity
+    SCAI_ASSERT_LT_ERROR( *std::max_element(newLocalIndices.begin(), newLocalIndices.end()), globalN, "Too large index (possible IndexType overflow?).");
+    SCAI_ASSERT_EQ_ERROR( comm->sum(newLocalIndices.size()), globalN, "distribution mismatch");
+    SCAI_ASSERT_EQ_ERROR( comm->sum(newLocalIndices.size()), globalN, "distribution mismatch");      
+
+
+    //possible optimization: remove dummy values during first copy, then directly copy into HArray and sort with pointers. Would save one copy.
+    
 
     DenseVector<IndexType> result;
 
@@ -170,16 +130,23 @@ DenseVector<IndexType> HilbertCurve<IndexType, ValueType>::computePartition(cons
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>//TODO: template this to help branch prediction
-ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(ValueType const * point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
+double HilbertCurve<IndexType, ValueType>::getHilbertIndex(ValueType const * point, const IndexType dimensions, const IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
     SCAI_REGION( "HilbertCurve.getHilbertIndex_newVersion")
 
+    IndexType newRecursionDepth = recursionDepth;
+
+    size_t bitsInValueType = sizeof(double) * CHAR_BIT;
+    if (recursionDepth > bitsInValueType/dimensions) {
+        newRecursionDepth = IndexType(bitsInValueType/dimensions);
+        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        PRINT0("*** Warning: Requested space-filling curve with precision " << recursionDepth << " but return datatype is double and only holds " <<bitsInValueType/dimensions << ". Setting recursion depth to " << newRecursionDepth);
+    }
+
     if(dimensions==2)
-        return HilbertCurve<IndexType, ValueType>::getHilbertIndex2D( point, dimensions, recursionDepth,
-                minCoords, maxCoords);
+        return HilbertCurve<IndexType, ValueType>::getHilbertIndex2D( point, dimensions, newRecursionDepth, minCoords, maxCoords);
 
     if(dimensions==3)
-        return HilbertCurve<IndexType, ValueType>::getHilbertIndex3D( point, dimensions, recursionDepth,
-                minCoords, maxCoords);
+        return HilbertCurve<IndexType, ValueType>::getHilbertIndex3D( point, dimensions, newRecursionDepth, minCoords, maxCoords);
 
     throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
 }
@@ -187,16 +154,8 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex(ValueType const * 
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const* point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
+double HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const* point, IndexType dimensions, IndexType recursionDepth, const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
     SCAI_REGION("HilbertCurve.getHilbertIndex2D")
-
-    size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
-    if (recursionDepth > bitsInValueType/dimensions) {
-        recursionDepth = IndexType(bitsInValueType/dimensions);
-        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
-            + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
-    }
 
     std::vector<ValueType> scaledCoord(dimensions);
 
@@ -216,7 +175,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const*
             if (scaledCoord[1] < 0.5) {
                 subSquare = 0;
                 //apply inverse hilbert operator
-                double temp = scaledCoord[0];
+                ValueType temp = scaledCoord[0];
                 scaledCoord[0] = 2*scaledCoord[1];
                 scaledCoord[1] = 2*temp;
             } else {
@@ -229,7 +188,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const*
             if (scaledCoord[1] < 0.5) {
                 subSquare = 3;
                 //apply inverse hilbert operator
-                double temp = scaledCoord[0];
+                ValueType temp = scaledCoord[0];
                 scaledCoord[0] = -2*scaledCoord[1]+1;
                 scaledCoord[1] = -2*temp+2;
             } else {
@@ -250,19 +209,11 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex2D(ValueType const*
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const* point, IndexType dimensions, IndexType recursionDepth,	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
+double HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const* point, IndexType dimensions, IndexType recursionDepth,	const std::vector<ValueType> &minCoords, const std::vector<ValueType> &maxCoords) {
     SCAI_REGION("HilbertCurve.getHilbertIndex3D")
 
     if (dimensions != 3) {
         throw std::logic_error("Space filling curve for 3 dimensions.");
-    }
-
-    size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
-    if ((unsigned int) recursionDepth > bitsInValueType/dimensions) {
-        recursionDepth = IndexType(bitsInValueType/dimensions);
-        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
-            + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
     }
 
     std::vector<ValueType> scaledCoord(dimensions);
@@ -345,7 +296,7 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
         integerIndex = (integerIndex << 3) | subSquare;
     }
     unsigned long long divisor = size_t(1) << size_t(3*int(recursionDepth));
-    double ret = double(integerIndex) / double(divisor);
+    ValueType ret = double(integerIndex) / double(divisor);
     SCAI_ASSERT(ret<1, ret << " , divisor= "<< divisor << " , integerIndex=" << integerIndex <<" , recursionDepth= " << recursionDepth << ", sizeof(unsigned long long)="<< sizeof(unsigned long long));
     return ret;
 
@@ -357,14 +308,24 @@ ValueType HilbertCurve<IndexType, ValueType>::getHilbertIndex3D(ValueType const*
 //
 
 template<typename IndexType, typename ValueType>
-std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndexVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth, const IndexType dimensions) {
+std::vector<double> HilbertCurve<IndexType, ValueType>::getHilbertIndexVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth, const IndexType dimensions) {
+
+    IndexType newRecursionDepth = recursionDepth;
+
+    size_t bitsInValueType = sizeof(double) * CHAR_BIT;
+    
+    if (recursionDepth > bitsInValueType/dimensions) {
+        newRecursionDepth = IndexType(bitsInValueType/dimensions);
+        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        PRINT0("Requested space-filling curve with precision " << recursionDepth << " but return datatype is double and only holds " << bitsInValueType/dimensions << ". Setting recursion depth to " << newRecursionDepth);
+    }
 
     if(dimensions==2) {
-        return HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector( coordinates, recursionDepth);
+        return HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector( coordinates, newRecursionDepth);
     }
 
     if(dimensions==3) {
-        return HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVector( coordinates, recursionDepth);
+        return HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVector( coordinates, newRecursionDepth);
     }
 
     throw std::logic_error("Space filling curve currently only implemented for two or three dimensions");
@@ -373,18 +334,10 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndexVector
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth) {
+std::vector<double> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth) {
     SCAI_REGION("HilbertCurve.getHilbertIndex2DVector")
 
     const IndexType dimensions = coordinates.size();
-
-    size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
-    if (recursionDepth > bitsInValueType/dimensions) {
-        recursionDepth = IndexType(bitsInValueType/dimensions);
-        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
-            + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
-    }
 
     if( dimensions!=2 ) {
         const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -420,14 +373,15 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
     const IndexType localN = coordinates[0].getLocalValues().size();
 
     // the vector to be returned
-    std::vector<ValueType> hilbertIndices(localN,-1);
+    std::vector<double> hilbertIndices(localN,-1);
 
     {
         SCAI_REGION( "HilbertCurve.getHilbertIndex2DVector.indicesCalculation" )
 
         scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
         scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
-        //scai::hmemo::WriteOnlyAccess<ValueType> hilbertIndices(hilbertIndices.getLocalValues());
+
+        const unsigned long divisor = size_t(1) << size_t(2*int(recursionDepth));
 
         for (IndexType i = 0; i < localN; i++) {
             scaledPoint[0] = (coordAccess0[i]-minCoords[0])/dim0Extent;
@@ -440,7 +394,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
                     if (scaledPoint[1] < 0.5) {
                         subSquare = 0;
                         //apply inverse hilbert operator
-                        double temp = scaledPoint[0];
+                        ValueType temp = scaledPoint[0];
                         scaledPoint[0] = 2*scaledPoint[1];
                         scaledPoint[1] = 2*temp;
                     } else {
@@ -453,7 +407,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
                     if (scaledPoint[1] < 0.5) {
                         subSquare = 3;
                         //apply inverse hilbert operator
-                        double temp = scaledPoint[0];
+                        ValueType temp = scaledPoint[0];
                         scaledPoint[0] = -2*scaledPoint[1]+1;
                         scaledPoint[1] = -2*temp+2;
                     } else {
@@ -466,7 +420,6 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
                 //std::cout<< subSquare<<std::endl;
                 integerIndex = (integerIndex << 2) | subSquare;
             }
-            unsigned long divisor = size_t(1) << size_t(2*int(recursionDepth));
             hilbertIndices[i] = double(integerIndex) / double(divisor);
         }
     }
@@ -477,18 +430,10 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVect
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth) {
+std::vector<double> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVector (const std::vector<DenseVector<ValueType>> &coordinates, IndexType recursionDepth) {
     SCAI_REGION("HilbertCurve.getHilbertIndex3DVector")
 
     const IndexType dimensions = coordinates.size();
-
-    size_t bitsInValueType = sizeof(ValueType) * CHAR_BIT;
-    if (recursionDepth > bitsInValueType/dimensions) {
-        recursionDepth = IndexType(bitsInValueType/dimensions);
-        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        PRINT0("Requested space-filling curve with precision " + std::to_string(recursionDepth)
-            + " but return datatype only holds " + std::to_string(bitsInValueType/dimensions));
-    }
 
     if( dimensions!=3 ) {
         const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -522,7 +467,7 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
     const IndexType localN = coordinates[0].getLocalValues().size();
 
     // the DV to be returned
-    std::vector<ValueType> hilbertIndices(localN,-1);
+    std::vector<double> hilbertIndices(localN,-1);
 
     {
         SCAI_REGION( "HilbertCurve.getHilbertIndex3DVector.indicesCalculation" )
@@ -530,7 +475,8 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
         scai::hmemo::ReadAccess<ValueType> coordAccess0( coordinates[0].getLocalValues() );
         scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
         scai::hmemo::ReadAccess<ValueType> coordAccess2( coordinates[2].getLocalValues() );
-        //scai::hmemo::WriteOnlyAccess<ValueType> hilbertIndices(hilbertIndices.getLocalValues());
+        
+        const unsigned long long divisor = size_t(1) << size_t(3*int(recursionDepth));
 
         for (IndexType i = 0; i < localN; i++) {
             x = (coordAccess0[i]-minCoords[0])/dim0Extent;
@@ -597,7 +543,6 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::getHilbertIndex3DVect
                 }
                 integerIndex = (integerIndex << 3) | subSquare;
             }
-            unsigned long long divisor = size_t(1) << size_t(3*int(recursionDepth));
             hilbertIndices[i] = double(integerIndex) / double(divisor);
         }
     }
@@ -640,16 +585,16 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(
         p = HilbertCurve<IndexType, ValueType>::Hilbert2DIndex2Point(r, level-1);
         switch(q) {
         case 0:
-            ret = {p[1]/2,      p[0]/2};
+            ret = {ValueType(p[1]/2.0), ValueType(p[0]/2.0)};
             break;
         case 1:
-            ret = {p[0]/2,      p[1]/2 + 0.5};
+            ret = {ValueType(p[0]/2.0), ValueType(p[1]/2.0 + 0.5)};
             break;
         case 2:
-            ret = {p[0]/2+0.5,  p[1]/2 + 0.5};
+            ret = {ValueType(p[0]/2.0+0.5), ValueType(p[1]/2.0 + 0.5)};
             break;
         case 3:
-            ret = {-p[1]/2+1,   -p[0]/2 + 0.5};
+            ret = {ValueType(-p[1]/2.0+1.0), ValueType(-p[0]/2.0 + 0.5)};
             break;
         }
     }
@@ -678,28 +623,28 @@ std::vector<ValueType> HilbertCurve<IndexType, ValueType>::Hilbert3DIndex2Point(
 
         switch(q) {
         case 0:
-            ret = {p[1]/2,   p[2]/2,     p[0]/2};
+            ret = { ValueType(p[1]/2.0), ValueType(p[2]/2.0), ValueType(p[0]/2.0)};
             break;
         case 1:
-            ret = {p[2]/2,   0.5+p[0]/2,     p[1]/2};
+            ret = { ValueType(p[2]/2.0), ValueType(0.5+p[0]/2.0), ValueType(p[1]/2.0)};
             break;
         case 2:
-            ret = {0.5+p[2]/2,   0.5+p[0]/2,     p[1]/2};
+            ret = { ValueType(0.5+p[2]/2.0), ValueType(0.5+p[0]/2.0), ValueType(p[1]/2.0)};
             break;
         case 3:
-            ret = {1-p[0]/2,     0.5-p[1]/2,     p[2]/2};
+            ret = { ValueType(1.0-p[0]/2.0), ValueType(0.5-p[1]/2.0), ValueType(p[2]/2.0)};
             break;
         case 4:
-            ret = {1-p[0]/2,     0.5-p[1]/2,     0.5+p[2]/2};
+            ret = { ValueType(1.0-p[0]/2.0), ValueType(0.5-p[1]/2.0), ValueType(0.5+p[2]/2.0)};
             break;
         case 5:
-            ret = {1-p[2]/2,     0.5+p[0]/2,     1-p[1]/2};
+            ret = { ValueType(1.0-p[2]/2.0), ValueType(0.5+p[0]/2.0), ValueType(1.0-p[1]/2.0)};
             break;
         case 6:
-            ret = {0.5-p[2]/2,   0.5+p[0]/2,     1-p[1]/2};
+            ret = { ValueType(0.5-p[2]/2.0), ValueType(0.5+p[0]/2.0), ValueType(1.0-p[1]/2.0)};
             break;
         case 7:
-            ret = {p[1]/2,   0.5-p[2]/2,     1-p[0]/2};
+            ret = { ValueType(p[1]/2.0), ValueType(0.5-p[2]/2.0), ValueType(1.0-p[0]/2.0)};
             break;
         }
     }
@@ -763,9 +708,8 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
     const IndexType localN = coordDist->getLocalSize();
     const IndexType globalN = coordDist->getGlobalSize();
 
-    const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(std::log2(globalN), double(21));
-    //const IndexType recursionDepth = std::min(std::log2(globalN), double(21));
-
+    const IndexType recursionDepth = settings.sfcResolution > 0 ? settings.sfcResolution : std::min(ValueType(std::log2(globalN)), ValueType(21));
+    
     /*
     *	create space filling curve indices.
     */
@@ -776,7 +720,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
         SCAI_REGION("HilbertCurve.getSortedHilbertIndices.spaceFillingCurve");
 
         //get hilbert indices for all the points
-        std::vector<ValueType> localHilbertInd = HilbertCurve<IndexType,ValueType>::getHilbertIndexVector(coordinates, recursionDepth, dimensions);
+        std::vector<double> localHilbertInd = HilbertCurve<IndexType,ValueType>::getHilbertIndexVector(coordinates, recursionDepth, dimensions);
         SCAI_ASSERT_EQ_ERROR(localHilbertInd.size(), localN, "Size mismatch");
 
         for (IndexType i = 0; i < localN; i++) {
@@ -794,13 +738,16 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
 
         int typesize;
         MPI_Type_size(MPI_DOUBLE_INT, &typesize);
+        //MPI_Type_size(getMPITypePair<double,IndexType>(), &typesize);
         //assert(typesize == sizeof(sort_pair)); does not have to be true anymore due to padding
 
-
         //call distributed sort
+        //sfc index is hardcoded to double to allow better precision
+
         //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
         MPI_Comm mpi_comm = MPI_COMM_WORLD;
         JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
+        //JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>());
 
         //copy hilbert indices into array
 
@@ -810,7 +757,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
         //check checksum
         if( settings.debugMode) {
             PRINT0("******** in debug mode");
-            long indexSumAfter = 0;
+            unsigned long indexSumAfter = 0;
             unsigned int newLocalN = localPairs.size();
             for (IndexType i=0; i<newLocalN; i++) {
                 indexSumAfter += localPairs[i].index;
@@ -829,7 +776,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
 
 
 template<typename IndexType, typename ValueType>
-void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<ValueType> >& coordinates, std::vector<DenseVector<ValueType>>& nodeWeights, Settings settings, struct Metrics& metrics) {
+void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<ValueType> >& coordinates, std::vector<DenseVector<ValueType>>& nodeWeights, Settings settings, Metrics<ValueType>& metrics) {
     SCAI_REGION_START("HilbertCurve.redistribute.sfc")
     scai::dmemo::DistributionPtr inputDist = coordinates[0].getDistributionPtr();
     scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
@@ -851,7 +798,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
 
     std::chrono::duration<double> migrationCalculation, migrationTime;
 
-    std::vector<ValueType> hilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
+    std::vector<double> hilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
     SCAI_REGION_END("HilbertCurve.redistribute.sfc")
     SCAI_REGION_START("HilbertCurve.redistribute.sort")
     /*
@@ -871,7 +818,8 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
 
     MPI_Comm mpi_comm = MPI_COMM_WORLD; //TODO: cast the communicator ptr to a MPI communicator and get getMPIComm()?
     JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
-    //IndexType newLocalN = localPairs.size();
+    //JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>() );
+    
     migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
     metrics.MM["timeMigrationAlgo"] = migrationCalculation.count();
     std::chrono::time_point < std::chrono::system_clock > beforeMigration = std::chrono::system_clock::now();
@@ -882,10 +830,10 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     std::vector<double> sendThresholds(comm->getSize(), minLocalIndex.value);
     std::vector<double> recvThresholds(comm->getSize());
 
-    MPI_Datatype MPI_ValueType = MPI_DOUBLE; //TODO: properly template this
-    MPI_Alltoall(sendThresholds.data(), 1, MPI_ValueType, recvThresholds.data(),
-                 1, MPI_ValueType, mpi_comm); //TODO: replace this monstrosity with a proper call to LAMA
-    //comm->all2all(recvThresholds.data(), sendTresholds.data());//TODO: maybe speed up with hypercube
+    //hardcoded the sfc index to double
+    MPI_Datatype MPI_ValueType = getMPIType<double>();
+    //MPI_Alltoall(sendThresholds.data(), 1, MPI_ValueType, recvThresholds.data(), 1, MPI_ValueType, mpi_comm); //TODO: replace this monstrosity with a proper call to LAMA
+    comm->all2all(recvThresholds.data(), sendThresholds.data());//TODO: maybe speed up with hypercube
     SCAI_ASSERT_LT_ERROR(recvThresholds[comm->getSize() - 1], 1, "invalid hilbert index");
     // merge to get quantities //Problem: nodes are not sorted according to their hilbert indices, so accesses are not aligned.
     // Need to sort before and after communication
@@ -943,7 +891,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     comm->exchangeByPlan(recvIndices.data(), recvPlan, sendIndices.data(), sendPlan);
     //get new distribution
     scai::hmemo::HArray<IndexType> indexTransport(newLocalN, recvIndices.data());
-    //scai::dmemo::DistributionPtr newDist = scai::dmemo::GeneralDistribution(globalN, indexTransport, comm);
+    
     auto newDist = scai::dmemo::generalDistributionUnchecked(globalN, std::move(indexTransport), comm);
 
     SCAI_ASSERT_EQUAL(newDist->getLocalSize(), newLocalN,
@@ -1028,13 +976,13 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
     }
 
     //get sfc indices in every PE
-    std::vector<ValueType> localSFCInd = getHilbertIndexVector ( coordinates,  settings.sfcResolution, settings.dimensions);
+    std::vector<double> localSFCInd = getHilbertIndexVector ( coordinates,  settings.sfcResolution, settings.dimensions);
 
     //sort local indices
     std::sort( localSFCInd.begin(), localSFCInd.end() );
 
     //the min and max local sfc value
-    ValueType sfcMinMax[2] = { localSFCInd.front(), localSFCInd.back() };
+    double sfcMinMax[2] = { localSFCInd.front(), localSFCInd.back() };
 
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
 
@@ -1049,7 +997,7 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
         arraySize = 2*p;
     }
     //so only the root PE allocates the array
-    ValueType allMinMax[arraySize];
+    double allMinMax[arraySize];
 
     //every PE sends its local min and max to root
     comm->gather(allMinMax, 2, root, sfcMinMax );
@@ -1069,10 +1017,36 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
 
     return comm->all( isSorted );
 }
+//-------------------------------------------------------------------------------------------------
 
+//template function to get a MPI datatype. These are on purpose outside
+// the class because we cannot specialize them without specializing
+// the whole class. Maybe doing so it not a problem...
 
-template class HilbertCurve<IndexType, ValueType>;
-//this instantiation does not work
-//template class HilbertCurve<int, double>;
+template<>
+MPI_Datatype getMPIType<float>(){
+ return MPI_FLOAT;
+}
+
+template<>
+MPI_Datatype getMPIType<double>(){
+    return MPI_DOUBLE ;
+}
+
+template<>
+MPI_Datatype getMPITypePair<double,IndexType>(){
+    return MPI_DOUBLE_INT;
+}
+
+template<>
+MPI_Datatype getMPITypePair<float,IndexType>(){
+    std::cout << __FILE__ << ", MPI_FLOAT_INT" << std::endl;
+    return MPI_FLOAT_INT;
+}
+
+//-------------------------------------------------------------------------------------------------
+
+template class HilbertCurve<IndexType, double>;
+template class HilbertCurve<IndexType, float>;
 
 } //namespace ITI

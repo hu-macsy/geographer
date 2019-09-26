@@ -40,11 +40,12 @@ extern "C" {
 int main(int argc, char** argv) {
 
     using namespace ITI;
+    typedef double ValueType;   //use double
 
     std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    if (comm->getType() != scai::dmemo::Communicator::CommunicatorKind::MPI) {
+    if (comm->getType() != scai::dmemo::CommunicatorType::MPI) {
         std::cout << "The linked lama version was compiled without MPI. Only sequential partitioning is supported." << std::endl;
     }
 
@@ -277,7 +278,7 @@ int main(int argc, char** argv) {
         scai::lama::DenseVector<IndexType> partition;
 
         // the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
-        struct Metrics metrics( settings );
+        Metrics<ValueType> metrics( settings );
         //metrics.numBlocks = settings.numBlocks;
 
         // if usign unit weights, set flag for wrappers

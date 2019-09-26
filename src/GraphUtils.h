@@ -9,6 +9,7 @@
 
 #include <set>
 #include <tuple>
+#include <vector>
 
 #include <scai/lama/matrix/CSRSparseMatrix.hpp>
 #include <scai/dmemo/Distribution.hpp>
@@ -31,7 +32,8 @@ public:
      *
      * @param[in,out] the graph
      *
-     * @return A block-distributed vector containing the old indices.
+     * @return A block-distributed vector containing the old local indices
+     of this PE
      */
     static scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType> &graph);
 

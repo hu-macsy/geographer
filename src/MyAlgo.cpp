@@ -8,7 +8,7 @@ DenseVector<IndexType> MyAlgo<IndexType, ValueType>::partitionGraph(
     std::vector<DenseVector<ValueType>> &coordinates,
     std::vector<DenseVector<ValueType>> &nodeWeights,
     Settings settings,
-    struct Metrics& metrics) {
+    Metrics<ValueType>& metrics) {
 	
 	//implementation of the algorithm
 	std::cout<< "Starting new algorithm" << std::endl;

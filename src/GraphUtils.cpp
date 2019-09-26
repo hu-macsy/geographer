@@ -49,6 +49,7 @@ scai::lama::DenseVector<IndexType> GraphUtils<IndexType,ValueType>::reindex(scai
     scai::dmemo::DistributionPtr blockDist = scai::dmemo::genBlockDistributionBySize(globalN, localN, comm);
     DenseVector<IndexType> result(blockDist,0);
     blockDist->getOwnedIndexes(result.getLocalValues());
+    
 for(int i=0; i<localN; i++){
     PRINT( *comm << ": i=" << i << ", glob i= " <<  result.getLocalValues()[i] );
 }
@@ -2079,8 +2080,7 @@ std::vector<IndexType> GraphUtils<IndexType, ValueType>::indexReorderCantor(cons
 }
 //-----------------------------------------------------------------------------------
 
-
-//template class GraphUtils<int, double>;
-template class GraphUtils<IndexType, ValueType>;
+template class GraphUtils<IndexType, double>;
+template class GraphUtils<IndexType, float>;
 
 } /* namespace ITI */
