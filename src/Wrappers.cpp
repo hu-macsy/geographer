@@ -151,9 +151,9 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::repartition (
 //-----------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-void Wrappers<IndexType, ValueType>::refine(
+scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
-        const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+        const std::vector<scai::lama::DenseVector<ValueType>> &coords,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
         const scai::lama::DenseVector<IndexType> partition,
         struct Settings &settings
@@ -211,19 +211,42 @@ void Wrappers<IndexType, ValueType>::refine(
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     const IndexType N = graph.getNumRows();
-    const IndexType localN= dist->getLocalSize();    
+    const IndexType localN= dist->getLocalSize();   
+
+    //partition and the graph rows must have the same distribution
+    SCAI_ASSERT( dist->isEqual( partition.getDistribution()), "Distributions must agree" );
     
     // partition array of size localN, contains the block every vertex belongs
-    std::vector<idx_t> partKway( partition.getLocalValues() );
+    std::vector<idx_t> partKway( localN );
+    scai::hmemo::ReadAccess<IndexType> rLocalPart( partition.getLocalValues() );
+    SCAI_ASSERT_EQ_ERROR( rLocalPart.size(), localN , "Wrong partition size" );
 
-    SCAI_ASSERT_EQ_ERROR(partKway.size(), localN , "Wrong partition size" );
+    for(int i=0; i<localN; i++){
+        partKway[i]= rLocalPart[i];
+    }    
+    rLocalPart.release();
 
     // comm: the MPI comunicator
     MPI_Comm metisComm;
     MPI_Comm_dup(MPI_COMM_WORLD, &metisComm);
     int metisRet;    
 
+    metisRet = ParMETIS_V3_RefineKway(
+        vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, tpwgts.data(), ubvec.data(), options.data(), &edgecut, partKway.data(), &metisComm );
 
+    //
+    // convert partition to a DenseVector
+    //
+
+    scai::lama::DenseVector<IndexType> partitionKway(dist, scai::hmemo::HArray<IndexType>(localN, partKway.data()) );
+    /*
+    scai::lama::DenseVector<IndexType> partitionKway(dist, IndexType(0));
+    scai::hmemo::WriteAccess<IndexType> rLocalPart( partition.getLocalValues() );
+    for(unsigned int i=0; i<localN; i++) {
+        partitionKway.getLocalValues()[i] = partKway[i];
+    }
+    */
+    return partitionKway;
 }
 //-----------------------------------------------------------------------------------------
 

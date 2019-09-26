@@ -88,8 +88,10 @@ public:
     of the input, apply local refinement.
 
     The input and the partition DenseVector should have the same distribution.
+
+    Returns the new, refined partition;
     */
-    static void refine(
+    static scai::lama::DenseVector<IndexType> refine(
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
