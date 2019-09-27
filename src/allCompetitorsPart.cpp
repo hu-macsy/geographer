@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
 
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
 
-        // set the node weigths
+        // set the node weights
         IndexType numReadNodeWeights = nodeWeights.size();
         if (numReadNodeWeights == 0) {
             nodeWeights.resize(1);
@@ -277,11 +277,11 @@ int main(int argc, char** argv) {
         //
         scai::lama::DenseVector<IndexType> partition;
 
-        // the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
+        // the constructor with metrics(comm->getSize()) is needed for ParcoRepart timing details
         Metrics<ValueType> metrics( settings );
         //metrics.numBlocks = settings.numBlocks;
 
-        // if usign unit weights, set flag for wrappers
+        // if using unit weights, set flag for wrappers
         bool nodeWeightsUse = true;
 
         // if graph is too big, repeat less times to avoid memory and time problems

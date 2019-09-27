@@ -159,6 +159,9 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
         struct Settings &settings
     ){
 
+//probably we gonna have problems if the distribution does not have 
+//a consecutive numbering. Fix here or outside
+
     // vtxDist is an array of size numPEs and is replicated in every processor
     std::vector<IndexType> vtxDist;
 
@@ -201,10 +204,8 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
     std::vector<IndexType> vwgt( vVwgt.begin(), vVwgt.end() );
 
 
+    // output parameters
     //
-    // OUTPUT parameters
-    //
-
     // edgecut: the size of cut
     IndexType edgecut;
 
@@ -226,7 +227,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
     }    
     rLocalPart.release();
 
-    // comm: the MPI comunicator
+    // comm: the MPI communicator
     MPI_Comm metisComm;
     MPI_Comm_dup(MPI_COMM_WORLD, &metisComm);
     int metisRet;    
