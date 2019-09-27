@@ -300,7 +300,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
             std::cout << "Local refinement only implemented for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
         }
 
-    aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, true);
+        //TODO: should this be here? probably no, we cannot redistribute
+        // if k!=p
+        //aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, true);
 
     }
 
