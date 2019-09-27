@@ -38,6 +38,7 @@ FIND_PACKAGE( Zoltan2 PATHS "/home/hpc/pr87si/di36qin/Code/Trilinos/build/packag
 find_library( METIS_LIB metis "${METIS_BASE}/lib" )
 find_library( PARMETIS_LIB parmetis "${PARMETIS_BASE}/lib" )
 
+
 ###
 ### define libraries and executables
 ###
@@ -46,7 +47,7 @@ find_library( PARMETIS_LIB parmetis "${PARMETIS_BASE}/lib" )
 ### for more info see the Zoltan2 documentation and https://trilinos.org/oldsite/Finding_Trilinos.txt
 ### see also in Trilinos_install_path/install/include/Makefile.export.Zoltan2
 
-if( Zoltan2_FOUND AND METIS_BASE AND PARMETIS_BASE )
+if( Zoltan2_FOUND AND METIS_LIB AND PARMETIS_LIB )
 	message( "\n\tFound package Zoltan2" )
 	message( "\tFound library metis in " ${METIS_LIB} )
 	message( "\tFound library parmetis in " ${PARMETIS_LIB} )
@@ -76,7 +77,7 @@ if( Zoltan2_FOUND AND METIS_BASE AND PARMETIS_BASE )
 	install(TARGETS allCompetitors DESTINATION "${BIN_DEST}") # executable
 	install(FILES Wrappers.h DESTINATION "${HEADER_DEST}")
 else()
-	#message( "Package Zoltan2 was not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
+	message( "Some of the packages Zoltan2, metis or parmetis were not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
 endif()
 
 
@@ -103,15 +104,18 @@ if (GTEST_FOUND)
     # add the wrappers test if zoltan and parmetis is found
     if( EXTRA_LIBRARIES_FOUND )
         set(FILES_TEST ${FILES_TEST} WrappersTest.cpp )
-        target_link_libraries(GeographerTest wrappers)
     endif( EXTRA_LIBRARIES_FOUND )
 
 	add_executable(GeographerTest ${FILES_TEST})
-	#target_include_directories(GeographerTest PUBLIC ${Boost_INCLUDE_DIRS})
+	
 	target_compile_options(GeographerTest PRIVATE -fprofile-arcs -ftest-coverage)
 	target_link_libraries(GeographerTest -fprofile-arcs -ftest-coverage)
 	target_link_libraries(GeographerTest geographer ${SCAI_LIBRARIES} ${MPI_CXX_LIBRARIES} ${GTEST_LIBRARIES})
 	target_link_libraries(GeographerTest -pthread)
+	if( EXTRA_LIBRARIES_FOUND )
+        target_link_libraries(GeographerTest wrappers)
+    endif( EXTRA_LIBRARIES_FOUND )
+    
 	add_test(NAME GeographerTest COMMAND GeographerTest WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 	install(TARGETS GeographerTest DESTINATION "${BIN_DEST}") # test executable
 endif (GTEST_FOUND)
