@@ -7,7 +7,7 @@ using namespace scai;
 
 namespace ITI {
 
-template<typename T>
+//template<typename T>
 class WrappersTest : public ::testing::Test {
 protected:
     // the directory of all the meshes used
@@ -15,16 +15,17 @@ protected:
     std::string graphPath = projectRoot+"/meshes/";
 };
 
-using testTypes = ::testing::Types<double,float>;
-TYPED_TEST_SUITE(WrappersTest, testTypes);
+//warning: currently, the wrappers wotk only for ValueType double 
+//using testTypes = ::testing::Types<double,float>;
+//TYPED_TEST_SUITE(WrappersTest, testTypes);
 
 //-----------------------------------------------
 
-TYPED_TEST( WrappersTest, testRefine ){
-    using ValueType = TypeParam;
+TEST_F( WrappersTest, testRefine ){
+    using ValueType = double;
 
     std::string fileName = "Grid8x8";
-    std::string file = WrappersTest<ValueType>::graphPath + fileName;
+    std::string file = WrappersTest::graphPath + fileName;
     std::ifstream f(file);
     const IndexType dimensions= 2;
     IndexType N, edges;
@@ -54,18 +55,21 @@ TYPED_TEST( WrappersTest, testRefine ){
         //IndexType blockId = ( (rand() % k) % (comm->getRank()+1) )%k; //heavily imbalanced partition
         IndexType blockId = (rand() % k);
         firstPartition.getLocalValues()[i] = blockId;
-    PRINT(comm->getRank() << ": " << blockId);        
     }
 
-    ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( graph ,firstPartition );
-
-    PRINT0("First cut is " << cut );
+    const ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( graph , firstPartition );
+	ValueType imbalance = GraphUtils<IndexType,ValueType>::computeImbalance( firstPartition, settings.numBlocks );
+	
+    PRINT0("First cut is " << cut << " and imbalance " << imbalance );
 
     DenseVector<IndexType> refinedPartition = Wrappers<IndexType,ValueType>::refine( graph, coordinates, uniformWeights, firstPartition, settings );
 
-    cut = GraphUtils<IndexType,ValueType>::computeCut( graph ,refinedPartition );
+    const ValueType refCut = GraphUtils<IndexType,ValueType>::computeCut( graph ,refinedPartition );
+	imbalance = GraphUtils<IndexType,ValueType>::computeImbalance( refinedPartition, settings.numBlocks );
 
-    PRINT0("Refined cut is " << cut );
+    PRINT0("Refined cut is " << cut << " and imbalance " << imbalance );
+	
+	EXPECT_LE( refCut, cut);
 
 }
 }//ITI
