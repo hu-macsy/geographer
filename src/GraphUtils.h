@@ -35,7 +35,15 @@ public:
      * @return A block-distributed vector containing the old local indices
      of this PE
      */
-    static scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType> &graph);
+    static scai::dmemo::DistributionPtr genBlockRedist(scai::lama::CSRSparseMatrix<ValueType> &graph);
+
+    /** @brief Attempt to locally renumber the matrix and convert it to
+    a general block distribution without actually redistributing
+    @attention  deprecated version,
+    */
+
+    //TODO: deprecated version, fix and use or remove
+    static scai::dmemo::DistributionPtr reindex(scai::lama::CSRSparseMatrix<ValueType> &graph);
 
     /**
      * @brief Perform a BFS on the local subgraph.
