@@ -209,11 +209,15 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     scai::dmemo::DistributionPtr distFromPartition;
 
     if( useRedistributor ) {
-        scai::dmemo::RedistributePlan resultRedist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
-        //auto resultRedist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
+        PRINT0("***\tWarning: using a redistributor creates inconsistencies and is currently deprecated. Switching to no-redistributor version");
+        useRedistributor = false;
+    }
 
-        partition = DenseVector<IndexType>(resultRedist.getTargetDistributionPtr(), comm->getRank());
-        scai::dmemo::RedistributePlan redistributor = scai::dmemo::redistributePlanByNewDistribution(resultRedist.getTargetDistributionPtr(), graph.getRowDistributionPtr());
+    if( useRedistributor ) {
+        scai::dmemo::RedistributePlan resultRedist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
+        distFromPartition = resultRedist.getTargetDistributionPtr();
+
+        scai::dmemo::RedistributePlan redistributor = scai::dmemo::redistributePlanByNewDistribution( distFromPartition, graph.getRowDistributionPtr());
 
         for (IndexType d=0; d<settings.dimensions; d++) {
             coordinates[d].redistribute(redistributor);
@@ -223,8 +227,10 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
         }
 
         graph.redistribute( redistributor, noDist );
-
-        distFromPartition = resultRedist.getTargetDistributionPtr();
+        partition.redistribute(redistributor);
+        //30/09/19: below is older code that seems wrong
+        //partition = DenseVector<IndexType>( distFromPartition, comm->getRank());
+        
     } else {
         // create new distribution from partition
         distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues());
@@ -243,10 +249,10 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
         }
     }
 
-    const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
-    SCAI_ASSERT_ERROR( nodeWeights[0].getDistribution().isEqual(*inputDist), "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*inputDist), "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*inputDist), "Distribution mismatch" );
+    const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
+    SCAI_ASSERT_ERROR( nodeWeights[0].getDistribution().isEqual(*rowDist), "Distribution mismatch" );
+    SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*rowDist), "Distribution mismatch" );
+    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*rowDist), "Distribution mismatch" );
 
     return distFromPartition;
 }//redistributeFromPartition

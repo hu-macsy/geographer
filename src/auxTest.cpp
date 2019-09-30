@@ -362,7 +362,8 @@ TYPED_TEST(auxTest, testRedistributeFromPartition) {
 
     using ValueType = TypeParam;
 
-    std::string fileName = "bubbles-00010.graph";
+    //std::string fileName = "bubbles-00010.graph";
+    std::string fileName = "Grid8x8";
     std::string file = auxTest<ValueType>::graphPath + fileName;
 
     const IndexType dimensions= 2;
@@ -386,7 +387,7 @@ TYPED_TEST(auxTest, testRedistributeFromPartition) {
     //create a random partition
     DenseVector<IndexType> partition(inputDist, 0);
     for (IndexType i = 0; i < localN; i++) {
-        //IndexType blockId = ( (rand() % k) % (comm->getRank()+1) )%k; //hevily imbalanced partition
+        //IndexType blockId = ( (rand() % k) % (comm->getRank()+1) )%k; //heavily imbalanced partition
         IndexType blockId = (rand() % k);
         partition.getLocalValues()[i] = blockId;
     }
@@ -394,39 +395,54 @@ TYPED_TEST(auxTest, testRedistributeFromPartition) {
     Settings settings;
     settings.numBlocks = comm->getSize();
 
-    for( bool useRedistributor: std::vector<bool>({true, false}) ){
-        for( bool renumberPEs: std::vector<bool>({false, true}) ){
+    for( bool useRedistributor: std::vector<bool>({false, true}) ){
+        for( bool renumberPEs: std::vector<bool>({true, false}) ){
+
+            PRINT0("useRedistributor: " << useRedistributor << ", renumberPEs: "<< renumberPEs);
+            
+            CSRSparseMatrix<ValueType> copyGraph = graph;
+            DenseVector<IndexType> copyPartition = partition;
+            std::vector<DenseVector<ValueType>> copyCoordinates = coordinates;
+            std::vector<DenseVector<ValueType>> copyWeights = nodeWeights;
+
+            //graph.redistribute( inputDist );
 
             //get some metrics of the current partition to verify that it does not change after renumbering
-            std::pair<std::vector<IndexType>,std::vector<IndexType>> borderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
-            ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( graph, partition );
-            ValueType imbalance = GraphUtils<IndexType,ValueType>::computeImbalance( partition, settings.numBlocks );
+            std::pair<std::vector<IndexType>,std::vector<IndexType>> borderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( copyGraph, copyPartition, settings);
+            ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( copyGraph, copyPartition );
+            ValueType imbalance = GraphUtils<IndexType,ValueType>::computeImbalance( copyPartition, settings.numBlocks );
             PRINT0( "imbalance: " << imbalance );
 
             //redistribute
 
-    scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition(
-                partition,
-                graph,
-                coordinates,
-                nodeWeights,
+            scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition(
+                copyPartition,
+                copyGraph,
+                copyCoordinates,
+                copyWeights,
                 settings,
                 useRedistributor,
                 renumberPEs);
 
-    //checks
+            //checks
 
-    const scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
-    EXPECT_TRUE( nodeWeights[0].getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*newDist), "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*newDist), "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*distFromPart), "Distribution mismatch" );
+            SCAI_ASSERT_DEBUG( copyPartition.isConsistent(), copyPartition << ": is invalid vector after redistribution" );
+            SCAI_ASSERT_DEBUG( copyCoordinates[0].isConsistent(), copyCoordinates[0] << ": is invalid vector after redistribution" );
+            SCAI_ASSERT_DEBUG( copyWeights[0].isConsistent(), copyWeights[0] << ": is invalid vector after redistribution" );
+            EXPECT_TRUE( copyGraph.checkSymmetry() );
+            SCAI_ASSERT_DEBUG( copyGraph.isConsistent(), copyGraph << ": is invalid matrix after redistribution" )
+            
+            const scai::dmemo::DistributionPtr newDist = copyGraph.getRowDistributionPtr();
+            EXPECT_TRUE( copyWeights[0].getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
+            SCAI_ASSERT_ERROR( copyCoordinates[0].getDistribution().isEqual(*newDist), "Distribution mismatch" );
+            SCAI_ASSERT_ERROR( copyPartition.getDistribution().isEqual(*newDist), "Distribution mismatch" );
+            SCAI_ASSERT_ERROR( copyPartition.getDistribution().isEqual(*distFromPart), "Distribution mismatch" );
 
             const IndexType newLocalN = newDist->getLocalSize();
             //PRINT( comm->getRank() <<": " << newLocalN );
 
-            //the border nodes, inner nodes, cut and imbalance shoulb be the same
-            std::pair<std::vector<IndexType>,std::vector<IndexType>> newborderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
+            //the border nodes, inner nodes, cut and imbalance should be the same
+            std::pair<std::vector<IndexType>,std::vector<IndexType>> newborderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( copyGraph, copyPartition, settings);
 
             std::sort( borderAndInnerNodes.first.begin(), borderAndInnerNodes.first.end(), std::greater<IndexType>() ) ;
             std::sort( newborderAndInnerNodes.first.begin(), newborderAndInnerNodes.first.end(), std::greater<IndexType>() );
@@ -436,16 +452,16 @@ TYPED_TEST(auxTest, testRedistributeFromPartition) {
             std::sort( newborderAndInnerNodes.second.begin(), newborderAndInnerNodes.second.end() );
             EXPECT_EQ( borderAndInnerNodes.second, borderAndInnerNodes.second );
 
-            ValueType newCut = GraphUtils<IndexType,ValueType>::computeCut( graph, partition );
+            ValueType newCut = GraphUtils<IndexType,ValueType>::computeCut( copyGraph, copyPartition );
             EXPECT_EQ( cut, newCut );
 
-            ValueType newImbalance = GraphUtils<IndexType,ValueType>::computeImbalance( partition, settings.numBlocks );
+            ValueType newImbalance = GraphUtils<IndexType,ValueType>::computeImbalance( copyPartition, settings.numBlocks );
             EXPECT_EQ( imbalance, newImbalance );
 
             EXPECT_EQ( comm->sum(newLocalN), N);
 
             for (IndexType i = 0; i < newLocalN; i++) {
-                SCAI_ASSERT_EQ_ERROR( partition.getLocalValues()[i], comm->getRank(), "error for i= " << i <<" and localN= "<< newLocalN );
+                SCAI_ASSERT_EQ_ERROR( copyPartition.getLocalValues()[i], comm->getRank(), "error for i= " << i <<" and localN= "<< newLocalN );
                 //PRINT(comm->getRank() << " : " << i << "- " << partition.getLocalValues()[i] );
             }
 

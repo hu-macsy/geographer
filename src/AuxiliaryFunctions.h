@@ -141,7 +141,7 @@ public:
     @param[in] adjM The graph,
     @param[in] partition The partition of the graph.
     */
-    static void print2DGrid(const scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama::DenseVector<IndexType>& partition  ) {
+    static void print2DGrid(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType>& partition  ) {
 
         IndexType N= adjM.getNumRows();
 
