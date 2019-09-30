@@ -67,14 +67,24 @@ if( Zoltan2_FOUND AND METIS_LIB AND PARMETIS_LIB )
 	set( EXTRA_LIBRARIES_FOUND "true" )
 	set( EXTRA_LIBRARIES ${METIS_LIB} ${PARMETIS_LIB} ${ZOLTAN2_LIB} ${Zoltan2_LIBRARIES}  PARENT_SCOPE )
 
-	add_executable( allCompetitors allCompetitorsPart.cpp parseArgs.cpp)
+	
+    add_executable( allCompetitors allCompetitorsPart.cpp parseArgs.cpp)
 	target_include_directories( allCompetitors PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} )
-	# include parmetis and metis ###
+	# include parmetis and metis 
 	target_include_directories( allCompetitors PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" ${CXXOPTS_DIR})
 	target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
+
+
+    add_executable( testMetisRefine testMetisRefinement.cpp parseArgs.cpp)
+    target_include_directories( testMetisRefine PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} )
+    # include parmetis and metis 
+    target_include_directories( testMetisRefine PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" ${CXXOPTS_DIR})
+    target_link_libraries( testMetisRefine geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
+
 	
 	install(TARGETS wrappers EXPORT wrappers DESTINATION "${LIB_DEST}") 
 	install(TARGETS allCompetitors DESTINATION "${BIN_DEST}") # executable
+    install(TARGETS testMetisRefine DESTINATION "${BIN_DEST}") # executable
 	install(FILES Wrappers.h DESTINATION "${HEADER_DEST}")
 else()
 	message( "Some of the packages Zoltan2, metis or parmetis were not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
