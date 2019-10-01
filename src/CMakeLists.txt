@@ -109,7 +109,7 @@ if (USE_NETWORKIT)
 endif (USE_NETWORKIT)
 
 ### define unit test target if GTest was found ###
-if (GTEST_FOUND)
+if (GTEST_FOUND AND 0)
 
     # add the wrappers test if zoltan and parmetis is found
     if( EXTRA_LIBRARIES_FOUND )
@@ -127,7 +127,7 @@ if (GTEST_FOUND)
     endif( EXTRA_LIBRARIES_FOUND )
     
 	add_test(NAME GeographerTest COMMAND GeographerTest WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
-	install(TARGETS GeographerTest DESTINATION "${BIN_DEST}") # test executable
+	install(TARGETS GeographerTest DESTINATION "${BIN_DEST}" OPTIONAL) # test executable
 endif (GTEST_FOUND)
 
 ### install library, header files and standalone executable ####

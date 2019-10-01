@@ -57,7 +57,7 @@ Options populateOptions() {
     ("maxKMeansIterations", "Tuning parameter for K-Means", value<IndexType>())
     ("tightenBounds", "Tuning parameter for K-Means")
     ("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
-    // using '/' to seperate the lines breaks the output message
+    // using '/' to separate the lines breaks the output message
     ("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3 4 10, there are 3 levels. In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
     //output
     ("outFile", "write result partition into file", value<std::string>())
@@ -65,6 +65,7 @@ Options populateOptions() {
     ("writeDebugCoordinates", "Write Coordinates of nodes in each block", value<bool>())
     ("verbose", "Increase output.")
     ("storeInfo", "Store timing and other metrics in file.")
+    ("storePartition", "Store the partition file.")
     ("callExit", "Call std::exit after finishing partitioning, useful in case of lingering MPI data structures.")
     // evaluation
     ("repeatTimes", "How many times we repeat the partitioning process.", value<IndexType>())
@@ -159,6 +160,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     using std::vector;
     settings.verbose = vm.count("verbose");
     settings.storeInfo = vm.count("storeInfo");
+    settings.storePartition = vm.count("storePartition");
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
     settings.noRefinement = vm.count("noRefinement");

@@ -21,8 +21,10 @@
 #include "Metrics.h"
 #include "MeshGenerator.h"
 #include "Wrappers.h"
+#include "ParcoRepart.h"
 #include "parseArgs.h"
 
+#include "mainHeader.h"
 
 //---------------------------------------------------------------------------------------------
 
@@ -74,17 +76,97 @@ int main(int argc, char** argv) {
     std::vector<DenseVector<ValueType>> coords(settings.dimensions);
     std::vector<DenseVector<ValueType>> nodeWeights;    //the weights for each node
 
-    std::string graphFile;
+    std::string graphFile =  vm["graphFile"].as<std::string>();
 
-    if (vm.count("graphFile")) {
+    IndexType N = readInput<ValueType>( vm, settings, comm, graph, coords, nodeWeights );
 
-    }else{
-        std::cout << "No input file was given. Call again with --graphFile, --quadTreeFile" << std::endl;
-        return 126;        
+    //-----------------------------------------
+    //
+    //partition input using some tool
+    
+    Metrics<ValueType> metricsBefore(settings);
+
+    DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coords, nodeWeights, settings, metricsBefore );
+
+    metricsBefore.getAllMetrics( graph, partition, nodeWeights, settings );
+    if (comm->getRank() == 0 && settings.metricsDetail.compare("no") != 0) {
+        metricsBefore.print( std::cout );
+/*
+        if( settings.storeInfo && settings.outFile!="-" ){
+            std::ofstream outF( settings.outFile, std::ios::out);
+            if(outF.is_open()) {
+                outF << "Running " << __FILE__ << std::endl;
+                settings.print( outF, comm);
+
+                metricsBefore.print( outF );
+                std::cout<< "Output information written to file " << settings.outFile << std::endl;
+            }else{
+                std::cout<< "Could not open file " << settings.outFile << " information not stored"<< std::endl;
+            }
+        }
+*/        
     }
 
-    //partition input using some tool
+    //-----------------------------------------
+    //
+    // if distribution do not agree, redistribute
 
+    const scai::dmemo::DistributionPtr graphDist = graph.getRowDistributionPtr();
+
+    bool willRedistribute = false;
+
+    if( not coords[0].getDistributionPtr()->isEqual(*graphDist) ){
+        PRINT0("Coordinate and graph distribution do not agree; will redistribute input");
+        willRedistribute = true;
+    }
+    if( not nodeWeights[0].getDistributionPtr()->isEqual(*graphDist) ){
+        PRINT0("nodeWeights and graph distribution do not agree; will redistribute input");
+        willRedistribute = true;        
+    }
+    if( not partition.getDistributionPtr()->isEqual(*graphDist) ){
+        PRINT0("nodeWeights and graph distribution do not agree; will redistribute input");
+        willRedistribute = true;        
+    }
+
+comm->synchronize();
+for( int p=0; p<comm->getSize(); p++){
+    if( comm->getRank()==p)
+        PRINT( *graphDist );
+}
+
+
+    if( willRedistribute ){
+        bool renumberPEs = true;
+        
+PRINT0("will redistribute input");
+
+        //redistribute
+        scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition(
+            partition, graph , coords, nodeWeights, settings, false, renumberPEs);        
+
+        //TODO?: can also redistribute everything based on a block or genBlock distribution
+        //const  scai::dmemo::DistributionPtr newGenBlockDist = GraphUtils<IndexType, ValueType>::genBlockRedist(graph);
+        //partition.redistribute( newGenBlockDist );
+    }
+    scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition( partition, graph , coords, nodeWeights, settings, false, true); 
+
+    PRINT0("\tStarting metis refinement\n");
+
+    //-----------------------------------------
+    //
     //refine partition using metisRefine
+
+    DenseVector<IndexType> refinedPartition = Wrappers<IndexType,ValueType>::refine( graph, coords, nodeWeights, partition, settings );
+
+    Metrics<ValueType> metricsRefined(settings);
+    metricsRefined.getAllMetrics( graph, refinedPartition, nodeWeights, settings );
+    if (comm->getRank() == 0 && settings.metricsDetail.compare("no") != 0) {
+        metricsRefined.print( std::cout );
+    }
+
+    //this is needed for supermuc
+    std::exit(0);
+
+    return 0;    
 
 }

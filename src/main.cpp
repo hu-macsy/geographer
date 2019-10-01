@@ -26,6 +26,7 @@
 #include "Metrics.h"
 #include "GraphUtils.h"
 #include "parseArgs.h"
+#include "mainHeader.h"
 
 /**
  *  Examples of use:
@@ -123,7 +124,7 @@ int main(int argc, char** argv) {
     std::vector<scai::lama::DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
     std::vector<scai::lama::DenseVector<ValueType>> nodeWeights;		//the weights for each node
 
-
+/*
     if (vm.count("graphFile")) {
         std::string graphFile = vm["graphFile"].as<std::string>();
         settings.fileName = graphFile;
@@ -322,6 +323,9 @@ int main(int argc, char** argv) {
         std::cout << "Call with --graphFile <input>" << std::endl;
         return 126;
     }
+*/
+
+    N = readInput<ValueType>( vm, settings, comm, graph, coordinates, nodeWeights );
 
     //
     // read the communication graph or the block sizes if provided
@@ -595,7 +599,7 @@ int main(int argc, char** argv) {
     }
 
 
-    if( settings.outFile!="-" ) {
+    if( settings.outFile!="-" and settings.storePartition ) {
         std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
         std::string partOutFile = settings.outFile+".part";
         ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );

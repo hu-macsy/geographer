@@ -542,7 +542,7 @@ bool ITI::aux<IndexType, ValueType>::checkConsistency(
     const IndexType rank = comm->getRank();
 
     if (!coordDist->isEqual( *inputDist) ) {
-        throw std::runtime_error( "Distributions should be equal.");
+        throw std::runtime_error( "Coordinate and graph distributions should be equal.");
     }
 
     bool nodesUnweighted = nodeWeights.size() == 1 && (nodeWeights[0].max() == nodeWeights[0].min());
