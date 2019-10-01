@@ -7,11 +7,13 @@
 
 #include <parmetis.h>
 
+
 //for zoltan
-#include <Zoltan2_PartitioningSolution.hpp>
-#include <Zoltan2_PartitioningProblem.hpp>
-#include <Zoltan2_BasicVectorAdapter.hpp>
-#include <Zoltan2_InputTraits.hpp>
+//#include <Zoltan2_PartitioningSolution.hpp>
+//#include <Zoltan2_PartitioningProblem.hpp>
+//#include <Zoltan2_BasicVectorAdapter.hpp>
+//#include <Zoltan2_InputTraits.hpp>
+
 
 #include "Wrappers.h"
 #include "Mapping.h"
@@ -580,6 +582,8 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
     struct Settings &settings,
     Metrics<ValueType> &metrics) {
 
+
+/*
     typedef Zoltan2::BasicUserTypes<ValueType, IndexType, IndexType> myTypes;
     typedef Zoltan2::BasicVectorAdapter<myTypes> inputAdapter_t;
 
@@ -747,7 +751,9 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
     delete[] zoltanCoords;
 
     return partitionZoltan;
+    */
 
+return scai::lama::DenseVector<IndexType> (coords[0].getDistributionPtr(), IndexType(0));
 }
 
 //---------------------------------------------------------------------------------------

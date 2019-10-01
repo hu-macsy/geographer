@@ -35,6 +35,8 @@ FIND_PACKAGE( Zoltan2 PATHS "/home/hpc/pr87si/di36qin/Code/Trilinos/build/packag
 #set(METIS_BASE "/lrz/sys/libraries/metis/5.1.0/i8r8")
 #set(PARMETIS_BASE  "/lrz/sys/libraries/parmetis/4.0.3/ibmmpi/i8r8")
 
+message(${METIS_BASE})
+
 find_library( METIS_LIB metis "${METIS_BASE}/lib" )
 find_library( PARMETIS_LIB parmetis "${PARMETIS_BASE}/lib" )
 
@@ -86,6 +88,38 @@ if( Zoltan2_FOUND AND METIS_LIB AND PARMETIS_LIB )
 	install(TARGETS allCompetitors DESTINATION "${BIN_DEST}") # executable
     install(TARGETS testMetisRefine DESTINATION "${BIN_DEST}") # executable
 	install(FILES Wrappers.h DESTINATION "${HEADER_DEST}")
+elseif( METIS_LIB AND PARMETIS_LIB )
+    message( "\tFound library metis in " ${METIS_LIB} )
+    message( "\tFound library parmetis in " ${PARMETIS_LIB} )
+    message( "\n" )
+
+    #TODO: link_directories is probably not needed; there is a better way to do this; at least, this works for now
+    link_directories( ${METIS_BASE}/lib ${PARMETIS_BASE}/lib )
+    
+    add_library( wrappers SHARED  Wrappers.cpp)
+    target_include_directories( wrappers PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" )
+    target_link_libraries( wrappers ${RBC_LIBRARY} ${METIS_LIB} ${PARMETIS_LIB} ) # libzoltan2.so metis parmetis
+    
+    set( EXTRA_LIBRARIES_FOUND "true" )
+    set( EXTRA_LIBRARIES ${METIS_LIB} ${PARMETIS_LIB} PARENT_SCOPE )
+
+    
+    add_executable( allCompetitors allCompetitorsPart.cpp parseArgs.cpp)
+    # include parmetis and metis 
+    target_include_directories( allCompetitors PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" ${CXXOPTS_DIR})
+    target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
+
+
+    add_executable( testMetisRefine testMetisRefinement.cpp parseArgs.cpp)
+    # include parmetis and metis 
+    target_include_directories( testMetisRefine PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" ${CXXOPTS_DIR})
+    target_link_libraries( testMetisRefine geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
+
+    
+    install(TARGETS wrappers EXPORT wrappers DESTINATION "${LIB_DEST}") 
+    install(TARGETS allCompetitors DESTINATION "${BIN_DEST}") # executable
+    install(TARGETS testMetisRefine DESTINATION "${BIN_DEST}") # executable
+    install(FILES Wrappers.h DESTINATION "${HEADER_DEST}")
 else()
 	message( "Some of the packages Zoltan2, metis or parmetis were not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
 endif()
