@@ -411,6 +411,7 @@ TYPED_TEST(auxTest, testRedistributeFromPartition) {
                         renumberPEs);
 
             //checks
+            EXPECT_TRUE( graph.isConsistent() );
 
             const scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
             EXPECT_TRUE( nodeWeights.getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
