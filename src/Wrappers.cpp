@@ -162,8 +162,11 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
 //probably we gonna have problems if the distribution does not have 
 //a consecutive numbering. Fix here or outside
 
+    SCAI_ASSERT_DEBUG( graph.isConsistent(), graph << " input graph is not consistent" );
+    //const scai::dmemo::DistributionPtr graphDist = graph.getRowDistributionPtr();
+
     // vtxDist is an array of size numPEs and is replicated in every processor
-    std::vector<IndexType> vtxDist;
+    std::vector<IndexType> vtxDist; 
 
     std::vector<IndexType> xadj;
     std::vector<IndexType> adjncy;
@@ -231,6 +234,8 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
     MPI_Comm metisComm;
     MPI_Comm_dup(MPI_COMM_WORLD, &metisComm);
     int metisRet;    
+
+PRINT0("About to call ParMETIS_V3_RefineKway in Wrappers::refine");
 
     metisRet = ParMETIS_V3_RefineKway(
         vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, tpwgts.data(), ubvec.data(), options.data(), &edgecut, partKway.data(), &metisComm );

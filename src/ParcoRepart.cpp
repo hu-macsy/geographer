@@ -441,6 +441,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         SCAI_ASSERT_EQ_ERROR( result.max(), settings.numBlocks -1, "Wrong index in partition" );
         //assert(result.max() == settings.numBlocks -1);
         assert(result.min() == 0);
+/*        
 {
     scai::hmemo::HArray< IndexType > myGlobalInd;
     coordinates[0].getDistributionPtr()->getOwnedIndexes(myGlobalInd);
@@ -450,6 +451,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
     coordinateCopy[0].getDistributionPtr()->getOwnedIndexes(myGlobalIndCopy);
     PRINT(*comm << ": coordsCopy " << myGlobalIndCopy[0] );
 }
+*/
         SCAI_ASSERT_ERROR( result.getDistributionPtr()->isEqual(coordinateCopy[0].getDistribution()), "Distribution mismatch");
 
     } else if (settings.initialPartition == ITI::Tool::geoMS) {// multisection

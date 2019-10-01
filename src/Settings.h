@@ -250,6 +250,7 @@ struct Settings {
     bool writeDebugCoordinates = false;		///< store coordinates and block id
     bool writePEgraph = false;				///< store the processor graph
     bool storeInfo = false;					///< store metrics info
+    bool storePartition = false;            ///< store metrics info
     IndexType repeatTimes = 1;				///< for benchmarking, how many times is the partition repeated
     IndexType thisRound=-1; //TODO: what is this? This has nothing to do with the settings.
 
