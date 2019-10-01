@@ -66,10 +66,6 @@ int main(int argc, char** argv) {
     if( !settings.isValid )
         return -1;
 
-    const IndexType thisPE = comm->getRank();
-    IndexType N;
-
-
     if( comm->getRank() ==0 ) {
         std::cout <<"Starting file " << __FILE__ << std::endl;
 
@@ -83,6 +79,7 @@ int main(int argc, char** argv) {
     // read the input graph or generate
     //
 
+    IndexType N;
     CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords(settings.dimensions);
     std::vector<DenseVector<ValueType>> nodeWeights;	//the weights for each node
@@ -336,6 +333,8 @@ int main(int argc, char** argv) {
         //
 
         std::string machine = settings.machine;
+        const IndexType thisPE = comm->getRank();
+    
 
         if( thisPE==0 ) {
             if( vm.count("generate") ) {
