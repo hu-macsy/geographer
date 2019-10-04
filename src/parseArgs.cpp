@@ -74,6 +74,7 @@ Options populateOptions() {
     ("metricsDetail", "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV", value<std::string>())
     //used for the competitors main
     ("outDir", "write result partition into folder", value<std::string>())
+    ("tools", "choose which supported tools to use. See in Settings::Tools for the supported tools and how to call them.", value<std::string>() )
     //mesh generation
     ("generate", "generate uniform mesh as input graph")
     ("numX", "Number of points in x dimension of generated graph", value<IndexType>())
@@ -264,7 +265,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("maxKMeansIterations")) {
         settings.maxKMeansIterations = vm["maxKMeansIterations"].as<IndexType>();
     }
-    if (vm.count("hierLevels")) {
+    if (vm.count("hierLevels")) {  
         std::stringstream ss( vm["hierLevels"].as<std::string>() );
         std::string item;
         std::vector<IndexType> hierLevels;
@@ -278,6 +279,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         }
 
         settings.hierLevels = hierLevels;
+
         if (!vm.count("numBlocks")) {
             settings.numBlocks = product;
         } else {
@@ -334,6 +336,19 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
             }
             settings.numBlocks = numBlocks;
         }
+    }
+
+    //used (mainly) from allCompetitors to define which tools to use
+    if (vm.count("tools")) {  
+        std::stringstream ss( vm["tools"].as<std::string>() );
+        std::string item;
+        std::vector<std::string> tools;
+
+        while (!std::getline(ss, item, ' ').fail()) {
+            tools.push_back( item );
+        }
+
+        settings.tools = tools;
     }
 
     return settings;

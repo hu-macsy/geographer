@@ -266,6 +266,10 @@ int main(int argc, char** argv) {
     }
 
 
+    std::string machine = settings.machine;
+    const IndexType thisPE = comm->getRank();
+    
+
     for( int t=0; t<wantedTools.size(); t++) {
 
         ITI::Tool thisTool = wantedTools[t];
@@ -284,9 +288,8 @@ int main(int argc, char** argv) {
         // if graph is too big, repeat less times to avoid memory and time problems
         if( N>std::pow(2,29) ) {
             settings.repeatTimes = 2;
-        } else {
-            settings.repeatTimes = 5;
-        }
+        } 
+        
         int parMetisGeom=0;
 
         std::string outFile = "-";
@@ -331,10 +334,6 @@ int main(int argc, char** argv) {
         //
         // Reporting output to std::cout
         //
-
-        std::string machine = settings.machine;
-        const IndexType thisPE = comm->getRank();
-    
 
         if( thisPE==0 ) {
             if( vm.count("generate") ) {
