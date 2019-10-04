@@ -35,10 +35,10 @@ FIND_PACKAGE( Zoltan2 PATHS "/home/hpc/pr87si/di36qin/Code/Trilinos/build/packag
 #set(METIS_BASE "/lrz/sys/libraries/metis/5.1.0/i8r8")
 #set(PARMETIS_BASE  "/lrz/sys/libraries/parmetis/4.0.3/ibmmpi/i8r8")
 
-message(${METIS_BASE})
+message("${METIS_BASE}/lib")
 
-find_library( METIS_LIB metis "${METIS_BASE}/lib" )
-find_library( PARMETIS_LIB parmetis "${PARMETIS_BASE}/lib" )
+find_library( METIS_LIB metis "${METIS_BASE}/lib"  NO_DEFAULT_PATH)
+find_library( PARMETIS_LIB libparmetis.so "${PARMETIS_BASE}/lib"  NO_DEFAULT_PATH)
 
 
 ###
@@ -107,13 +107,13 @@ elseif( METIS_LIB AND PARMETIS_LIB )
     add_executable( allCompetitors allCompetitorsPart.cpp parseArgs.cpp)
     # include parmetis and metis 
     target_include_directories( allCompetitors PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" ${CXXOPTS_DIR})
-    target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
+    target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES} ) # ${METIS_LIB} ${PARMETIS_LIB}  metis parmetis)
 
 
     add_executable( testMetisRefine testMetisRefinement.cpp parseArgs.cpp)
     # include parmetis and metis 
     target_include_directories( testMetisRefine PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" ${CXXOPTS_DIR})
-    target_link_libraries( testMetisRefine geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
+    target_link_libraries( testMetisRefine geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES} ) # ${METIS_LIB} ${PARMETIS_LIB}  )# metis parmetis)
 
     
     install(TARGETS wrappers EXPORT wrappers DESTINATION "${LIB_DEST}") 
@@ -143,7 +143,7 @@ if (USE_NETWORKIT)
 endif (USE_NETWORKIT)
 
 ### define unit test target if GTest was found ###
-if (GTEST_FOUND AND 0)
+if (GTEST_FOUND )
 
     # add the wrappers test if zoltan and parmetis is found
     if( EXTRA_LIBRARIES_FOUND )

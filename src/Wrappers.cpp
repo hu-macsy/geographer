@@ -7,6 +7,7 @@
 
 #include <parmetis.h>
 
+#include <scai/partitioning/Partitioning.hpp>
 
 //for zoltan
 //#include <Zoltan2_PartitioningSolution.hpp>
@@ -196,6 +197,25 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
         graph, coords, nodeWeights, settings, vtxDist, xadj, adjncy,
         vVwgt, tpwgts, wgtFlag, numWeights, ubvec, xyzLocal, options );
 
+
+{
+scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+PRINT(comm->getRank() << ": " << std::accumulate(tpwgts.begin(), tpwgts.end(), 0.0) );
+
+ValueType sum = 0.0;
+for( int i=0;i <tpwgts.size();i++){
+    sum += tpwgts.data()[i];
+}
+PRINT(comm->getRank() << ": " << sum);
+
+}
+//scai::partitioning::Partitioning::normWeights( tpwgts );
+
+real_t rTpwgts[ tpwgts.size() ];
+for( int ii=0; ii<tpwgts.size(); ii++ ){
+    rTpwgts[ii] = tpwgts[ii];
+}
+
     // nparts: the number of parts to partition (=k)
     IndexType nparts= settings.numBlocks;
     // ndims: the number of dimensions
@@ -240,7 +260,8 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
 PRINT0("About to call ParMETIS_V3_RefineKway in Wrappers::refine");
 
     metisRet = ParMETIS_V3_RefineKway(
-        vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, tpwgts.data(), ubvec.data(), options.data(), &edgecut, partKway.data(), &metisComm );
+        vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, rTpwgts /* &tpwgts[0]*/, ubvec.data(), options.data(), &edgecut, partKway.data(), &metisComm );
+
 
     //
     // convert partition to a DenseVector

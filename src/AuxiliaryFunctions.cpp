@@ -411,6 +411,8 @@ IndexType aux<IndexType, ValueType>::toMetisInterface(
         tpwgts[i] = ValueType(1.0)/nparts;
         total += tpwgts[i];
     }
+PRINT0( tpwgts[1] );
+PRINT(comm->getRank() <<": " << total);
     SCAI_ASSERT_LT_ERROR( std::abs(total-numWeights), 1e-6, "Wrong tpwgts assignment");    
 
 

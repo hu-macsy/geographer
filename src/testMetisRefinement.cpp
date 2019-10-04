@@ -142,13 +142,20 @@ PRINT0("will redistribute input");
 
         //redistribute
         scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition(
-            partition, graph , coords, nodeWeights, settings, false, renumberPEs);        
+            partition, graph, coords, nodeWeights, settings, false, renumberPEs);        
 
         //TODO?: can also redistribute everything based on a block or genBlock distribution
         //const  scai::dmemo::DistributionPtr newGenBlockDist = GraphUtils<IndexType, ValueType>::genBlockRedist(graph);
         //partition.redistribute( newGenBlockDist );
     }
-    scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition( partition, graph , coords, nodeWeights, settings, false, true); 
+    //scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition( partition, graph , coords, nodeWeights, settings, false, true); 
+
+const scai::dmemo::DistributionPtr newGraphDist = graph.getRowDistributionPtr();
+comm->synchronize();
+for( int p=0; p<comm->getSize(); p++){
+    if( comm->getRank()==p)
+        PRINT( *newGraphDist );
+}
 
     PRINT0("\tStarting metis refinement\n");
 
