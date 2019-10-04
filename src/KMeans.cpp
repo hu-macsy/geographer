@@ -1330,9 +1330,9 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
             const ValueType ratio = totalSampledWeightSum / nodeWeightSum[i];
             adjustedBlockSizes[i].resize(targetBlockWeights[i].size());
 
-            //TODO: merge to one assertion
+            //TODO: merge to one assertion; or not...
             if( std::is_same<ValueType,float>::value ){
-                SCAI_ASSERT_LE_ERROR(totalSampledWeightSum, nodeWeightSum[i]*(1+1e-4), "Error in sampled weight sum.");
+                //SCAI_ASSERT_LE_ERROR(totalSampledWeightSum, nodeWeightSum[i]*(1+1e-4), "Error in sampled weight sum.");
             }else{  //double
                 SCAI_ASSERT_LE_ERROR(totalSampledWeightSum, nodeWeightSum[i]*(1+1e-8), "Error in sampled weight sum.");
             }
