@@ -96,7 +96,8 @@ public:
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
         const scai::lama::DenseVector<IndexType> partition,
-        struct Settings &settings
+        struct Settings &settings,
+        Metrics<ValueType> &metrics
     );
 
 private:

@@ -12,6 +12,7 @@
 */
 #include <cxxopts.hpp>
 
+#include "AuxiliaryFunctions.h"
 #include "FileIO.h"
 #include "Settings.h"
 #include "Metrics.h"
@@ -32,7 +33,7 @@ namespace ITI{
 template <typename ValueType>
 IndexType readInput( 
     const cxxopts::ParseResult vm,
-    Settings settings,
+    const Settings settings,
     const scai::dmemo::CommunicatorPtr comm,
     scai::lama::CSRSparseMatrix<ValueType>& graph,
     std::vector<scai::lama::DenseVector<ValueType>>& coords,
@@ -101,9 +102,6 @@ IndexType readInput(
         SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size(), coords[1].getLocalValues().size(), "coordinates not of same size" );      
 
     }else if(vm.count("generate")) {
-        if (settings.dimensions == 2) {
-            settings.numZ = 1;
-        }
 
         N = settings.numX * settings.numY * settings.numZ;
 
@@ -175,6 +173,11 @@ IndexType readInput(
     }else{
         std::cout << "No input file was given. Call again with --graphFile, --quadTreeFile" << std::endl;
         return 126;        
+    }
+
+    if( not aux<IndexType,ValueType>::checkConsistency( graph, coords, nodeWeights, settings) ){
+        PRINT0("Input not consistent.\nAborting...");
+        return -1;
     }
 
     return N;

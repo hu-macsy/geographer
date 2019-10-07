@@ -31,9 +31,7 @@
 int main(int argc, char** argv) {
 
     using namespace ITI;
-    typedef double ValueType;   //use double
-
-    std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+    using ValueType = double;   //use double
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     if (comm->getType() != scai::dmemo::CommunicatorType::MPI) {
@@ -76,9 +74,8 @@ int main(int argc, char** argv) {
     std::vector<DenseVector<ValueType>> coords(settings.dimensions);
     std::vector<DenseVector<ValueType>> nodeWeights;    //the weights for each node
 
-    std::string graphFile =  vm["graphFile"].as<std::string>();
+    readInput<ValueType>( vm, settings, comm, graph, coords, nodeWeights );
 
-    IndexType N = readInput<ValueType>( vm, settings, comm, graph, coords, nodeWeights );
 
     //-----------------------------------------
     //
@@ -87,6 +84,7 @@ int main(int argc, char** argv) {
     Metrics<ValueType> metricsBefore(settings);
 
     DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coords, nodeWeights, settings, metricsBefore );
+
 
     metricsBefore.getAllMetrics( graph, partition, nodeWeights, settings );
     if (comm->getRank() == 0 && settings.metricsDetail.compare("no") != 0) {
@@ -106,6 +104,7 @@ int main(int argc, char** argv) {
         }
 */        
     }
+
 
     //-----------------------------------------
     //
@@ -127,52 +126,42 @@ int main(int argc, char** argv) {
         PRINT0("nodeWeights and graph distribution do not agree; will redistribute input");
         willRedistribute = true;        
     }
-
-comm->synchronize();
-for( int p=0; p<comm->getSize(); p++){
-    if( comm->getRank()==p)
-        PRINT( *graphDist );
-}
-
+    if( not graphDist->isBlockDistributed(comm) ){
+        PRINT0("Input does not have a suitable distribution; will redistribute");
+        willRedistribute = true;            
+    }
 
     if( willRedistribute ){
-        bool renumberPEs = true;
         
-PRINT0("will redistribute input");
+        PRINT0("will redistribute input");
 
+        //TODO: is this redistribution needed?
         //redistribute
-        scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition(
-            partition, graph, coords, nodeWeights, settings, false, renumberPEs);        
+        scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, false, true);        
 
         //TODO?: can also redistribute everything based on a block or genBlock distribution
-        //const  scai::dmemo::DistributionPtr newGenBlockDist = GraphUtils<IndexType, ValueType>::genBlockRedist(graph);
-        //partition.redistribute( newGenBlockDist );
+        const  scai::dmemo::DistributionPtr newGenBlockDist = GraphUtils<IndexType, ValueType>::genBlockRedist(graph);
+        
+        aux<IndexType,ValueType>::redistributeInput( newGenBlockDist, partition, graph, coords, nodeWeights);
+        
     }
-    //scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition( partition, graph , coords, nodeWeights, settings, false, true); 
-
-const scai::dmemo::DistributionPtr newGraphDist = graph.getRowDistributionPtr();
-comm->synchronize();
-for( int p=0; p<comm->getSize(); p++){
-    if( comm->getRank()==p)
-        PRINT( *newGraphDist );
-}
-
+    
     PRINT0("\tStarting metis refinement\n");
 
     //-----------------------------------------
     //
     //refine partition using metisRefine
+    Metrics<ValueType> metrics(settings);
 
-    DenseVector<IndexType> refinedPartition = Wrappers<IndexType,ValueType>::refine( graph, coords, nodeWeights, partition, settings );
+    DenseVector<IndexType> refinedPartition = Wrappers<IndexType,ValueType>::refine( graph, coords, nodeWeights, partition, settings, metrics );
 
-    Metrics<ValueType> metricsRefined(settings);
-    metricsRefined.getAllMetrics( graph, refinedPartition, nodeWeights, settings );
+    metrics.getAllMetrics( graph, refinedPartition, nodeWeights, settings );
     if (comm->getRank() == 0 && settings.metricsDetail.compare("no") != 0) {
-        metricsRefined.print( std::cout );
+        metrics.print( std::cout );
     }
 
     //this is needed for supermuc
-    std::exit(0);
+    //std::exit(0);
 
     return 0;    
 

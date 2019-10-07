@@ -102,7 +102,8 @@ endif (USE_NETWORKIT)
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
 add_definitions("-DBUILD_COMMIT=${GIT_COMMIT}")
 
-add_definitions("-Wall -Wno-sign-compare -Wno-unused")
+#add_definitions("-Wall -Wno-sign-compare -Wno-unused")
+add_definitions("-Wall -Wno-sign-compare")
 
 ### define install directories ###
 set(BIN_DEST "bin")

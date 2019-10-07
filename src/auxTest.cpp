@@ -651,7 +651,7 @@ TYPED_TEST (auxTest, testMetisInterface) {
     EXPECT_EQ( adjncy.size(), graph.getLocalNumValues() );
     EXPECT_EQ( vwgt.size(), numWeights*localN );
     EXPECT_EQ( xyzLocal.size(), dimensions*localN );
-    EXPECT_EQ( std::accumulate( tpwgts.begin(), tpwgts.end(), 0.0), 1.0 );
+    EXPECT_EQ( std::accumulate( tpwgts.begin(), tpwgts.end(), 0.0), ValueType (numWeights) );
 
     //check weights
     for(int w=0; w<numWeights; w++ ){

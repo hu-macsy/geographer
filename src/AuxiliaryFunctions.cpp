@@ -335,7 +335,7 @@ IndexType aux<IndexType, ValueType>::toMetisInterface(
         }
         ++ub2;  // we need max+1
     }
-PRINT(comm->getRank() << ": "<< lb2 << " - "<< ub2);    
+    //PRINT(comm->getRank() << ": "<< lb2 << " - "<< ub2);    
 
     scai::hmemo::HArray<IndexType> sendVtx(size+1, static_cast<ValueType>( 0 ));
     scai::hmemo::HArray<IndexType> recvVtx(size+1);
@@ -438,20 +438,14 @@ PRINT(comm->getRank() << ": "<< lb2 << " - "<< ub2);
     // vertex weight that should be distributed to each sub-domain for each balance
     // constraint. Here we want equal sizes, so every value is 1/nparts.
     
-    //tpwgts.resize( nparts*numWeights );
+    tpwgts.resize( nparts*numWeights );
 
     ValueType total = 0.0;
     for(int i=0; i<nparts*numWeights ; i++) {
-        //tpwgts[i] = ValueType(1.0)/nparts;
-        tpwgts.push_back(ValueType(1.0)/nparts);
+        tpwgts[i] = ValueType(1.0)/nparts;
         total += tpwgts[i];
-//PRINT(comm->getRank() <<" :-: " << tpwgts[i]);      
     }
 
-//scai::partitioning::Partitioning::normWeights( tpwgts );
-
-PRINT0( nparts << " _ _ _ " << numWeights );
-PRINT(comm->getRank() <<": " << total);
     SCAI_ASSERT_LT_ERROR( std::abs(total-numWeights), 1e-6, "Wrong tpwgts assignment");    
 
 

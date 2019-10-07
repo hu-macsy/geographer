@@ -245,7 +245,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     Metrics<ValueType>& metrics)
 {
     IndexType k = settings.numBlocks;
-    ValueType epsilon = settings.epsilon;
     const IndexType dimensions = coordinates.size();
 
     SCAI_REGION( "ParcoRepart.partitionGraph" )
@@ -266,8 +265,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
-    const IndexType rank = comm->getRank();
-
+    
 	// timing info
     std::chrono::duration<double> partitionTime= std::chrono::duration<double>(0.0);
 	std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
@@ -286,7 +284,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     // At this point we have the initial, geometric partition.
     //
 
-	
     if (comm->getSize() == k) {
         //WARNING: the result  is not redistributed. must redistribute afterwards
         if( !settings.noRefinement ) {

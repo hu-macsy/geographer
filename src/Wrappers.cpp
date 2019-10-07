@@ -24,6 +24,7 @@
 namespace ITI {
 
 IndexType HARD_TIME_LIMIT= 600; 	// hard limit in seconds to stop execution if exceeded
+//using ValueType= real_t;
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
@@ -159,11 +160,20 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
         const std::vector<scai::lama::DenseVector<ValueType>> &coords,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
         const scai::lama::DenseVector<IndexType> partition,
-        struct Settings &settings
+        struct Settings &settings,
+        Metrics<ValueType> &metrics
     ){
 
-//probably we gonna have problems if the distribution does not have 
-//a consecutive numbering. Fix here or outside
+    //probably we gonna have problems if the distribution does not have 
+    //a consecutive numbering. Fix here or outside
+    if( not std::is_same<ValueType,real_t>::value ){
+        PRINT("*** Warning, ValueType and real_t do not agree");
+    }
+
+    if( sizeof(ValueType)!=sizeof(real_t) ) {
+        std::cout<< "WARNING: IndexType size= " << sizeof(IndexType) << " and idx_t size=" << sizeof(idx_t) << "  do not agree, this may cause problems " << std::endl;
+    }
+    
 
     SCAI_ASSERT_DEBUG( graph.isConsistent(), graph << " input graph is not consistent" );
     //const scai::dmemo::DistributionPtr graphDist = graph.getRowDistributionPtr();
@@ -179,13 +189,14 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
     // tpwgts: array that is used to specify the fraction of
     // vertex weight that should be distributed to each sub-domain for each balance constraint.
     // Here we want equal sizes, so every value is 1/nparts; size = ncons*nparts 
-    std::vector<real_t> tpwgts;
+    std::vector<ValueType> tpwgts;
 
     // the xyz array for coordinates of size dim*localN contains the local coords
-    std::vector<real_t> xyzLocal;
+    std::vector<ValueType> xyzLocal;    
+
     // ubvec: array of size ncon to specify imbalance for every vertex weigth.
     // 1 is perfect balance and nparts perfect imbalance. Here 1 for now
-    std::vector<real_t> ubvec;
+    std::vector<ValueType> ubvec;
 
     //local number of edges; number of node weights; flag about edge and vertex weights 
     IndexType numWeights=0, wgtFlag=0;
@@ -193,41 +204,24 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
     // options: array of integers for passing arguments.
     std::vector<IndexType> options;
 
-    IndexType localN2 = aux<IndexType,ValueType>::toMetisInterface(
+    aux<IndexType,ValueType>::toMetisInterface(
         graph, coords, nodeWeights, settings, vtxDist, xadj, adjncy,
         vVwgt, tpwgts, wgtFlag, numWeights, ubvec, xyzLocal, options );
 
-
-{
-scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-PRINT(comm->getRank() << ": " << std::accumulate(tpwgts.begin(), tpwgts.end(), 0.0) );
-
-ValueType sum = 0.0;
-for( int i=0;i <tpwgts.size();i++){
-    sum += tpwgts.data()[i];
-}
-PRINT(comm->getRank() << ": " << sum);
-
-}
-//scai::partitioning::Partitioning::normWeights( tpwgts );
-
-real_t rTpwgts[ tpwgts.size() ];
-for( int ii=0; ii<tpwgts.size(); ii++ ){
-    rTpwgts[ii] = tpwgts[ii];
-}
+    SCAI_ASSERT_EQ_ERROR( tpwgts.size(), numWeights*settings.numBlocks, "Wrong tpwgts size" );
+    {
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        SCAI_ASSERT_EQ_ERROR( vtxDist.size(), comm->getSize()+1, "Wrong vtxDist size" );
+    }
 
     // nparts: the number of parts to partition (=k)
     IndexType nparts= settings.numBlocks;
-    // ndims: the number of dimensions
-    IndexType ndims = settings.dimensions;      
+
+
     // numflag: 0 for C-style (start from 0), 1 for Fortran-style (start from 1)
     IndexType numflag= 0;          
     // edges weights not supported
     IndexType* adjwgt= NULL;
-
-    //parmetis requires weights to be integers
-    std::vector<IndexType> vwgt( vVwgt.begin(), vVwgt.end() );
-
 
     // output parameters
     //
@@ -236,9 +230,13 @@ for( int ii=0; ii<tpwgts.size(); ii++ ){
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-    const IndexType N = graph.getNumRows();
+    //const IndexType N = graph.getNumRows();
     const IndexType localN= dist->getLocalSize();   
 
+    //parmetis requires weights to be integers
+    std::vector<IndexType> vwgt( vVwgt.begin(), vVwgt.end() );
+    SCAI_ASSERT_EQ_ERROR( vwgt.size(), localN*numWeights, "Wrong weights size" );
+    
     //partition and the graph rows must have the same distribution
     SCAI_ASSERT( dist->isEqual( partition.getDistribution()), "Distributions must agree" );
     
@@ -255,26 +253,31 @@ for( int ii=0; ii<tpwgts.size(); ii++ ){
     // comm: the MPI communicator
     MPI_Comm metisComm;
     MPI_Comm_dup(MPI_COMM_WORLD, &metisComm);
-    int metisRet;    
+    //int metisRet;    
 
-PRINT0("About to call ParMETIS_V3_RefineKway in Wrappers::refine");
+    PRINT0("About to call ParMETIS_V3_RefineKway in Wrappers::refine");
 
-    metisRet = ParMETIS_V3_RefineKway(
-        vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, rTpwgts /* &tpwgts[0]*/, ubvec.data(), options.data(), &edgecut, partKway.data(), &metisComm );
+    //overwrite the default options because parmetis by default neglects the
+    //partition if k=p
+    std::vector<IndexType>options2(4,1);
+    options2[1] = 0; //verbosity
+    options2[3] = PARMETIS_PSR_UNCOUPLED; //if k=p (coupled) or not (uncoupled); 2 is always uncoupled
 
+    std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+
+    ParMETIS_V3_RefineKway(
+        vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, tpwgts.data() , ubvec.data(), options2.data(), &edgecut, partKway.data(), &metisComm );
+
+    std::chrono::duration<double> partitionKwayTime = std::chrono::system_clock::now() - startTime;
+    double partKwayTime= comm->max(partitionKwayTime.count() );
+    metrics.MM["timeFinalPartition"] = partKwayTime;
 
     //
     // convert partition to a DenseVector
     //
 
     scai::lama::DenseVector<IndexType> partitionKway(dist, scai::hmemo::HArray<IndexType>(localN, partKway.data()) );
-    /*
-    scai::lama::DenseVector<IndexType> partitionKway(dist, IndexType(0));
-    scai::hmemo::WriteAccess<IndexType> rLocalPart( partition.getLocalValues() );
-    for(unsigned int i=0; i<localN; i++) {
-        partitionKway.getLocalValues()[i] = partKway[i];
-    }
-    */
+
     return partitionKway;
 }
 //-----------------------------------------------------------------------------------------
@@ -291,7 +294,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-    const IndexType N = graph.getNumRows();
+    //const IndexType N = graph.getNumRows();
     const IndexType localN= dist->getLocalSize();
 
     PRINT0("\t\tStarting the metis wrapper");
@@ -342,13 +345,14 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
         // tpwgts: array that is used to specify the fraction of
         // vertex weight that should be distributed to each sub-domain for each balance constraint.
         // Here we want equal sizes, so every value is 1/nparts; size = ncons*nparts 
-        std::vector<real_t> tpwgts;
+        std::vector<ValueType> tpwgts;
 
         // the xyz array for coordinates of size dim*localN contains the local coords
-        std::vector<real_t> xyzLocal;
+        std::vector<ValueType> xyzLocal;
+
         // ubvec: array of size ncon to specify imbalance for every vertex weigth.
         // 1 is perfect balance and nparts perfect imbalance. Here 1 for now
-        std::vector<real_t> ubvec;
+        std::vector<ValueType> ubvec;
 
         //local number of edges; number of node weights; flag about edge and vertex weights 
         IndexType numWeights=0, wgtFlag=0;
@@ -356,9 +360,13 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
         // options: array of integers for passing arguments.
         std::vector<IndexType> options;
 
-        IndexType localN2 = aux<IndexType,ValueType>::toMetisInterface(
+        IndexType newLocalN = aux<IndexType,ValueType>::toMetisInterface(
             graph, coords, nodeWeights, settings, vtxDist, xadj, adjncy,
             vVwgt, tpwgts, wgtFlag, numWeights, ubvec, xyzLocal, options );
+
+        if( newLocalN==-1){
+            return scai::lama::DenseVector<IndexType>(0,0);
+        }
 
         // nparts: the number of parts to partition (=k)
         IndexType nparts= settings.numBlocks;
@@ -383,7 +391,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
         // comm: the MPI comunicator
         MPI_Comm metisComm;
         MPI_Comm_dup(MPI_COMM_WORLD, &metisComm);
-        int metisRet;
+        //int metisRet;
 
         //PRINT(*comm<< ": xadj.size()= "<< sizeof(xadj) << "  adjncy.size=" <<sizeof(adjncy) );
         //PRINT(*comm << ": "<< sizeof(xyzLocal)/sizeof(real_t) << " ## "<< sizeof(partKway)/sizeof(idx_t) << " , localN= "<< localN);
@@ -399,12 +407,12 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
 
         if( parMetisGeom==0) {
-            metisRet = ParMETIS_V3_PartKway( 
+            /*metisRet = */ParMETIS_V3_PartKway( 
                 vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, tpwgts.data(), ubvec.data(), options.data(), &edgecut, partKway, &metisComm );
         } else if( parMetisGeom==1 ) {
-            metisRet = ParMETIS_V3_PartGeomKway( vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &ndims, xyzLocal.data(), &numWeights, &nparts, tpwgts.data(), ubvec.data(), options.data(), &edgecut, partKway, &metisComm );
+            ParMETIS_V3_PartGeomKway( vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &ndims, xyzLocal.data(), &numWeights, &nparts, tpwgts.data(), ubvec.data(), options.data(), &edgecut, partKway, &metisComm );
         } else if( parMetisGeom==2 ) {
-            metisRet = ParMETIS_V3_PartGeom( vtxDist.data(), &ndims, xyzLocal.data(), partKway, &metisComm );
+            ParMETIS_V3_PartGeom( vtxDist.data(), &ndims, xyzLocal.data(), partKway, &metisComm );
         } else {
             //repartition
 
@@ -424,7 +432,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
             */
             real_t itr = 1000;	//TODO: check other values too
 
-            metisRet = ParMETIS_V3_AdaptiveRepart( vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), vsize, adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, tpwgts.data(), ubvec.data(), &itr, options.data(), &edgecut, partKway, &metisComm );
+            ParMETIS_V3_AdaptiveRepart( vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), vsize, adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, tpwgts.data(), ubvec.data(), &itr, options.data(), &edgecut, partKway, &metisComm );
 
             delete[] vsize;
         }
@@ -779,7 +787,8 @@ return scai::lama::DenseVector<IndexType> (coords[0].getDistributionPtr(), Index
 
 //---------------------------------------------------------------------------------------
 
-template class Wrappers<IndexType, double>;
+//template class Wrappers<IndexType, double>;
 //template class Wrappers<IndexType, float>;
+template class Wrappers<IndexType, real_t>;
 
 }//namespace

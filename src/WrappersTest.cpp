@@ -1,7 +1,9 @@
 #include "FileIO.h"
 #include "Wrappers.h"
+#include "AuxiliaryFunctions.h"
 
 #include "gtest/gtest.h"
+
 
 using namespace scai;
 
@@ -24,7 +26,7 @@ protected:
 TEST_F( WrappersTest, testRefine ){
     using ValueType = double;
 
-    std::string fileName = "Grid8x8";
+    std::string fileName = "Grid32x32";
     std::string file = WrappersTest::graphPath + fileName;
     std::ifstream f(file);
     const IndexType dimensions= 2;
@@ -32,6 +34,7 @@ TEST_F( WrappersTest, testRefine ){
     f >> N >> edges;
 
     const dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
 
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 
@@ -41,33 +44,42 @@ TEST_F( WrappersTest, testRefine ){
     const IndexType localN = dist->getLocalSize();
     EXPECT_TRUE(coordinates[0].getDistributionPtr()->isEqual(*dist));
 
-    std::vector<DenseVector<ValueType>> uniformWeights(1, DenseVector<ValueType>( dist, 1.0) );
+    std::vector<DenseVector<ValueType>> uniformWeights(3, DenseVector<ValueType>( dist, 1.41) );
+
+
     //partition
 
     struct Settings settings;
-    const IndexType k = 6;
+    const IndexType k = comm->getSize()-1;
     settings.numBlocks = k;  
+    settings.dimensions = dimensions;
+    Metrics<ValueType> metrics(settings);
 
     srand(comm->getRank());
 
     DenseVector<IndexType> firstPartition(dist, 0);
     for (IndexType i = 0; i < localN; i++) {
-        //IndexType blockId = ( (rand() % k) % (comm->getRank()+1) )%k; //heavily imbalanced partition
+        //heavily imbalanced partition
+        //IndexType blockId = ( (rand() % k) % (comm->getRank()+1) )%k; 
         IndexType blockId = (rand() % k);
         firstPartition.getLocalValues()[i] = blockId;
     }
 
+    aux<IndexType,ValueType>::print2DGrid( graph, firstPartition );
+
     const ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( graph , firstPartition );
 	ValueType imbalance = GraphUtils<IndexType,ValueType>::computeImbalance( firstPartition, settings.numBlocks );
-	
+
     PRINT0("First cut is " << cut << " and imbalance " << imbalance );
 
-    DenseVector<IndexType> refinedPartition = Wrappers<IndexType,ValueType>::refine( graph, coordinates, uniformWeights, firstPartition, settings );
+    DenseVector<IndexType> refinedPartition = Wrappers<IndexType,ValueType>::refine( graph, coordinates, uniformWeights, firstPartition, settings, metrics );
+
+    aux<IndexType,ValueType>::print2DGrid( graph, refinedPartition );
 
     const ValueType refCut = GraphUtils<IndexType,ValueType>::computeCut( graph ,refinedPartition );
-	imbalance = GraphUtils<IndexType,ValueType>::computeImbalance( refinedPartition, settings.numBlocks );
+	imbalance = GraphUtils<IndexType,ValueType>::computeImbalance( refinedPartition, settings.numBlocks );   
 
-    PRINT0("Refined cut is " << cut << " and imbalance " << imbalance );
+    PRINT0("Refined cut is " << refCut << " and imbalance " << imbalance );
 	
 	EXPECT_LE( refCut, cut);
 

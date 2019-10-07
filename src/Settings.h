@@ -182,7 +182,7 @@ struct Settings {
     //@{
     IndexType numX = 32;
     IndexType numY = 32;
-    IndexType numZ = 32;
+    IndexType numZ = 1;
     //@}
 
     /** @name Tuning parameters for local refinement
