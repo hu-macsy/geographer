@@ -1,4 +1,5 @@
 #include "AuxiliaryFunctions.h"
+#include "scai/partitioning/Partitioning.hpp"
 #include <numeric>
 
 
@@ -20,7 +21,6 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     const IndexType thisPE = comm->getRank();
     const IndexType globalN = coordinates[0].getDistributionPtr()->getGlobalSize();
     const IndexType localN = partition.getDistributionPtr()->getLocalSize();
-    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
 
     SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), globalN, "Mismatch in graph and coordinates size" );
     SCAI_ASSERT_EQ_ERROR( nodeWeights[0].getDistributionPtr()->getGlobalSize(), globalN, "Mismatch in nodeWeights vector" );
@@ -218,35 +218,13 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
         distFromPartition = resultRedist.getTargetDistributionPtr();
 
         scai::dmemo::RedistributePlan redistributor = scai::dmemo::redistributePlanByNewDistribution( distFromPartition, graph.getRowDistributionPtr());
-
-        for (IndexType d=0; d<settings.dimensions; d++) {
-            coordinates[d].redistribute(redistributor);
-        }
-        for(int w=0; w<nodeWeights.size(); w++){
-            nodeWeights[w].redistribute(redistributor);
-        }
-
-        graph.redistribute( redistributor, noDist );
-        partition.redistribute(redistributor);
-        //30/09/19: below is older code that seems wrong
-        //partition = DenseVector<IndexType>( distFromPartition, comm->getRank());
-        
+    
+        redistributeInput( redistributor, partition, graph, coordinates, nodeWeights);      
     } else {
         // create new distribution from partition
         distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues());
 
-        partition.redistribute( distFromPartition );
-        graph.redistribute( distFromPartition, noDist );
-
-        for(int w=0; w<nodeWeights.size(); w++){
-            nodeWeights[w].redistribute( distFromPartition );
-        }
-
-        // redistribute coordinates
-        for (IndexType d = 0; d < settings.dimensions; d++) {
-            //assert( coordinates[dim].size() == globalN);
-            coordinates[d].redistribute( distFromPartition );
-        }
+        redistributeInput( distFromPartition, partition, graph, coordinates, nodeWeights);       
     }
 
     const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
@@ -256,6 +234,58 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 
     return distFromPartition;
 }//redistributeFromPartition
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+void aux<IndexType,ValueType>::redistributeInput(
+    const scai::dmemo::DistributionPtr targetDistribution,
+    DenseVector<IndexType>& partition,
+    CSRSparseMatrix<ValueType>& graph,
+    std::vector<DenseVector<ValueType>>& coordinates,
+    std::vector<DenseVector<ValueType>>& nodeWeights){
+
+    for (IndexType d=0; d<coordinates.size(); d++) {
+        coordinates[d].redistribute( targetDistribution );
+    }
+
+    for(int w=0; w<nodeWeights.size(); w++){
+        nodeWeights[w].redistribute( targetDistribution );
+    }
+
+    //column are not distributed
+    const IndexType globalN = coordinates[0].getDistributionPtr()->getGlobalSize();
+    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
+
+    graph.redistribute( targetDistribution, noDist );
+    partition.redistribute( targetDistribution );
+} 
+
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+void  aux<IndexType,ValueType>::redistributeInput(
+    const scai::dmemo::RedistributePlan redistributor,
+    DenseVector<IndexType>& partition,
+    CSRSparseMatrix<ValueType>& graph,
+    std::vector<DenseVector<ValueType>>& coordinates,
+    std::vector<DenseVector<ValueType>>& nodeWeights){
+
+    for (IndexType d=0; d<coordinates.size(); d++) {
+        coordinates[d].redistribute(redistributor);
+    }
+    for(int w=0; w<nodeWeights.size(); w++){
+        nodeWeights[w].redistribute(redistributor);
+    }
+
+    //column are not distributed
+    const IndexType globalN = coordinates[0].getDistributionPtr()->getGlobalSize();
+    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
+
+    graph.redistribute( redistributor, noDist );
+    partition.redistribute(redistributor);
+    //30/09/19: below is older code that seems wrong
+    //partition = DenseVector<IndexType>( distFromPartition, comm->getRank());
+} 
 
 //---------------------------------------------------------------------------------------
 
@@ -287,6 +317,9 @@ IndexType aux<IndexType, ValueType>::toMetisInterface(
         PRINT0("Input not consistent.\nAborting...");
         return -1;
     }
+
+    SCAI_ASSERT_ERROR( dist->isBlockDistributed(comm), "to convert to metis interface the input must have a block or generalBlock distribution");
+        
     // get local range of indices
 
     IndexType lb2=N+1, ub2=-1;
@@ -302,7 +335,7 @@ IndexType aux<IndexType, ValueType>::toMetisInterface(
         }
         ++ub2;  // we need max+1
     }
-    //PRINT(*comm<< ": "<< lb2 << " - "<< ub2);    
+PRINT(comm->getRank() << ": "<< lb2 << " - "<< ub2);    
 
     scai::hmemo::HArray<IndexType> sendVtx(size+1, static_cast<ValueType>( 0 ));
     scai::hmemo::HArray<IndexType> recvVtx(size+1);
@@ -404,14 +437,20 @@ IndexType aux<IndexType, ValueType>::toMetisInterface(
     // tpwgts: array of size ncons*nparts, that is used to specify the fraction of
     // vertex weight that should be distributed to each sub-domain for each balance
     // constraint. Here we want equal sizes, so every value is 1/nparts.
-    tpwgts.resize( nparts*numWeights );
+    
+    //tpwgts.resize( nparts*numWeights );
 
     ValueType total = 0.0;
-    for(int i=0; i<tpwgts.size(); i++) {
-        tpwgts[i] = ValueType(1.0)/nparts;
+    for(int i=0; i<nparts*numWeights ; i++) {
+        //tpwgts[i] = ValueType(1.0)/nparts;
+        tpwgts.push_back(ValueType(1.0)/nparts);
         total += tpwgts[i];
+//PRINT(comm->getRank() <<" :-: " << tpwgts[i]);      
     }
-PRINT0( tpwgts[1] );
+
+//scai::partitioning::Partitioning::normWeights( tpwgts );
+
+PRINT0( nparts << " _ _ _ " << numWeights );
 PRINT(comm->getRank() <<": " << total);
     SCAI_ASSERT_LT_ERROR( std::abs(total-numWeights), 1e-6, "Wrong tpwgts assignment");    
 
@@ -432,7 +471,7 @@ PRINT(comm->getRank() <<": " << total);
 
     // options: array of integers for passing arguments.
     // Here, options[0]=0 for the default values.
-    options.resize(2, 0);
+    options.resize(1, 0);
 
     return localN;
 
@@ -508,8 +547,6 @@ bool ITI::aux<IndexType, ValueType>::checkConsistency(
     const IndexType dimensions = coordinates.size();
 	const IndexType n = input.getNumRows();
 
-    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
-
     /*
     * check input arguments for sanity
     */
@@ -541,13 +578,10 @@ bool ITI::aux<IndexType, ValueType>::checkConsistency(
     const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
-    const IndexType rank = comm->getRank();
 
     if (!coordDist->isEqual( *inputDist) ) {
         throw std::runtime_error( "Coordinate and graph distributions should be equal.");
     }
-
-    bool nodesUnweighted = nodeWeights.size() == 1 && (nodeWeights[0].max() == nodeWeights[0].min());
 
     if (settings.repartition && nodeWeights.size() > 1) {
         throw std::logic_error("Repartitioning not implemented for multiple node weights.");

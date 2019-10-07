@@ -332,6 +332,23 @@ public:
         bool useRedistributor = true,
         bool renumberPEs = true );
 
+
+    static void redistributeInput(
+        const scai::dmemo::DistributionPtr targetDistribution,
+        scai::lama::DenseVector<IndexType>& partition,
+        scai::lama::CSRSparseMatrix<ValueType>& graph,
+        std::vector<scai::lama::DenseVector<ValueType>>& coordinates,
+        std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights);
+
+
+    static void redistributeInput(
+        const scai::dmemo::RedistributePlan redistributor,
+        scai::lama::DenseVector<IndexType>& partition,
+        scai::lama::CSRSparseMatrix<ValueType>& graph,
+        std::vector<scai::lama::DenseVector<ValueType>>& coordinates,
+        std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights);
+
+
     /** Function to convert lama data structures to raw pointers as used
         by the metis and parmetis interface. All const arguments are the
         input and the rest are output parameters. Returns the number of
