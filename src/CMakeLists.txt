@@ -51,7 +51,7 @@ endif()
 ### for more info see the Zoltan2 documentation and https://trilinos.org/oldsite/Finding_Trilinos.txt
 ### see also in Trilinos_install_path/install/include/Makefile.export.Zoltan2
 
-if( Zoltan2_FOUND AND PARMETIS_LIB )
+if( 0 AND Zoltan2_FOUND AND PARMETIS_LIB )
 	message( "\n\tFound package Zoltan2" )
 	message( "\tFound metis inlude in " ${METIS_INCLUDE} )
 	message( "\tFound parmetis library in " ${PARMETIS_LIB} )
@@ -64,28 +64,28 @@ if( Zoltan2_FOUND AND PARMETIS_LIB )
 	find_library( ZOLTAN_LIB libzoltan.so ${Zoltan_LIBRARY_DIRS} )
 
 	#TODO: link_directories is probably not needed; there is a better way to do this; at least, this works for now
-	#link_directories( ${Zoltan2_LIBRARY_DIRS} ${METIS_BASE}/lib ${PARMETIS_BASE}/lib )
+	link_directories( ${Zoltan2_LIBRARY_DIRS} ${PARMETIS_BASE}/lib )
 	
-	add_library( wrappers SHARED  Wrappers.cpp)
+	add_library( wrappers SHARED  Wrappers.cpp parmetisWrapper.cpp zoltanWrapper.cpp )
 	target_include_directories( wrappers PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} ${METIS_INCLUDE} "${PARMETIS_BASE}/include" )
-	target_link_libraries( wrappers ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${ZOLTAN2_LIB}  ${ZOLTAN_LIB} ${Zoltan2_LIBRARIES} ) # libzoltan2.so metis parmetis
+	target_link_libraries( wrappers ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${PARMETIS_LIB} ${ZOLTAN2_LIB}  ${ZOLTAN_LIB} ${Zoltan2_LIBRARIES} ) # libzoltan2.so metis parmetis
 	
 	set( EXTRA_LIBRARIES_FOUND "true" )
-	set( EXTRA_LIBRARIES ${METIS_LIB} ${PARMETIS_LIB} ${ZOLTAN2_LIB} ${Zoltan2_LIBRARIES}  PARENT_SCOPE )
+	set( EXTRA_LIBRARIES ${PARMETIS_LIB} ${ZOLTAN2_LIB} ${Zoltan2_LIBRARIES}  PARENT_SCOPE )
 
 	
     add_executable( allCompetitors allCompetitorsPart.cpp parseArgs.cpp)
 	target_include_directories( allCompetitors PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} )
 	# include parmetis and metis 
 	target_include_directories( allCompetitors PUBLIC ${METIS_INCLUDE} "${PARMETIS_BASE}/include" ${CXXOPTS_DIR})
-	target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
+	target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
 
 
     add_executable( testMetisRefine testMetisRefinement.cpp parseArgs.cpp)
     target_include_directories( testMetisRefine PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} )
     # include parmetis and metis 
     target_include_directories( testMetisRefine PUBLIC ${METIS_INCLUDE} "${PARMETIS_BASE}/include" ${CXXOPTS_DIR})
-    target_link_libraries( testMetisRefine geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
+    target_link_libraries( testMetisRefine geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
 
 	
 	install(TARGETS wrappers EXPORT wrappers DESTINATION "${LIB_DEST}") 
@@ -104,7 +104,7 @@ elseif( PARMETIS_LIB )
     
     add_library( wrappers SHARED  Wrappers.cpp parmetisWrapper.cpp)
     target_include_directories( wrappers PUBLIC ${METIS_INCLUDE} "${PARMETIS_BASE}/include" )
-    target_link_libraries( wrappers ${RBC_LIBRARY} ${PARMETIS_LIB} ) 
+    target_link_libraries( wrappers ${RBC_LIBRARY} ${PARMETIS_LIB} ${METIS_LIB}  ) 
     
     set( EXTRA_LIBRARIES_FOUND "true" )
     set( EXTRA_LIBRARIES ${PARMETIS_LIB} PARENT_SCOPE )
@@ -148,8 +148,11 @@ if (USE_NETWORKIT)
   target_link_libraries(GeographerStandalone networkit)
 endif (USE_NETWORKIT)
 
+
+option(COMPILE_TESTS "Compile the tests using googletest." ON)
+
 ### define unit test target if GTest was found ###
-if (GTEST_FOUND )
+if (GTEST_FOUND AND COMPILE_TESTS)
 
     # add the wrappers test if zoltan and parmetis is found
     if( EXTRA_LIBRARIES_FOUND )
@@ -168,7 +171,7 @@ if (GTEST_FOUND )
     
 	add_test(NAME GeographerTest COMMAND GeographerTest WORKING_DIRECTORY ${PROJECT_SOURCE_DIR})
 	install(TARGETS GeographerTest DESTINATION "${BIN_DEST}" OPTIONAL) # test executable
-endif (GTEST_FOUND)
+endif (GTEST_FOUND AND COMPILE_TESTS)
 
 ### install library, header files and standalone executable ####
 install(TARGETS geographer EXPORT geographer DESTINATION "${LIB_DEST}") # library

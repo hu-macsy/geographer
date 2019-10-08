@@ -9,6 +9,8 @@ namespace ITI {
 template <typename IndexType, typename ValueType>
 class zoltanWrapper {
 
+friend class Wrappers<IndexType,ValueType>;
+	
 public:
 
     static scai::lama::DenseVector<IndexType> partition (
