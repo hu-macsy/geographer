@@ -62,7 +62,7 @@ if( Zoltan2_FOUND AND METIS_LIB AND PARMETIS_LIB )
 	#TODO: link_directories is probably not needed; there is a better way to do this; at least, this works for now
 	link_directories( ${Zoltan2_LIBRARY_DIRS} ${METIS_BASE}/lib ${PARMETIS_BASE}/lib )
 	
-	add_library( wrappers SHARED  Wrappers.cpp)
+	add_library( wrappers SHARED  Wrappers.cpp zoltanWrappers.cpp)
 	target_include_directories( wrappers PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} "${METIS_BASE}/include" "${PARMETIS_BASE}/include" )
 	target_link_libraries( wrappers ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${ZOLTAN2_LIB}  ${ZOLTAN_LIB} ${Zoltan2_LIBRARIES} ) # libzoltan2.so metis parmetis
 	
