@@ -51,7 +51,7 @@ endif()
 ### for more info see the Zoltan2 documentation and https://trilinos.org/oldsite/Finding_Trilinos.txt
 ### see also in Trilinos_install_path/install/include/Makefile.export.Zoltan2
 
-if( 0 AND Zoltan2_FOUND AND PARMETIS_LIB )
+if(Zoltan2_FOUND AND PARMETIS_LIB )
 	message( "\n\tFound package Zoltan2" )
 	message( "\tFound metis inlude in " ${METIS_INCLUDE} )
 	message( "\tFound parmetis library in " ${PARMETIS_LIB} )

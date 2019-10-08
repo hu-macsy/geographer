@@ -223,6 +223,7 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
 
         //clear tree and rebuild. This will correctly construct the intermediate levels
         tree.clear();
+        [[maybe_unused]] IndexType size = createTreeFromLeaves( hierLevel );
 
         areWeightsAdapted = true;
     }
