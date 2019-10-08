@@ -39,7 +39,6 @@ Settings settings) {
     const IndexType localN = coordinates[0].getLocalValues().size();
     const IndexType globalN = coordinates[0].size();
     const IndexType dimensions = settings.dimensions;
-    const IndexType k = settings.numBlocks;
     // global communicator
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -1330,9 +1329,9 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
             const ValueType ratio = totalSampledWeightSum / nodeWeightSum[i];
             adjustedBlockSizes[i].resize(targetBlockWeights[i].size());
 
-            //TODO: merge to one assertion
+            //TODO: merge to one assertion; or not...
             if( std::is_same<ValueType,float>::value ){
-                SCAI_ASSERT_LE_ERROR(totalSampledWeightSum, nodeWeightSum[i]*(1+1e-4), "Error in sampled weight sum.");
+                //SCAI_ASSERT_LE_ERROR(totalSampledWeightSum, nodeWeightSum[i]*(1+1e-4), "Error in sampled weight sum.");
             }else{  //double
                 SCAI_ASSERT_LE_ERROR(totalSampledWeightSum, nodeWeightSum[i]*(1+1e-8), "Error in sampled weight sum.");
             }
@@ -1600,7 +1599,6 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierarchicalPartition
 
     const IndexType numNodeWeights = nodeWeights.size();
     const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
-    const IndexType localN = dist->getLocalSize();
 
     // redistribute points based on their hilbert curve index
     // warning: this functions redistributes the coordinates and the node weights.

@@ -11,7 +11,7 @@ class zoltanWrapper {
 
 public:
 
-    static scai::lama::DenseVector<IndexType> zoltanPartition (
+    static scai::lama::DenseVector<IndexType> partition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coords,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
@@ -20,7 +20,7 @@ public:
         struct Settings &settings,
         Metrics<ValueType> &metrics);
 
-    static scai::lama::DenseVector<IndexType> zoltanRepartition (
+    static scai::lama::DenseVector<IndexType> repartition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coords,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,

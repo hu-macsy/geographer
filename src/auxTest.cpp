@@ -425,6 +425,7 @@ TYPED_TEST(auxTest, testRedistributeFromPartition) {
                 renumberPEs);
 
             //checks
+            EXPECT_TRUE( graph.isConsistent() );
 
             SCAI_ASSERT_DEBUG( copyPartition.isConsistent(), copyPartition << ": is invalid vector after redistribution" );
             SCAI_ASSERT_DEBUG( copyCoordinates[0].isConsistent(), copyCoordinates[0] << ": is invalid vector after redistribution" );

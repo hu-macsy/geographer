@@ -20,7 +20,7 @@
 
 namespace ITI {
 
-IndexType HARD_TIME_LIMIT= 600;     // hard limit in seconds to stop execution if exceeded
+static const IndexType HARD_TIME_LIMIT= 600;     // hard limit in seconds to stop execution if exceeded
 
 /** @brief Class for external partitioning tools like zoltan and metis.
 */

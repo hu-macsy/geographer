@@ -1,6 +1,7 @@
 #include <parmetis.h>
 
 #include "parmetisWrapper.h"
+#include "AuxiliaryFunctions.h"
 
 namespace ITI {
 
@@ -133,7 +134,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::refine
 //-----------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::metisPartition (
+scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partition (
     const scai::lama::CSRSparseMatrix<ValueType> &graph,
     const std::vector<scai::lama::DenseVector<ValueType>> &coords,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
@@ -338,7 +339,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::metisP
 //      general distribution. Must reindex vertices for parMetis
 //
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::metisRepartition (
+scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::repartition (
     const scai::lama::CSRSparseMatrix<ValueType> &graph,
     const std::vector<scai::lama::DenseVector<ValueType>> &coords,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
@@ -397,7 +398,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::metisR
     }
 
     int parMetisVersion = 3; // flag for repartition
-    scai::lama::DenseVector<IndexType> partition = parmetisWrapper<IndexType, ValueType>::metisPartition( copyGraph, copyCoords, copyNodeWeights, nodeWeightsFlag, parMetisVersion, settings, metrics);
+    scai::lama::DenseVector<IndexType> partition = parmetisWrapper<IndexType, ValueType>::partition( copyGraph, copyCoords, copyNodeWeights, nodeWeightsFlag, parMetisVersion, settings, metrics);
 
     //because of the reindexing, we must redistribute the partition
     partition.redistribute( graph.getRowDistributionPtr() );

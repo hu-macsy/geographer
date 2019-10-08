@@ -36,26 +36,30 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
     scai::lama::DenseVector<IndexType> partition;
     switch( tool) {
     case Tool::parMetisGraph:
-        partition = parmetisWrapper<IndexType, ValueType>::metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 0, settings, metrics);
+        partition = parmetisWrapper<IndexType, ValueType>::partition( graph, coordinates, nodeWeights, nodeWeightsFlag, 0, settings, metrics);
         break;
     case Tool::parMetisGeom:
-        partition =  metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 1, settings, metrics);
+        partition =  parmetisWrapper<IndexType, ValueType>::partition( graph, coordinates, nodeWeights, nodeWeightsFlag, 1, settings, metrics);
         break;
     case Tool::parMetisSFC:
-        partition = metisPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, 2, settings, metrics);
+        partition = parmetisWrapper<IndexType, ValueType>::partition( graph, coordinates, nodeWeights, nodeWeightsFlag, 2, settings, metrics);
         break;
+
+#ifdef ZOLTAN_FOUND        
     case Tool::zoltanRIB:
-        partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rib", settings, metrics);
+        partition = zoltanWrapper<IndexType, ValueType>::partition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rib", settings, metrics);
         break;
     case Tool::zoltanRCB:
-        partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rcb", settings, metrics);
+        partition = zoltanWrapper<IndexType, ValueType>::partition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rcb", settings, metrics);
         break;
     case Tool::zoltanMJ:
-        partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "multijagged", settings, metrics);
+        partition = zoltanWrapper<IndexType, ValueType>::partition( graph, coordinates, nodeWeights, nodeWeightsFlag, "multijagged", settings, metrics);
         break;
     case Tool::zoltanSFC:
-        partition = zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "hsfc", settings, metrics);
+        partition = zoltanWrapper<IndexType, ValueType>::partition( graph, coordinates, nodeWeights, nodeWeightsFlag, "hsfc", settings, metrics);
         break;
+#endif        
+
     default:
         throw std::runtime_error("Wrong tool given to partition.\nAborting...");
         partition = scai::lama::DenseVector<IndexType>(graph.getLocalNumRows(), -1 );
@@ -134,18 +138,20 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::repartition (
         throw std::runtime_error("Unfortunatelly, Current version does not support repartitioning with parmetis.\nAborting...");
     //TODO: parmetis needs consective indices for the vertices; must reindex vertices
     //return metisRepartition( graph, coordinates, nodeWeights, nodeWeightsFlag, settings, metrics);
-
+        
+#ifdef ZOLTAN_FOUND 
     case Tool::zoltanRIB:
-        return zoltanPartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rib", settings, metrics);
+        return zoltanWrapper<IndexType, ValueType>::repartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rib", settings, metrics);
 
     case Tool::zoltanRCB:
-        return zoltanRepartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rcb", settings, metrics);
+        return zoltanWrapper<IndexType, ValueType>::repartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "rcb", settings, metrics);
 
     case Tool::zoltanMJ:
-        return zoltanRepartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "multijagged", settings, metrics);
+        return zoltanWrapper<IndexType, ValueType>::repartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "multijagged", settings, metrics);
 
     case Tool::zoltanSFC:
-        return zoltanRepartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "hsfc", settings, metrics);
+        return zoltanWrapper<IndexType, ValueType>::repartition( graph, coordinates, nodeWeights, nodeWeightsFlag, "hsfc", settings, metrics);
+#endif
 
     default:
         throw std::runtime_error("Wrong tool given to repartition.\nAborting...");

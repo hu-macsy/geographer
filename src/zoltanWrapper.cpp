@@ -12,12 +12,14 @@
 
 namespace ITI {
 
+friend class Wrappers<IndexType,ValueType>;
+
 //---------------------------------------------------------
 //                      zoltan
 //---------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanPartition (
+scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::partition (
     const scai::lama::CSRSparseMatrix<ValueType> &graph,
     const std::vector<scai::lama::DenseVector<ValueType>> &coords,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
@@ -36,7 +38,7 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanPa
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanRepartition (
+scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::repartition (
     const scai::lama::CSRSparseMatrix<ValueType> &graph,
     const std::vector<scai::lama::DenseVector<ValueType>> &coords,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
@@ -66,8 +68,6 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     struct Settings &settings,
     Metrics<ValueType> &metrics) {
 
-
-/*
     typedef Zoltan2::BasicUserTypes<ValueType, IndexType, IndexType> myTypes;
     typedef Zoltan2::BasicVectorAdapter<myTypes> inputAdapter_t;
 
@@ -235,9 +235,7 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     delete[] zoltanCoords;
 
     return partitionZoltan;
-    */
-
-return scai::lama::DenseVector<IndexType> (coords[0].getDistributionPtr(), IndexType(0));
+    
 }
 
 //---------------------------------------------------------------------------------------

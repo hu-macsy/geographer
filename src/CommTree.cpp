@@ -192,7 +192,6 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
         //we need to access leaves like that because getLeaves is const
         std::vector<commNode> hierLevel = this->tree.back();
 
-        const IndexType numBlocks = hierLevel.size();
         const IndexType numWeights = this->getNumWeights();
         SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
 
@@ -222,9 +221,8 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
             }
         }
 
-        //clear tree and rebuild. This will correctly construct the intemediate levels
+        //clear tree and rebuild. This will correctly construct the intermediate levels
         tree.clear();
-        IndexType size = createTreeFromLeaves( hierLevel );
 
         areWeightsAdapted = true;
     }
@@ -243,9 +241,6 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
     unsigned int levelBelowsize = levelBelow.size();
     std::vector<bool> seen(levelBelowsize, false);
     //PRINT("level below has size " << levelBelowsize );
-
-    //will be used later to normalize the speed
-    ValueType maxRelatSpeed = 0;
 
     std::vector<commNode> aboveLevel;
 

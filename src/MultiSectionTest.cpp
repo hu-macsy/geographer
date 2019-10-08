@@ -1558,16 +1558,6 @@ TYPED_TEST(MultiSectionTest, testIndexTo) {
 }
 //---------------------------------------------------------------------------------------
 
-TYPED_TEST(MultiSectionTest, testIndexToNonQubic) {
-    using ValueType = TypeParam;
-
-    std::vector<IndexType> sideLen= { 4, 5, 6 };
-
-    //TODO: continue the test
-
-}
-//---------------------------------------------------------------------------------------
-
 /*
 INSTANTIATE_TEST_CASE_P(InstantiationName,
                         MultiSectionTest,

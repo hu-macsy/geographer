@@ -431,7 +431,7 @@ void Metrics<ValueType>::getMappingMetrics(
     }
 
     ValueType avgDilation = ((ValueType) sumDilation)/((ValueType) peM/2);
-    ValueType avgCongestion = std::accumulate( congestion.begin(), congestion.end(), 0.0)/peM;
+    //ValueType avgCongestion = std::accumulate( congestion.begin(), congestion.end(), 0.0)/peM;
 
     MM["maxCongestion"] = maxCongestion;
     MM["maxDilation"] = maxDilation;

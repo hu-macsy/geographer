@@ -1221,7 +1221,6 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
         ind += 3;
     }
 
-    const unsigned int numPEs = comm->getSize();
     const IndexType rootPE = 0; // set PE 0 as root
 
     //TODO: the array size can get very big. Another way would be to use a custom

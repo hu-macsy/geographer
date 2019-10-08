@@ -4,7 +4,9 @@
 namespace ITI {
 
 template <typename IndexType, typename ValueType>
-class parmetisWrapper {
+class parmetisWrapper{ 
+
+friend class Wrappers<IndexType,ValueType>;
 
 /** @brief Class for external partitioning parmetis tool.
 */
@@ -25,7 +27,7 @@ class parmetisWrapper {
         Metrics<ValueType> &metrics
     );
 
-private:
+protected:
 
     //metis wrapper
 
@@ -43,7 +45,7 @@ private:
      *
      * @return A DenseVector of size N with the partition calcualted: 0<= return[i] < k with the block that point i belongs to
      */
-    static scai::lama::DenseVector<IndexType> metisPartition (
+    static scai::lama::DenseVector<IndexType> partition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
@@ -56,7 +58,7 @@ private:
 //TODO: parMetis assumes that vertices are stores in a consecutive manner. This is not true for a
 //      general distribution. Must reindex vertices for parMetis repartition
 //
-    static scai::lama::DenseVector<IndexType> metisRepartition (
+    static scai::lama::DenseVector<IndexType> repartition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
