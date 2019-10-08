@@ -192,7 +192,6 @@ TYPED_TEST (GraphUtilsTest, testLocalDijkstra) {
     using ValueType = TypeParam;
 
     std::string file = GraphUtilsTest<ValueType>::graphPath + "Grid4x4";
-    IndexType dimensions = 2;
     IndexType N;
     bool executed = true;
 
@@ -395,7 +394,6 @@ TYPED_TEST(GraphUtilsTest, testNonLocalNeighbors) {
     using ValueType = TypeParam;
 
     std::string file = GraphUtilsTest<ValueType>::graphPath + "trace-00008.graph";
-    IndexType dimensions = 2;
 
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
 
@@ -417,7 +415,6 @@ TYPED_TEST(GraphUtilsTest, testMEColoring_local) {
     std::string file = GraphUtilsTest<ValueType>::graphPath + "Grid8x8";
     //std::string file = GraphUtilsTest<ValueType>::graphPath + "delaunayTest.graph";
     //std::string file = GraphUtilsTest<ValueType>::graphPath + "bigtrace-00000.graph";
-    IndexType dimensions = 2;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
@@ -452,7 +449,6 @@ TYPED_TEST(GraphUtilsTest, testMEColoring_local) {
     std::vector<std::vector<IndexType>> coloring = GraphUtils<IndexType,ValueType>::mecGraphColoring( graph, colors);
     //
     std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - start;
-    ValueType ourTime = elapTime.count();
 
     EXPECT_EQ( coloring[0].size(), M);
 
@@ -462,8 +458,6 @@ TYPED_TEST(GraphUtilsTest, testMEColoring_local) {
 
     IndexType maxNode0 = *std::max_element( coloring[0].begin(), coloring[0].end() );
     IndexType maxNode1 = *std::max_element( coloring[1].begin(), coloring[1].end() );
-    IndexType minNode0 = *std::min_element( coloring[0].begin(), coloring[0].end() );
-    IndexType minNode1 = *std::min_element( coloring[1].begin(), coloring[1].end() );
     EXPECT_LE(maxNode0,N-1);
     EXPECT_LE(maxNode1,N-1);
     EXPECT_GE(maxNode0,0);
@@ -497,7 +491,7 @@ TYPED_TEST(GraphUtilsTest, testMEColoring_local) {
         }
     }
 
-    ValueType sumEdgeWeight = std::accumulate(maxEdge.begin(), maxEdge.end(), 0.0);
+    //ValueType sumEdgeWeight = std::accumulate(maxEdge.begin(), maxEdge.end(), 0.0);
 }
 //------------------------------------------------------------------------------------
 
@@ -505,16 +499,12 @@ TYPED_TEST(GraphUtilsTest, testImbalance) {
     using ValueType = TypeParam;
 
     std::string file = GraphUtilsTest<ValueType>::graphPath + "Grid8x8";
-    const IndexType dimensions = 2;
     const IndexType k = 4;
 
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
-    const IndexType N = graph.getNumRows();
     const IndexType localN = graph.getLocalNumRows();
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    const IndexType thisPE = comm->getRank();
-
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 
     //the partition
@@ -704,7 +694,6 @@ TYPED_TEST ( GraphUtilsTest, testGetBlockGraph) {
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings, metrics);
 
     scai::lama::CSRSparseMatrix<ValueType> blockGraph1, blockGraph2;
-    bool useDist = true;
     ValueType edgeSum = 0;
 
     blockGraph1 = GraphUtils<IndexType, ValueType>::getBlockGraph_dist( graph, partition, k);

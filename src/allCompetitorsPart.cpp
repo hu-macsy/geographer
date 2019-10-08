@@ -27,12 +27,7 @@
 #include "MeshGenerator.h"
 #include "Wrappers.h"
 #include "parseArgs.h"
-
-
-extern "C" {
-    void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);
-}
-
+#include "mainHeader.h"
 
 
 //---------------------------------------------------------------------------------------------
@@ -79,132 +74,14 @@ int main(int argc, char** argv) {
     // read the input graph or generate
     //
 
-    IndexType N;
     CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords(settings.dimensions);
     std::vector<DenseVector<ValueType>> nodeWeights;	//the weights for each node
 
-    std::string graphFile;
-
-    if (vm.count("graphFile")) {
-
-        graphFile = vm["graphFile"].as<std::string>();
-        std::string coordFile;
-        if (vm.count("coordFile")) {
-            coordFile = vm["coordFile"].as<std::string>();
-        } else {
-            coordFile = graphFile + ".xyz";
-        }
-
-        // read the graph
-        if (vm.count("fileFormat")) {
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights, settings.fileFormat );
-        } else {
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights );
-        }
-
-        N = graph.getNumRows();
-
-        SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows(), "matrix not square");
-        SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
-
-        scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
-
-        // set the node weights
-        IndexType numReadNodeWeights = nodeWeights.size();
-        if (numReadNodeWeights == 0) {
-            nodeWeights.resize(1);
-            nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
-        }
-
-        if (settings.numNodeWeights > 0) {
-            if (settings.numNodeWeights < nodeWeights.size()) {
-                nodeWeights.resize(settings.numNodeWeights);
-                if (comm->getRank() == 0) {
-                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, thus discarding "
-                              << numReadNodeWeights - settings.numNodeWeights << std::endl;
-                }
-            } else if (settings.numNodeWeights > nodeWeights.size()) {
-                nodeWeights.resize(settings.numNodeWeights);
-                for (IndexType i = numReadNodeWeights; i < settings.numNodeWeights; i++) {
-                    nodeWeights[i] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
-                }
-                if (comm->getRank() == 0) {
-                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, padding with "
-                              << settings.numNodeWeights - numReadNodeWeights << " uniform weights. " << std::endl;
-                }
-            }
-        }
-
-        //read the coordinates file
-        if (vm.count("coordFormat")) {
-            coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.coordFormat);
-        } else if (vm.count("fileFormat")) {
-            coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
-        } else {
-            coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
-        }
-        SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size(), coords[1].getLocalValues().size(), "coordinates not of same size" );
-
-    } else if(vm.count("generate")) {
-        if (settings.dimensions != 3) {
-            if(comm->getRank() == 0) {
-                std::cout << "Graph generation supported only fot 2 or 3 dimensions, not " << settings.dimensions << std::endl;
-                return 127;
-            }
-        }
-
-        N = settings.numX * settings.numY * settings.numZ;
-
-        std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
-
-        maxCoord[0] = settings.numX;
-        maxCoord[1] = settings.numY;
-        maxCoord[2] = settings.numZ;
-
-        std::vector<IndexType> numPoints(3); // number of points in each dimension, used only for 3D
-
-        for (IndexType i = 0; i < 3; i++) {
-            numPoints[i] = maxCoord[i];
-        }
-
-        if( comm->getRank()== 0) {
-            std::cout<< "Generating for dim= "<< settings.dimensions << " and numPoints= "<< settings.numX << ", " << settings.numY << ", "<< settings.numZ << ", in total "<< N << " number of points" << std::endl;
-            std::cout<< "\t\t and maxCoord= "<< maxCoord[0] << ", "<< maxCoord[1] << ", " << maxCoord[2]<< std::endl;
-        }
-
-        scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-        scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
-        graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( rowDistPtr, noDistPtr );
-
-        scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-        for(IndexType i=0; i<settings.dimensions; i++) {
-            coords[i].allocate(coordDist);
-            coords[i] = static_cast<ValueType>( 0 );
-        }
-
-        // create the adjacency matrix and the coordinates
-        ITI::MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist( graph, coords, maxCoord, numPoints, settings.dimensions);
-
-        IndexType nodes= graph.getNumRows();
-        IndexType edges= graph.getNumValues()/2;
-        if(comm->getRank()==0) {
-            std::cout<< "Generated structured 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
-        }
-
-    } else {
-        std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
-        return 126;
-    }
+    IndexType N = readInput<ValueType>( vm, settings, comm, graph, coords, nodeWeights );
 
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-
-    /*
-    //TODO: must compile with mpicc and module mpi.ibm/1.4 and NOT mpi.ibm/1.4_gcc
-    size_t total=-1,used=-1,free=-1,buffers=-1, cached=-1;
-    memusage(&total, &used, &free, &buffers, &cached);
-    printf("MEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %ld \n",total,used,free,buffers, cached);
-    */
+    std::string graphFile = vm["graphFile"].as<std::string>();
 
     //---------------------------------------------------------------------------------
     //
@@ -290,13 +167,19 @@ int main(int argc, char** argv) {
             settings.repeatTimes = 2;
         } 
         
-        int parMetisGeom=0;
-
         std::string outFile = "-";
 
         if( vm.count("outDir") and vm.count("storeInfo") ) {
             //set the graphName in order to create the outFile name
-            std::string copyName = graphFile;
+            std::string copyName;
+            if( vm.count("graphFile") ){
+                copyName = vm["graphFile"].as<std::string>();
+            }else{     
+                copyName = "generate_"+vm["numX"].as<std::string>()+"_"+vm["numY"].as<std::string>();
+                //if( settings.dimensions==3 ){
+                //    copyName += "_"+vm["numZ"].as<std::string>();
+               // }
+            }
             std::reverse( copyName.begin(), copyName.end() );
             std::vector<std::string> strs = aux<IndexType,ValueType>::split( copyName, '/' );
             std::string graphName = aux<IndexType,ValueType>::split(strs.back(), '.')[0];
