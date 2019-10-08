@@ -40,6 +40,7 @@ extern "C" {
 int main(int argc, char** argv) {
 
     using namespace ITI;
+    typedef double ValueType;   //use double
 
     std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
 
@@ -65,10 +66,6 @@ int main(int argc, char** argv) {
     if( !settings.isValid )
         return -1;
 
-    const IndexType thisPE = comm->getRank();
-    IndexType N;
-
-
     if( comm->getRank() ==0 ) {
         std::cout <<"Starting file " << __FILE__ << std::endl;
 
@@ -82,6 +79,7 @@ int main(int argc, char** argv) {
     // read the input graph or generate
     //
 
+    IndexType N;
     CSRSparseMatrix<ValueType> graph;
     std::vector<DenseVector<ValueType>> coords(settings.dimensions);
     std::vector<DenseVector<ValueType>> nodeWeights;	//the weights for each node
@@ -112,7 +110,7 @@ int main(int argc, char** argv) {
 
         scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
 
-        // set the node weigths
+        // set the node weights
         IndexType numReadNodeWeights = nodeWeights.size();
         if (numReadNodeWeights == 0) {
             nodeWeights.resize(1);
@@ -268,6 +266,10 @@ int main(int argc, char** argv) {
     }
 
 
+    std::string machine = settings.machine;
+    const IndexType thisPE = comm->getRank();
+    
+
     for( int t=0; t<wantedTools.size(); t++) {
 
         ITI::Tool thisTool = wantedTools[t];
@@ -276,19 +278,18 @@ int main(int argc, char** argv) {
         //
         scai::lama::DenseVector<IndexType> partition;
 
-        // the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
-        struct Metrics metrics( settings );
+        // the constructor with metrics(comm->getSize()) is needed for ParcoRepart timing details
+        Metrics<ValueType> metrics( settings );
         //metrics.numBlocks = settings.numBlocks;
 
-        // if usign unit weights, set flag for wrappers
+        // if using unit weights, set flag for wrappers
         bool nodeWeightsUse = true;
 
         // if graph is too big, repeat less times to avoid memory and time problems
         if( N>std::pow(2,29) ) {
             settings.repeatTimes = 2;
-        } else {
-            settings.repeatTimes = 5;
-        }
+        } 
+        
         int parMetisGeom=0;
 
         std::string outFile = "-";
@@ -334,8 +335,6 @@ int main(int argc, char** argv) {
         // Reporting output to std::cout
         //
 
-        std::string machine = settings.machine;
-
         if( thisPE==0 ) {
             if( vm.count("generate") ) {
                 std::cout << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon;
@@ -369,7 +368,7 @@ int main(int argc, char** argv) {
             }
         }
 
-        if( outFile!="-" ) {
+        if( outFile!="-" and settings.storePartition ) {
             std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
             std::string partOutFile = outFile+".part";
             ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );

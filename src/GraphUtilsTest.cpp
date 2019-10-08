@@ -5,10 +5,14 @@
 #include "ParcoRepart.h"
 #include "FileIO.h"
 #include "GraphUtils.h"
+#include "MeshGenerator.h"
 
 #include <scai/dmemo/CyclicDistribution.hpp>
 #include <scai/hmemo/ReadAccess.hpp>
 #include <scai/hmemo/WriteAccess.hpp>
+
+//remove
+#include "HilbertCurve.h"
 
 namespace ITI {
 
@@ -28,60 +32,100 @@ TYPED_TEST_SUITE(GraphUtilsTest, testTypes);
 TYPED_TEST(GraphUtilsTest, testReindexCut) {
     using ValueType = TypeParam;
 
-    std::string fileName = "trace-00008.graph";
+    //std::string fileName = "trace-00008.graph";
     //std::string fileName = "delaunayTest.graph";
+    std::string fileName = "Grid8x8";
 
     std::string file = GraphUtilsTest<ValueType>::graphPath + fileName;
+    std::string coordsFile = file + ".xyz";
 
     const IndexType dimensions= 2;
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType n = graph.getNumRows();
 
-    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
     // for now local refinement requires k = P
     const IndexType k = comm->getSize();
+    const IndexType localN = dist->getLocalSize();
 
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), n, dimensions);
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordsFile, n, dimensions);
     ASSERT_TRUE(coords[0].getDistributionPtr()->isEqual(*dist));
+
+    ValueType l2Norm = graph.l2Norm(); 
+
+    EXPECT_TRUE( graph.isConsistent() );
+    EXPECT_TRUE( graph.checkSymmetry() );
+    
+    std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, scai::lama::DenseVector<ValueType>(dist, 1));
 
     //get sfc partition
     Settings settings;
     settings.numBlocks = k;
     settings.noRefinement = true;
     settings.dimensions = dimensions;
+    settings.debugMode = true;
 
-    DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
+    //DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, nodeWeights, settings);
 
-    //WARNING: with the noRefinement flag the partition is not destributed
-    partition.redistribute( dist);
+    //try random partition
+    srand(0);
+    DenseVector<IndexType> partition( dist, 0 );
+    for (IndexType i = 0; i < localN; i++) {
+        IndexType blockId = (rand() % k);
+        partition.getLocalValues()[i] = blockId;
+    }
 
-    ASSERT_TRUE( coords[0].getDistributionPtr()->isEqual(*dist) );
-    ASSERT_TRUE( partition.getDistributionPtr()->isEqual(*dist) );
-    //scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(n));
+    //redistribute based on the partition to simulate a real scenario
+    aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings );    
+    const scai::dmemo::DistributionPtr genDist = graph.getRowDistributionPtr();
+
+    //graph.checkSettings();
+    SCAI_ASSERT_DEBUG( graph.isConsistent(), graph << ": is invalid matrix after redistribution" )
+    EXPECT_TRUE( graph.isConsistent() );
+    EXPECT_TRUE( graph.checkSymmetry() );
+    EXPECT_NEAR( l2Norm, graph.l2Norm(), 1e-5 );
+
+    //assert that all input data have the same distribution
+    ASSERT_TRUE( coords[0].getDistributionPtr()->isEqual(*genDist) );
+    ASSERT_TRUE( partition.getDistributionPtr()->isEqual(*genDist) );
+
 
     //get first cut
     ValueType initialCut = GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
     ASSERT_GE(initialCut, 0);
+    ValueType initialImbalance = GraphUtils<IndexType, ValueType>::computeImbalance( partition, k );
     std::pair<std::vector<IndexType>,std::vector<IndexType>> initialBorderInnerNodes = GraphUtils<IndexType, ValueType>::getNumBorderInnerNodes( graph, partition, settings );
-    ValueType sumNonLocalInitial = GraphUtils<IndexType, ValueType>::localSumOutgoingEdges(graph, true);
 
-    PRINT0("about to reindex the graph");
+    PRINT0("about to redistribute the graph");
     //now reindex and get second metrics
-    GraphUtils<IndexType, ValueType>::reindex(graph);
+    const  scai::dmemo::DistributionPtr newGenBlockDist = GraphUtils<IndexType, ValueType>::genBlockRedist(graph);
 
-    ValueType sumNonLocalAfterReindexing = GraphUtils<IndexType, ValueType>::localSumOutgoingEdges(graph, true);
-    EXPECT_EQ(sumNonLocalInitial, sumNonLocalAfterReindexing);
+    //checks
 
-    DenseVector<IndexType> reIndexedPartition = DenseVector<IndexType>(graph.getRowDistributionPtr(), partition.getLocalValues());
-    ASSERT_TRUE(reIndexedPartition.getDistributionPtr()->isEqual(*graph.getRowDistributionPtr()));
+    //graph.checkSettings();
+    EXPECT_TRUE( graph.isConsistent() );
+    EXPECT_TRUE( graph.checkSymmetry() );
+    EXPECT_NEAR( l2Norm, graph.l2Norm(), 1e-5 );
+
+    partition.redistribute( newGenBlockDist );
+    DenseVector<IndexType> reIndexedPartition = partition;
+
+    ASSERT_TRUE(reIndexedPartition.getDistributionPtr()->isEqual(*newGenBlockDist));
+
 
     ValueType secondCut = GraphUtils<IndexType, ValueType>::computeCut(graph, reIndexedPartition, true);
-    EXPECT_EQ(initialCut, secondCut);
+    ValueType secondImbalance = GraphUtils<IndexType, ValueType>::computeImbalance( reIndexedPartition, k );
+    EXPECT_EQ( initialCut, secondCut );
+    EXPECT_NEAR( initialImbalance, secondImbalance, 1e-5 );
+
+    ASSERT_TRUE( newGenBlockDist->isEqual(*graph.getRowDistributionPtr()) );
+    ASSERT_TRUE( reIndexedPartition.getDistributionPtr()->isEqual(*newGenBlockDist) );
 
     std::pair<std::vector<IndexType>,std::vector<IndexType>> secondBorderInnerNodes = GraphUtils<IndexType, ValueType>::getNumBorderInnerNodes( graph, reIndexedPartition, settings );
-    EXPECT_EQ( initialBorderInnerNodes.first,secondBorderInnerNodes.first );
-    EXPECT_EQ( initialBorderInnerNodes.second,secondBorderInnerNodes.second );
+    EXPECT_EQ( initialBorderInnerNodes.first, secondBorderInnerNodes.first );
+    EXPECT_EQ( initialBorderInnerNodes.second, secondBorderInnerNodes.second );
+
 }
 //-----------------------------------------------------------------
 

@@ -37,19 +37,41 @@ using scai::lama::CSRSparseMatrix;
 using scai::lama::DenseVector;
 using scai::lama::CSRStorage;
 
+
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> GraphUtils<IndexType,ValueType>::reindex(scai::lama::CSRSparseMatrix<ValueType> &graph) {
+scai::dmemo::DistributionPtr GraphUtils<IndexType,ValueType>::genBlockRedist(scai::lama::CSRSparseMatrix<ValueType> &graph) {
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
 
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = inputDist->getGlobalSize();
-    //const IndexType p = comm->getSize();
 
+    //get the global IDs of all the local indices
     scai::dmemo::DistributionPtr blockDist = scai::dmemo::genBlockDistributionBySize(globalN, localN, comm);
-    DenseVector<IndexType> result(blockDist,0);
+
+    graph.redistribute( blockDist, graph.getColDistributionPtr() );
+
+    return blockDist;
+}
+
+//TODO: deprecated version, fix and use or remove
+template<typename IndexType, typename ValueType>
+scai::dmemo::DistributionPtr GraphUtils<IndexType,ValueType>::reindex(scai::lama::CSRSparseMatrix<ValueType> &graph) {
+    const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
+
+    const IndexType localN = inputDist->getLocalSize();
+    const IndexType globalN = inputDist->getGlobalSize();
+
+    //get the global IDs of all the local indices
+    scai::dmemo::DistributionPtr blockDist = scai::dmemo::genBlockDistributionBySize(globalN, localN, comm);
+
+    DenseVector<IndexType> result(blockDist,0); 
     blockDist->getOwnedIndexes(result.getLocalValues());
 
+    //for(int i=0; i<localN; i++){
+    //   PRINT( comm->getRank() << ": i=" << i << ", glob i= " <<  result.getLocalValues()[i] );
+    //}
     SCAI_ASSERT_EQUAL_ERROR(result.sum(), globalN*(globalN-1)/2);
 
     scai::dmemo::HaloExchangePlan partHalo = buildNeighborHalo(graph);
@@ -65,6 +87,7 @@ scai::lama::DenseVector<IndexType> GraphUtils<IndexType,ValueType>::reindex(scai
         for (IndexType i = 0; i < ja.size(); i++) {
             IndexType oldNeighborID = ja[i];
             IndexType localNeighbor = inputDist->global2Local(oldNeighborID);
+            //this neighboring vertex is also local in this PE
             if (localNeighbor != scai::invalidIndex) {
                 ja[i] = rResult[localNeighbor];
                 assert(blockDist->isLocal(ja[i]));
@@ -80,7 +103,9 @@ scai::lama::DenseVector<IndexType> GraphUtils<IndexType,ValueType>::reindex(scai
     CSRStorage<ValueType> newStorage(localN, globalN, localStorage.getIA(), newJA, localStorage.getValues());
     graph = CSRSparseMatrix<ValueType>(blockDist, std::move(newStorage));
 
-    return result;
+    graph.redistribute( blockDist, graph.getColDistributionPtr() );
+
+    return blockDist;
 }
 
 template<typename IndexType, typename ValueType>

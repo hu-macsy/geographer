@@ -35,7 +35,6 @@
 #include "Mapping.h"
 
 
-
 namespace ITI {
 
 template<typename IndexType, typename ValueType>
@@ -153,16 +152,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
-    IndexType *vwgt, IndexType dimensions, ValueType *xyz,
+    IndexType *vwgt, ValueType *xyz,
     Settings  settings, Metrics<ValueType>& metrics ) {
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const IndexType numPEs = comm->getSize();
     const IndexType thisPE = comm->getRank();
 
-    //SCAI_ASSERT_EQ_ERROR(numPEs+1, sizeof(vtxDist)/sizeof(IndexType), "wrong size for array vtxDist" );
-    // ^^ this is wrong,  sizeof(vtxDist)=size of a pointer. How to check if size is correct?
     const IndexType N = vtxDist[numPEs];
+    const IndexType dimensions = settings.dimensions;
 
     // how to check if array has the correct size?
     const IndexType localN = vtxDist[thisPE+1]-vtxDist[thisPE];
@@ -247,7 +245,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     Metrics<ValueType>& metrics)
 {
     IndexType k = settings.numBlocks;
-    ValueType epsilon = settings.epsilon;
     const IndexType dimensions = coordinates.size();
 
     SCAI_REGION( "ParcoRepart.partitionGraph" )
@@ -268,8 +265,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
-    const IndexType rank = comm->getRank();
-
+    
 	// timing info
     std::chrono::duration<double> partitionTime= std::chrono::duration<double>(0.0);
 	std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
@@ -288,7 +284,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     // At this point we have the initial, geometric partition.
     //
 
-	
     if (comm->getSize() == k) {
         //WARNING: the result  is not redistributed. must redistribute afterwards
         if( !settings.noRefinement ) {
@@ -297,10 +292,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
         }
     } else {
-        result.redistribute(inputDist);
+        //result.redistribute(inputDist);
         if (comm->getRank() == 0 && !settings.noRefinement) {
             std::cout << "Local refinement only implemented for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
         }
+
+        //TODO: should this be here? probably no, we cannot redistribute
+        // if k!=p
+        //aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, true);
+
     }
 
     std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startTime;
@@ -331,9 +331,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
-    CSRSparseMatrix<ValueType> &input,
-    std::vector<DenseVector<ValueType>> &coordinates,
-    std::vector<DenseVector<ValueType>> &nodeWeights,
+    const CSRSparseMatrix<ValueType> &input,
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
     DenseVector<IndexType>& previous,
     CommTree<IndexType,ValueType> commTree,
     scai::dmemo::CommunicatorPtr comm,
@@ -341,7 +341,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
     Metrics<ValueType>& metrics){
     
 	SCAI_REGION( "ParcoRepart.initialPartition" )
-	
+
 	const IndexType k = settings.numBlocks;
 	std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
 
@@ -438,6 +438,18 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         SCAI_ASSERT_EQ_ERROR( result.max(), settings.numBlocks -1, "Wrong index in partition" );
         //assert(result.max() == settings.numBlocks -1);
         assert(result.min() == 0);
+/*        
+{
+    scai::hmemo::HArray< IndexType > myGlobalInd;
+    coordinates[0].getDistributionPtr()->getOwnedIndexes(myGlobalInd);
+    //std::cout<< myGlobalInd[0] << std::endl;
+    PRINT(*comm << ": coords " << myGlobalInd[0] );
+    scai::hmemo::HArray< IndexType > myGlobalIndCopy;
+    coordinateCopy[0].getDistributionPtr()->getOwnedIndexes(myGlobalIndCopy);
+    PRINT(*comm << ": coordsCopy " << myGlobalIndCopy[0] );
+}
+*/
+        SCAI_ASSERT_ERROR( result.getDistributionPtr()->isEqual(coordinateCopy[0].getDistribution()), "Distribution mismatch");
 
     } else if (settings.initialPartition == ITI::Tool::geoMS) {// multisection
         PRINT0("Initial partition with multisection");
@@ -463,9 +475,23 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         //no need to explicitly check for repartitioning mode or not.
         assert(comm->getSize() == settings.numBlocks);
         result = DenseVector<IndexType>(input.getRowDistributionPtr(), comm->getRank());
-    }
-    else {
+    }else {
         throw std::runtime_error("Initial Partitioning mode unsupported.");
+    }
+/*    
+{
+    scai::hmemo::HArray< IndexType > myGlobalInd;
+    coordinates.getDistributionPtr()->getOwnedIndexes(myGlobalInd);
+    //std::cout<< myGlobalInd[0] << std::endl;
+    PRINT(*comm << ": coords " << myGlobalInd[0] );
+    scai::hmemo::HArray< IndexType > myGlobalIndCopy;
+    coordinateCopy.getDistributionPtr()->getOwnedIndexes(myGlobalInd);
+    PRINT(*comm << ": coordsCopy " << myGlobalIndCopy[0] );
+}     
+*/
+    //if using k-means the result has different distribution
+    if( not result.getDistributionPtr()->isEqual( coordinates[0].getDistribution()) ){
+        result.redistribute( coordinates[0].getDistributionPtr() );
     }
 
     return result;
@@ -497,7 +523,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 	 * redistribute to prepare for local refinement
 	 */
 	bool useRedistributor = true;
-	aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights[0], settings, useRedistributor);
+	aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, useRedistributor);
 	
 	std::chrono::duration<double> redistTime =  std::chrono::system_clock::now() - start;
 	
@@ -1000,5 +1026,6 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::neighbourPixels(const 
 //to force instantiation
 template class ParcoRepart<IndexType, double>;
 template class ParcoRepart<IndexType, float>;
+
 
 } //namespace ITI

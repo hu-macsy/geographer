@@ -153,10 +153,11 @@ public:
 
     * vwgt, size=localN, array for the node weights
 
-    * ndims, the dimensions of the coordinates
-
     * xyz, size=ndims*locaN, the coordinates for every vertex. For vertex/point i, its coordinates are
     		in xyz[ndims*i], xyz[ndims*i+1], ... , xyz[ndims*i+ndims]
+    * ndims is the dimensions of the coordinates are given via settings.dimensions
+
+    \warning One a single node weight is supported. Edge weights not supported.
 
     \sa <a href="glaros.dtc.umn.edu/gkhome/fetch/sw/metis/manual.pdf">metis manual</a>.
 
@@ -164,8 +165,8 @@ public:
     */
     static std::vector<IndexType> partitionGraph(
         IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
-        IndexType *vwgt, IndexType ndims, ValueType *xyz,
-        Settings  settings, Metrics<ValueType>& metrics);
+        IndexType *vwgt, ValueType *xyz,
+        Settings settings, Metrics<ValueType>& metrics);
 
     /**
      * Get an initial partition using the morton curve and measuring density per square.
@@ -205,9 +206,9 @@ private:
     using the coordinates of the graph.
     */
     static DenseVector<IndexType> initialPartition(
-        CSRSparseMatrix<ValueType> &input,
-        std::vector<DenseVector<ValueType>> &coordinates,
-        std::vector<DenseVector<ValueType>> &nodeWeights,
+        const CSRSparseMatrix<ValueType> &input,
+        const std::vector<DenseVector<ValueType>> &coordinates,
+        const std::vector<DenseVector<ValueType>> &nodeWeights,
         DenseVector<IndexType>& previous,
         CommTree<IndexType,ValueType> commTree,
         scai::dmemo::CommunicatorPtr comm,

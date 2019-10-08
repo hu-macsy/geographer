@@ -47,7 +47,7 @@ public:
         bool nodeWeightsFlag,
         Tool tool,
         struct Settings &settings,
-        struct Metrics &metrics
+        Metrics<ValueType> &metrics
     );
 
 
@@ -59,7 +59,7 @@ public:
         bool nodeWeightsFlag,
         Tool tool,
         struct Settings &settings,
-        struct Metrics &metrics
+        Metrics<ValueType> &metrics
     );
 
     /** Returns a partition with one of the supported tools based on the current distribution of the data.
@@ -67,12 +67,12 @@ public:
      * @param[in] graph The adjacency matrix of the graph of size NxN
      * @param[in] coordinates The coordinates of the mesh. Not always needed by all tools
      * @param[in] nodeWeights Weights for every node, used only is nodeWeightFlag is true
-     * @param[in] nodeWeightsFlag If true the node weigts are used, if false they are ignored
+     * @param[in] nodeWeightsFlag If true the node weights are used, if false they are ignored
      * @param[in] tool One of the supported tools.
      * @param[in] settings A Settings structure to pass various settings
      * @param[out] metrics Structure to store/return timing info
      *
-     * @return A DenseVector of size N with the partition calcualted: 0<= return[i] < k with the block that point i belongs to
+     * @return A DenseVector of size N with the partition calculated: 0<= return[i] < k with the block that point i belongs to
      */
     static scai::lama::DenseVector<IndexType> repartition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
@@ -81,9 +81,24 @@ public:
         bool nodeWeightsFlag,
         Tool tool,
         struct Settings &settings,
-        struct Metrics &metrics
+        Metrics<ValueType> &metrics
     );
 
+    /** Given the input (graph, coordinates, node weights) and a partition
+    of the input, apply local refinement.
+
+    The input and the partition DenseVector should have the same distribution.
+
+    Returns the new, refined partition;
+    */
+    static scai::lama::DenseVector<IndexType> refine(
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        const scai::lama::DenseVector<IndexType> partition,
+        struct Settings &settings,
+        Metrics<ValueType> &metrics
+    );
 
 private:
 
@@ -110,7 +125,7 @@ private:
         bool nodeWeightsFlag,
         int parMetisGeom,
         struct Settings &settings,
-        struct Metrics &metrics);
+        Metrics<ValueType> &metrics);
 
 //
 //TODO: parMetis assumes that vertices are stores in a consecutive manner. This is not true for a
@@ -122,7 +137,7 @@ private:
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
         bool nodeWeightsFlag,
         struct Settings &settings,
-        struct Metrics &metrics);
+        Metrics<ValueType> &metrics);
 
 
     // zoltan wrappers
@@ -134,7 +149,7 @@ private:
         bool nodeWeightsFlag,
         std::string algo,
         struct Settings &settings,
-        struct Metrics &metrics);
+        Metrics<ValueType> &metrics);
 
     static scai::lama::DenseVector<IndexType> zoltanRepartition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
@@ -143,7 +158,7 @@ private:
         bool nodeWeightsFlag,
         std::string algo,
         struct Settings &settings,
-        struct Metrics &metrics);
+        Metrics<ValueType> &metrics);
 
     static scai::lama::DenseVector<IndexType> zoltanCore (
         const std::vector<scai::lama::DenseVector<ValueType>> &coords,
@@ -152,7 +167,7 @@ private:
         std::string algo,
         bool repart,
         struct Settings &settings,
-        struct Metrics &metrics);
+        Metrics<ValueType> &metrics);
 
 };
 } /* namespace ITI */

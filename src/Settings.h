@@ -128,7 +128,7 @@ inline std::ostream& operator<<(std::ostream& out, Format method) {
 - zoltanMJ Partition a point set (no graph is needed) using the Multijagged algorithm of zoltan2.
 - zoltanMJ Partition a point set (no graph is needed) using the space filling curves algorithm of zoltan2.
 */
-enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, none};
+enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, myAlgo, none};
 
 
 std::istream& operator>>(std::istream& in, ITI::Tool& tool);
@@ -182,7 +182,7 @@ struct Settings {
     //@{
     IndexType numX = 32;
     IndexType numY = 32;
-    IndexType numZ = 32;
+    IndexType numZ = 1;
     //@}
 
     /** @name Tuning parameters for local refinement
@@ -250,6 +250,7 @@ struct Settings {
     bool writeDebugCoordinates = false;		///< store coordinates and block id
     bool writePEgraph = false;				///< store the processor graph
     bool storeInfo = false;					///< store metrics info
+    bool storePartition = false;            ///< store metrics info
     IndexType repeatTimes = 1;				///< for benchmarking, how many times is the partition repeated
     IndexType thisRound=-1; //TODO: what is this? This has nothing to do with the settings.
 
@@ -271,6 +272,8 @@ struct Settings {
     /// variable to check if the settings given are valid or not
     bool isValid = true;
     //@}
+	
+	int myAlgoParam = 0;
 
     //
     // print settings

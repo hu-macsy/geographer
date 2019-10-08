@@ -7,19 +7,24 @@
 
 #include <parmetis.h>
 
+#include <scai/partitioning/Partitioning.hpp>
+
 //for zoltan
-#include <Zoltan2_PartitioningSolution.hpp>
-#include <Zoltan2_PartitioningProblem.hpp>
-#include <Zoltan2_BasicVectorAdapter.hpp>
-#include <Zoltan2_InputTraits.hpp>
+//#include <Zoltan2_PartitioningSolution.hpp>
+//#include <Zoltan2_PartitioningProblem.hpp>
+//#include <Zoltan2_BasicVectorAdapter.hpp>
+//#include <Zoltan2_InputTraits.hpp>
+
 
 #include "Wrappers.h"
 #include "Mapping.h"
+#include "AuxiliaryFunctions.h"
 
 
 namespace ITI {
 
 IndexType HARD_TIME_LIMIT= 600; 	// hard limit in seconds to stop execution if exceeded
+//using ValueType= real_t;
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
@@ -29,7 +34,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
     bool nodeWeightsFlag,
     Tool tool,
     struct Settings &settings,
-    struct Metrics &metrics	) {
+    Metrics<ValueType> &metrics	) {
 
     scai::lama::DenseVector<IndexType> partition;
     switch( tool) {
@@ -80,7 +85,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
     bool nodeWeightsFlag,
     Tool tool,
     struct Settings &settings,
-    struct Metrics &metrics	) {
+    Metrics<ValueType> &metrics	) {
 
     //create dummy graph as the these tools do not use it.
     const scai::dmemo::DistributionPtr distPtr = coordinates[0].getDistributionPtr();
@@ -119,7 +124,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::repartition (
     bool nodeWeightsFlag,
     Tool tool,
     struct Settings &settings,
-    struct Metrics &metrics) {
+    Metrics<ValueType> &metrics) {
 
     switch( tool) {
     // for repartition, metis uses the same function
@@ -149,6 +154,133 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::repartition (
 }
 //-----------------------------------------------------------------------------------------
 
+template<typename IndexType, typename ValueType>
+scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const std::vector<scai::lama::DenseVector<ValueType>> &coords,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        const scai::lama::DenseVector<IndexType> partition,
+        struct Settings &settings,
+        Metrics<ValueType> &metrics
+    ){
+
+    //probably we gonna have problems if the distribution does not have 
+    //a consecutive numbering. Fix here or outside
+    if( not std::is_same<ValueType,real_t>::value ){
+        PRINT("*** Warning, ValueType and real_t do not agree");
+    }
+
+    if( sizeof(ValueType)!=sizeof(real_t) ) {
+        std::cout<< "WARNING: IndexType size= " << sizeof(IndexType) << " and idx_t size=" << sizeof(idx_t) << "  do not agree, this may cause problems " << std::endl;
+    }
+    
+
+    SCAI_ASSERT_DEBUG( graph.isConsistent(), graph << " input graph is not consistent" );
+    //const scai::dmemo::DistributionPtr graphDist = graph.getRowDistributionPtr();
+
+    // vtxDist is an array of size numPEs and is replicated in every processor
+    std::vector<IndexType> vtxDist; 
+
+    std::vector<IndexType> xadj;
+    std::vector<IndexType> adjncy;
+    // vwgt , adjwgt stores the weights of vertices.
+    std::vector<ValueType> vVwgt;
+
+    // tpwgts: array that is used to specify the fraction of
+    // vertex weight that should be distributed to each sub-domain for each balance constraint.
+    // Here we want equal sizes, so every value is 1/nparts; size = ncons*nparts 
+    std::vector<ValueType> tpwgts;
+
+    // the xyz array for coordinates of size dim*localN contains the local coords
+    std::vector<ValueType> xyzLocal;    
+
+    // ubvec: array of size ncon to specify imbalance for every vertex weigth.
+    // 1 is perfect balance and nparts perfect imbalance. Here 1 for now
+    std::vector<ValueType> ubvec;
+
+    //local number of edges; number of node weights; flag about edge and vertex weights 
+    IndexType numWeights=0, wgtFlag=0;
+
+    // options: array of integers for passing arguments.
+    std::vector<IndexType> options;
+
+    aux<IndexType,ValueType>::toMetisInterface(
+        graph, coords, nodeWeights, settings, vtxDist, xadj, adjncy,
+        vVwgt, tpwgts, wgtFlag, numWeights, ubvec, xyzLocal, options );
+
+    SCAI_ASSERT_EQ_ERROR( tpwgts.size(), numWeights*settings.numBlocks, "Wrong tpwgts size" );
+    {
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        SCAI_ASSERT_EQ_ERROR( vtxDist.size(), comm->getSize()+1, "Wrong vtxDist size" );
+    }
+
+    // nparts: the number of parts to partition (=k)
+    IndexType nparts= settings.numBlocks;
+
+
+    // numflag: 0 for C-style (start from 0), 1 for Fortran-style (start from 1)
+    IndexType numflag= 0;          
+    // edges weights not supported
+    IndexType* adjwgt= NULL;
+
+    // output parameters
+    //
+    // edgecut: the size of cut
+    IndexType edgecut;
+
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    //const IndexType N = graph.getNumRows();
+    const IndexType localN= dist->getLocalSize();   
+
+    //parmetis requires weights to be integers
+    std::vector<IndexType> vwgt( vVwgt.begin(), vVwgt.end() );
+    SCAI_ASSERT_EQ_ERROR( vwgt.size(), localN*numWeights, "Wrong weights size" );
+    
+    //partition and the graph rows must have the same distribution
+    SCAI_ASSERT( dist->isEqual( partition.getDistribution()), "Distributions must agree" );
+    
+    // partition array of size localN, contains the block every vertex belongs
+    std::vector<idx_t> partKway( localN );
+    scai::hmemo::ReadAccess<IndexType> rLocalPart( partition.getLocalValues() );
+    SCAI_ASSERT_EQ_ERROR( rLocalPart.size(), localN , "Wrong partition size" );
+
+    for(int i=0; i<localN; i++){
+        partKway[i]= rLocalPart[i];
+    }    
+    rLocalPart.release();
+
+    // comm: the MPI communicator
+    MPI_Comm metisComm;
+    MPI_Comm_dup(MPI_COMM_WORLD, &metisComm);
+    //int metisRet;    
+
+    PRINT0("About to call ParMETIS_V3_RefineKway in Wrappers::refine");
+
+    //overwrite the default options because parmetis by default neglects the
+    //partition if k=p
+    std::vector<IndexType>options2(4,1);
+    options2[1] = 0; //verbosity
+    options2[3] = PARMETIS_PSR_UNCOUPLED; //if k=p (coupled) or not (uncoupled); 2 is always uncoupled
+
+    std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+
+    ParMETIS_V3_RefineKway(
+        vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, tpwgts.data() , ubvec.data(), options2.data(), &edgecut, partKway.data(), &metisComm );
+
+    std::chrono::duration<double> partitionKwayTime = std::chrono::system_clock::now() - startTime;
+    double partKwayTime= comm->max(partitionKwayTime.count() );
+    metrics.MM["timeFinalPartition"] = partKwayTime;
+
+    //
+    // convert partition to a DenseVector
+    //
+
+    scai::lama::DenseVector<IndexType> partitionKway(dist, scai::hmemo::HArray<IndexType>(localN, partKway.data()) );
+
+    return partitionKway;
+}
+//-----------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartition (
@@ -158,11 +290,11 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
     bool nodeWeightsFlag,
     int parMetisGeom,
     struct Settings &settings,
-    struct Metrics &metrics) {
+    Metrics<ValueType> &metrics) {
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-    const IndexType N = graph.getNumRows();
+    //const IndexType N = graph.getNumRows();
     const IndexType localN= dist->getLocalSize();
 
     PRINT0("\t\tStarting the metis wrapper");
@@ -188,8 +320,6 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
     double sumKwayTime = 0.0;
     int repeatTimes = settings.repeatTimes;
 
-    idx_t *partKway;
-
     //
     // parmetis partition
     //
@@ -197,196 +327,71 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
     if( parMetisGeom==1 and comm->getRank()==0 ) std::cout<< "About to call ParMETIS_V3_PartGeom" << std::endl;
     if( parMetisGeom==2 and comm->getRank()==0 ) std::cout<< "About to call ParMETIS_V3_PartSfc" << std::endl;
 
+    // partition array of size localN, contains the block every vertex belongs
+    idx_t *partKway = new idx_t[ localN ];
+
+
     int r;
     for( r=0; r<repeatTimes; r++) {
 
-        //get the vtx array
-
-        IndexType size = comm->getSize();
-
-        //TODO: generalize for any distribution or throw appropriate message
-        /*
-        //this, obviously, only applies for a block distribution
-        IndexType lb, ub;
-        scai::dmemo::BlockDistribution blockDist(N, comm);
-        blockDist.getLocalRange(lb, ub, N, comm->getRank(), comm->getSize() );
-        PRINT(*comm<< ": "<< lb << " _ "<< ub);
-        */
-
-        // get local range of indices
-
-        IndexType lb2=N+1, ub2=-1;
-        {
-            scai::hmemo::HArray<IndexType> myGlobalIndexes;
-            dist->getOwnedIndexes( myGlobalIndexes );
-            scai::hmemo::ReadAccess<IndexType> rIndices( myGlobalIndexes );
-            SCAI_ASSERT_EQ_ERROR( localN, myGlobalIndexes.size(), "Local size mismatch" );
-
-            for( int i=0; i<localN; i++) {
-                if( rIndices[i]<lb2 ) lb2=rIndices[i];
-                if( rIndices[i]>ub2 ) ub2=rIndices[i];
-            }
-            ++ub2;	// we need max+1
-        }
-        //PRINT(*comm<< ": "<< lb2 << " - "<< ub2);
-
-        scai::hmemo::HArray<IndexType> sendVtx(size+1, static_cast<ValueType>( 0 ));
-        scai::hmemo::HArray<IndexType> recvVtx(size+1);
-
-        //TODO: use a sumArray instead of shiftArray
-        for(IndexType round=0; round<comm->getSize(); round++) {
-            SCAI_REGION("ParcoRepart.getBlockGraph.shiftArray");
-            {   // write your part
-                scai::hmemo::WriteAccess<IndexType> sendPartWrite( sendVtx );
-                sendPartWrite[0]=0;
-                sendPartWrite[comm->getRank()+1]=ub2;
-            }
-            comm->shiftArray(recvVtx, sendVtx, 1);
-            sendVtx.swap(recvVtx);
-        }
-
-        scai::hmemo::ReadAccess<IndexType> recvPartRead( recvVtx );
-
         // vtxDist is an array of size numPEs and is replicated in every processor
-        idx_t vtxDist[ size+1 ];
-        vtxDist[0]= 0;
+        std::vector<IndexType> vtxDist;
 
-        for(int i=0; i<recvPartRead.size()-1; i++) {
-            vtxDist[i+1]= recvPartRead[i+1];
-        }
-        /*
-        for(IndexType i=0; i<recvPartRead.size(); i++){
-        	PRINT(*comm<< " , " << i <<": " << vtxDist[i]);
-        }
-        */
-        recvPartRead.release();
+        std::vector<IndexType> xadj;
+        std::vector<IndexType> adjncy;
+        // vwgt , adjwgt stores the weights of vertices.
+        std::vector<ValueType> vVwgt;
 
-        //
-        // set the input parameters for parmetis
-        //
+        // tpwgts: array that is used to specify the fraction of
+        // vertex weight that should be distributed to each sub-domain for each balance constraint.
+        // Here we want equal sizes, so every value is 1/nparts; size = ncons*nparts 
+        std::vector<ValueType> tpwgts;
 
-        // ndims: the number of dimensions
-        idx_t ndims = settings.dimensions;
-
-        // nparts: the number of parts to partition (=k)
-        idx_t nparts= settings.numBlocks;
-
-        // setting xadj=ia and adjncy=ja values, these are the local values of every processor
-        const scai::lama::CSRStorage<ValueType>& localMatrix= graph.getLocalStorage();
-
-        scai::hmemo::ReadAccess<IndexType> ia( localMatrix.getIA() );
-        scai::hmemo::ReadAccess<IndexType> ja( localMatrix.getJA() );
-        IndexType iaSize= ia.size();
-
-        idx_t* xadj = new idx_t[ iaSize ];
-        idx_t* adjncy = new idx_t[ ja.size() ];
-
-        for(int i=0; i<iaSize ; i++) {
-            xadj[i]= ia[i];
-            SCAI_ASSERT( xadj[i] >=0, "negative value for i= "<< i << " , val= "<< xadj[i]);
-        }
-
-        for(int i=0; i<ja.size(); i++) {
-            adjncy[i]= ja[i];
-            SCAI_ASSERT( adjncy[i] >=0, "negative value for i= "<< i << " , val= "<< adjncy[i]);
-            SCAI_ASSERT( adjncy[i] <N, "too large value for i= "<< i << " , val= "<< adjncy[i]);
-        }
-        ia.release();
-        ja.release();
-
-        // wgtflag is for the weight and can take 4 values. Here, 0 is for no weights.
-        idx_t wgtflag= 0;
-
-        // ncon: the numbers of weigths each vertex has.
-        idx_t ncon = 1;
-
-        // vwgt , adjwgt stores the weigths of vertices.
-        idx_t* vwgt= NULL;
-
-        // if node weights are given
-        if( nodeWeightsFlag ) {
-            const unsigned int numWeights = nodeWeights.size();
-            ncon = numWeights;
-            vwgt = new idx_t[localN*numWeights];
-
-            for( unsigned int w=0; w<numWeights; w++ ) {
-                scai::hmemo::ReadAccess<ValueType> localWeights( nodeWeights[w].getLocalValues() );
-                SCAI_ASSERT_EQ_ERROR( localN, localWeights.size(), "Local weights size mismatch. Are node weights distributed correctly?");
-
-                //all weights for each vertex are stored contiguously
-                for(unsigned int i=0; i<localN; i++) {
-                    int index = i*numWeights + w;
-                    vwgt[index] = idx_t (localWeights[i]);
-                }
-            }
-
-            wgtflag = 2;	//weights only in vertices
-        }
-
+        // the xyz array for coordinates of size dim*localN contains the local coords
+        std::vector<ValueType> xyzLocal;
 
         // ubvec: array of size ncon to specify imbalance for every vertex weigth.
         // 1 is perfect balance and nparts perfect imbalance. Here 1 for now
-        real_t ubvec[ncon];
-        for(unsigned int i=0; i<ncon; i++) {
-            ubvec[i] = real_t(settings.epsilon + 1); //same balance for all constraints
-        }
+        std::vector<ValueType> ubvec;
 
-        // edges weights not supported
-        idx_t* adjwgt= NULL;
-
-        // numflag: 0 for C-style (start from 0), 1 for Fortrant-style (start from 1)
-        idx_t numflag= 0;
-
-        // tpwgts: array of size ncons*nparts, that is used to specify the fraction of
-        // vertex weight that should be distributed to each sub-domain for each balance
-        // constraint. Here we want equal sizes, so every value is 1/nparts.
-        real_t tpwgts[ nparts*ncon ];
-        real_t total = 0;
-        for(int i=0; i<sizeof(tpwgts)/sizeof(real_t) ; i++) {
-            tpwgts[i] = real_t(1)/nparts;
-            //PRINT(*comm << ": " << i <<": "<< tpwgts[i]);
-            total += tpwgts[i];
-        }
-        SCAI_ASSERT_LT_ERROR( std::abs(total-ncon), 1e-10, "Wrong tpwgts assignment");
-
-        // the xyz array for coordinates of size dim*localN contains the local coords
-        // convert the vector<DenseVector> to idx_t*
-        real_t *xyzLocal;
-
-        if( parMetisGeom==1 or parMetisGeom==2 or settings.writeDebugCoordinates ) {
-            xyzLocal = new real_t[ ndims*localN ];
-
-            std::vector<scai::hmemo::HArray<ValueType>> localPartOfCoords( ndims );
-            for(int d=0; d<ndims; d++) {
-                localPartOfCoords[d] = coords[d].getLocalValues();
-            }
-            for(unsigned int i=0; i<localN; i++) {
-                SCAI_ASSERT_LE_ERROR( ndims*(i+1), ndims*localN, "Too large index, localN= " << localN );
-                for(int d=0; d<ndims; d++) {
-                    xyzLocal[ndims*i+d] = real_t(localPartOfCoords[d][i]);
-                }
-            }
-
-        }
+        //local number of edges; number of node weights; flag about edge and vertex weights 
+        IndexType numWeights=0, wgtFlag=0;
 
         // options: array of integers for passing arguments.
-        // Here, options[0]=0 for the default values.
-        idx_t options[1]= {0};
+        std::vector<IndexType> options;
+
+        IndexType newLocalN = aux<IndexType,ValueType>::toMetisInterface(
+            graph, coords, nodeWeights, settings, vtxDist, xadj, adjncy,
+            vVwgt, tpwgts, wgtFlag, numWeights, ubvec, xyzLocal, options );
+
+        if( newLocalN==-1){
+            return scai::lama::DenseVector<IndexType>(0,0);
+        }
+
+        // nparts: the number of parts to partition (=k)
+        IndexType nparts= settings.numBlocks;
+        // ndims: the number of dimensions
+        IndexType ndims = settings.dimensions;      
+        // numflag: 0 for C-style (start from 0), 1 for Fortran-style (start from 1)
+        IndexType numflag= 0;          
+        // edges weights not supported
+        IndexType* adjwgt= NULL;
+
+        //parmetis requires weights to be integers
+        std::vector<IndexType> vwgt( vVwgt.begin(), vVwgt.end() );
+
 
         //
         // OUTPUT parameters
         //
 
         // edgecut: the size of cut
-        idx_t edgecut;
-
-        // partition array of size localN, contains the block every vertex belongs
-        partKway = new idx_t[ localN ];
+        IndexType edgecut;
 
         // comm: the MPI comunicator
         MPI_Comm metisComm;
         MPI_Comm_dup(MPI_COMM_WORLD, &metisComm);
-        int metisRet;
+        //int metisRet;
 
         //PRINT(*comm<< ": xadj.size()= "<< sizeof(xadj) << "  adjncy.size=" <<sizeof(adjncy) );
         //PRINT(*comm << ": "<< sizeof(xyzLocal)/sizeof(real_t) << " ## "<< sizeof(partKway)/sizeof(idx_t) << " , localN= "<< localN);
@@ -402,11 +407,12 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
         std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
 
         if( parMetisGeom==0) {
-            metisRet = ParMETIS_V3_PartKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ncon, &nparts, tpwgts, ubvec, options, &edgecut, partKway, &metisComm );
+            /*metisRet = */ParMETIS_V3_PartKway( 
+                vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, tpwgts.data(), ubvec.data(), options.data(), &edgecut, partKway, &metisComm );
         } else if( parMetisGeom==1 ) {
-            metisRet = ParMETIS_V3_PartGeomKway( vtxDist, xadj, adjncy, vwgt, adjwgt, &wgtflag, &numflag, &ndims, xyzLocal, &ncon, &nparts, tpwgts, ubvec, options, &edgecut, partKway, &metisComm );
+            ParMETIS_V3_PartGeomKway( vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &ndims, xyzLocal.data(), &numWeights, &nparts, tpwgts.data(), ubvec.data(), options.data(), &edgecut, partKway, &metisComm );
         } else if( parMetisGeom==2 ) {
-            metisRet = ParMETIS_V3_PartGeom( vtxDist, &ndims, xyzLocal, partKway, &metisComm );
+            ParMETIS_V3_PartGeom( vtxDist.data(), &ndims, xyzLocal.data(), partKway, &metisComm );
         } else {
             //repartition
 
@@ -426,7 +432,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
             */
             real_t itr = 1000;	//TODO: check other values too
 
-            metisRet = ParMETIS_V3_AdaptiveRepart( vtxDist, xadj, adjncy, vwgt, vsize, adjwgt, &wgtflag, &numflag, &ncon, &nparts, tpwgts, ubvec, &itr, options, &edgecut, partKway, &metisComm );
+            ParMETIS_V3_AdaptiveRepart( vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), vsize, adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, tpwgts.data(), ubvec.data(), &itr, options.data(), &edgecut, partKway, &metisComm );
 
             delete[] vsize;
         }
@@ -439,18 +445,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisPartitio
         if( comm->getRank()==0 ) {
             std::cout<< "Running time for run number " << r << " is " << partKwayTime << std::endl;
         }
-
-        //
-        // free arrays
-        //
-        delete[] xadj;
-        delete[] adjncy;
-        if( parMetisGeom==1 or parMetisGeom==2 or settings.writeDebugCoordinates ) {
-            delete[] xyzLocal;
-        }
-        if( nodeWeightsFlag ) {
-            delete[] vwgt;
-        }
+      
         if( sumKwayTime>HARD_TIME_LIMIT) {
             std::cout<< "Stopping runs because of excessive running total running time: " << sumKwayTime << std::endl;
             break;
@@ -499,7 +494,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::metisRepartit
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
     bool nodeWeightsFlag,
     struct Settings &settings,
-    struct Metrics &metrics) {
+    Metrics<ValueType> &metrics) {
 
     // copy graph and reindex
     scai::lama::CSRSparseMatrix<ValueType> copyGraph = graph;
@@ -574,7 +569,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanPartiti
     bool nodeWeightsFlag,
     std::string algo,
     struct Settings &settings,
-    struct Metrics &metrics) {
+    Metrics<ValueType> &metrics) {
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     PRINT0("\t\tStarting the zoltan wrapper for partition with "<< algo);
@@ -593,7 +588,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanReparti
     bool nodeWeightsFlag,
     std::string algo,
     struct Settings &settings,
-    struct Metrics &metrics) {
+    Metrics<ValueType> &metrics) {
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     PRINT0("\t\tStarting the zoltan wrapper for repartition with " << algo);
@@ -614,8 +609,10 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
     std::string algo,
     bool repart,
     struct Settings &settings,
-    struct Metrics &metrics) {
+    Metrics<ValueType> &metrics) {
 
+
+/*
     typedef Zoltan2::BasicUserTypes<ValueType, IndexType, IndexType> myTypes;
     typedef Zoltan2::BasicVectorAdapter<myTypes> inputAdapter_t;
 
@@ -783,11 +780,15 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
     delete[] zoltanCoords;
 
     return partitionZoltan;
+    */
 
+return scai::lama::DenseVector<IndexType> (coords[0].getDistributionPtr(), IndexType(0));
 }
 
 //---------------------------------------------------------------------------------------
 
-template class Wrappers<IndexType, ValueType>;
+//template class Wrappers<IndexType, double>;
+//template class Wrappers<IndexType, float>;
+template class Wrappers<IndexType, real_t>;
 
 }//namespace

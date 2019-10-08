@@ -14,7 +14,7 @@ Options populateOptions() {
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     Settings settings;
 
-    options.add_options()
+	options.add_options()
     ("help", "display options")
     ("version", "show version")
     //main arguments for daily use
@@ -57,7 +57,7 @@ Options populateOptions() {
     ("maxKMeansIterations", "Tuning parameter for K-Means", value<IndexType>())
     ("tightenBounds", "Tuning parameter for K-Means")
     ("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
-    // using '/' to seperate the lines breaks the output message
+    // using '/' to separate the lines breaks the output message
     ("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3 4 10, there are 3 levels. In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
     //output
     ("outFile", "write result partition into file", value<std::string>())
@@ -65,6 +65,7 @@ Options populateOptions() {
     ("writeDebugCoordinates", "Write Coordinates of nodes in each block", value<bool>())
     ("verbose", "Increase output.")
     ("storeInfo", "Store timing and other metrics in file.")
+    ("storePartition", "Store the partition file.")
     ("callExit", "Call std::exit after finishing partitioning, useful in case of lingering MPI data structures.")
     // evaluation
     ("repeatTimes", "How many times we repeat the partitioning process.", value<IndexType>())
@@ -72,7 +73,8 @@ Options populateOptions() {
     ("maxDiameterRounds", "abort diameter algorithm after that many BFS rounds", value<IndexType>())
     ("metricsDetail", "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV", value<std::string>())
     //used for the competitors main
-    // ("outDir", "write result partition into file", value<std::string>())
+    ("outDir", "write result partition into folder", value<std::string>())
+    ("tools", "choose which supported tools to use. See in Settings::Tools for the supported tools and how to call them.", value<std::string>() )
     //mesh generation
     ("generate", "generate uniform mesh as input graph")
     ("numX", "Number of points in x dimension of generated graph", value<IndexType>())
@@ -81,6 +83,7 @@ Options populateOptions() {
     // exotic test cases
     ("quadTreeFile", "read QuadTree from file", value<std::string>())
     ("useDiffusionCoordinates", "Use coordinates based from diffusive systems instead of loading from file", value<bool>())
+	//("myAlgoParam", "help message", value<int>())
     ;
 
     return options;
@@ -158,6 +161,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     using std::vector;
     settings.verbose = vm.count("verbose");
     settings.storeInfo = vm.count("storeInfo");
+    settings.storePartition = vm.count("storePartition");
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
     settings.noRefinement = vm.count("noRefinement");
@@ -261,7 +265,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("maxKMeansIterations")) {
         settings.maxKMeansIterations = vm["maxKMeansIterations"].as<IndexType>();
     }
-    if (vm.count("hierLevels")) {
+    if (vm.count("hierLevels")) {  
         std::stringstream ss( vm["hierLevels"].as<std::string>() );
         std::string item;
         std::vector<IndexType> hierLevels;
@@ -275,6 +279,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         }
 
         settings.hierLevels = hierLevels;
+
         if (!vm.count("numBlocks")) {
             settings.numBlocks = product;
         } else {
@@ -331,6 +336,19 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
             }
             settings.numBlocks = numBlocks;
         }
+    }
+
+    //used (mainly) from allCompetitors to define which tools to use
+    if (vm.count("tools")) {  
+        std::stringstream ss( vm["tools"].as<std::string>() );
+        std::string item;
+        std::vector<std::string> tools;
+
+        while (!std::getline(ss, item, ' ').fail()) {
+            tools.push_back( item );
+        }
+
+        settings.tools = tools;
     }
 
     return settings;
