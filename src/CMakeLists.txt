@@ -62,7 +62,7 @@ if( Zoltan2_FOUND AND METIS_LIB AND PARMETIS_LIB )
 	#TODO: link_directories is probably not needed; there is a better way to do this; at least, this works for now
 	link_directories( ${Zoltan2_LIBRARY_DIRS} ${METIS_BASE}/lib ${PARMETIS_BASE}/lib )
 	
-	add_library( wrappers SHARED  Wrappers.cpp zoltanWrappers.cpp)
+	add_library( wrappers SHARED  Wrappers.cpp zoltanWrappers.cpp parmetisWrapper.cpp)
 	target_include_directories( wrappers PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} "${METIS_BASE}/include" "${PARMETIS_BASE}/include" )
 	target_link_libraries( wrappers ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${ZOLTAN2_LIB}  ${ZOLTAN_LIB} ${Zoltan2_LIBRARIES} ) # libzoltan2.so metis parmetis
 	
@@ -87,7 +87,7 @@ if( Zoltan2_FOUND AND METIS_LIB AND PARMETIS_LIB )
 	install(TARGETS wrappers EXPORT wrappers DESTINATION "${LIB_DEST}") 
 	install(TARGETS allCompetitors DESTINATION "${BIN_DEST}") # executable
     install(TARGETS testMetisRefine DESTINATION "${BIN_DEST}") # executable
-	install(FILES Wrappers.h DESTINATION "${HEADER_DEST}")
+	install(FILES Wrappers.h parmetisWrapper.h zoltanWrapper.h DESTINATION "${HEADER_DEST}")
 elseif( PARMETIS_LIB )
      message( "\tFound library parmetis in " ${PARMETIS_LIB} )
     message( "\n" )
@@ -95,7 +95,7 @@ elseif( PARMETIS_LIB )
     #TODO: link_directories is probably not needed; there is a better way to do this; at least, this works for now
     link_directories( ${METIS_BASE}/lib ${PARMETIS_BASE}/lib )
     
-    add_library( wrappers SHARED  Wrappers.cpp)
+    add_library( wrappers SHARED  Wrappers.cpp parmetisWrapper.cpp)
     target_include_directories( wrappers PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" )
     target_link_libraries( wrappers ${RBC_LIBRARY} ${PARMETIS_LIB} ) 
     
@@ -118,7 +118,7 @@ elseif( PARMETIS_LIB )
     install(TARGETS wrappers EXPORT wrappers DESTINATION "${LIB_DEST}") 
     install(TARGETS allCompetitors DESTINATION "${BIN_DEST}") # executable
     install(TARGETS testMetisRefine DESTINATION "${BIN_DEST}") # executable
-    install(FILES Wrappers.h DESTINATION "${HEADER_DEST}")
+    install(FILES Wrappers.h parmetisWrapper.h DESTINATION "${HEADER_DEST}")
 else()
 	message( "Some of the packages Zoltan2, metis or parmetis were not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
 endif()

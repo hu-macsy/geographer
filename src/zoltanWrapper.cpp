@@ -1,14 +1,14 @@
-#include "Wrappers.h"
+//#include "Wrappers.h"
 //#include "Mapping.h"
 #include "AuxiliaryFunctions.h"
+#include "zoltanWrapper.h"
 
-/*
 //for zoltan
 #include <Zoltan2_PartitioningSolution.hpp>
 #include <Zoltan2_PartitioningProblem.hpp>
 #include <Zoltan2_BasicVectorAdapter.hpp>
 #include <Zoltan2_InputTraits.hpp>
-*/
+
 
 namespace ITI {
 
@@ -17,7 +17,7 @@ namespace ITI {
 //---------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanPartition (
+scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanPartition (
     const scai::lama::CSRSparseMatrix<ValueType> &graph,
     const std::vector<scai::lama::DenseVector<ValueType>> &coords,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
@@ -31,12 +31,12 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanPartiti
 
     bool repart = false;
 
-    return Wrappers<IndexType, ValueType>::zoltanCore( coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);
+    return zoltanWrapper<IndexType, ValueType>::zoltanCore( coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);
 }
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanRepartition (
+scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanRepartition (
     const scai::lama::CSRSparseMatrix<ValueType> &graph,
     const std::vector<scai::lama::DenseVector<ValueType>> &coords,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
@@ -50,14 +50,14 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanReparti
 
     bool repart = true;
 
-    return Wrappers<IndexType, ValueType>::zoltanCore( coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);
+    return zoltanWrapper<IndexType, ValueType>::zoltanCore( coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);
 }
 //---------------------------------------------------------------------------------------
 
 //relevant code can be found in zoltan, in Trilinos/packages/zoltan2/test/partition
 
 template<typename IndexType, typename ValueType>
-scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::zoltanCore (
+scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCore (
     const std::vector<scai::lama::DenseVector<ValueType>> &coords,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
     bool nodeWeightsFlag,
@@ -242,6 +242,6 @@ return scai::lama::DenseVector<IndexType> (coords[0].getDistributionPtr(), Index
 
 //---------------------------------------------------------------------------------------
 
-template class Wrappers<IndexType, double>;
+template class zoltanWrapper<IndexType, double>;
 
 }//namespace ITI
