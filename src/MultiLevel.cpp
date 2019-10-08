@@ -229,7 +229,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
         }
         std::chrono::duration<double> elapTime2 = std::chrono::system_clock::now() - before;
-        ValueType refineTime = comm->max( elapTime2.count() );
+        //ValueType refineTime = comm->max( elapTime2.count() );
         //PRINT0("local refinement time: " << refineTime );
     }
 
@@ -526,8 +526,6 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     wIndices.resize(std::distance(wIndices.get(), newEnd));
     assert(wIndices.size() == newLocalN);
     wIndices.release();
-
-    const IndexType localEdgeCount = newJA.size();
 
     const auto newDist = scai::dmemo::generalDistributionUnchecked(newGlobalN, myGlobalIndices, comm);
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(newGlobalN));

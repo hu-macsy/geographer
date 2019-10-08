@@ -33,7 +33,6 @@ DenseVector<IndexType> HilbertCurve<IndexType, ValueType>::computePartition(cons
     IndexType k = settings.numBlocks;
     const IndexType dimensions = coordinates.size();
     assert(dimensions == settings.dimensions);
-    const IndexType localN = coordDist->getLocalSize();
     const IndexType globalN = coordDist->getGlobalSize();
 
     if (k != comm->getSize() && comm->getRank() == 0) {
@@ -782,7 +781,6 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = inputDist->getGlobalSize();
-    const IndexType rank = comm->getRank();
 
     if (comm->getSize() == 1) {
         return;
@@ -831,7 +829,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     std::vector<double> recvThresholds(comm->getSize());
 
     //hardcoded the sfc index to double
-    MPI_Datatype MPI_ValueType = getMPIType<double>();
+    //MPI_Datatype MPI_ValueType = getMPIType<double>();
     //MPI_Alltoall(sendThresholds.data(), 1, MPI_ValueType, recvThresholds.data(), 1, MPI_ValueType, mpi_comm); //TODO: replace this monstrosity with a proper call to LAMA
     comm->all2all(recvThresholds.data(), sendThresholds.data());//TODO: maybe speed up with hypercube
     SCAI_ASSERT_LT_ERROR(recvThresholds[comm->getSize() - 1], 1, "invalid hilbert index");

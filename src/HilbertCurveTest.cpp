@@ -152,8 +152,7 @@ TYPED_TEST(HilbertCurveTest, testHilbertFromFileNew_Local_2D) {
     scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( fileName );
 
     const IndexType N = graph.getNumRows();
-    const IndexType M = graph.getNumValues();
-
+    
     std::vector<ValueType> maxCoords({0,0});
 
     //get coords

@@ -129,11 +129,7 @@ scai::lama::DenseVector<IndexType> MultiSection<IndexType, ValueType>::computePa
 
     const scai::dmemo::DistributionPtr inputDistPtr = input.getRowDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = inputDistPtr->getCommunicatorPtr();
-
     const IndexType k = settings.numBlocks;
-    const IndexType dim = settings.dimensions;
-    const IndexType globalN = inputDistPtr->getGlobalSize();
-    const IndexType localN = inputDistPtr->getLocalSize();
 
     //
     // get a partitioning into rectangles
@@ -336,7 +332,7 @@ IndexType MultiSection<IndexType, ValueType>::projectAnd1Dpartition(
             //TODO: make sure that projections[l] and allLeaves[l] refer to the same rectangle
             struct rectangle<ValueType> thisRectangle = allLeaves[l]->getRect();
 
-            ValueType optWeight = thisRectangle.weight/(*thisDimCuts);
+            //ValueType optWeight = thisRectangle.weight/(*thisDimCuts);
             ValueType maxWeight = 0;
 
             // create the new rectangles and add them to the queue
@@ -734,8 +730,6 @@ std::shared_ptr<rectCell<IndexType,ValueType>> MultiSection<IndexType, ValueType
 
     // TODO: try to avoid that, probably not needed
     ValueType totalWeight = nodeWeights.sum();
-    ValueType averageWeight = totalWeight/k;
-
     bBox.weight = totalWeight;
 
     // create the root of the tree that contains the whole grid
