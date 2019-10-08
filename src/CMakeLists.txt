@@ -35,10 +35,12 @@ FIND_PACKAGE( Zoltan2 PATHS "/home/hpc/pr87si/di36qin/Code/Trilinos/build/packag
 #set(METIS_BASE "/lrz/sys/libraries/metis/5.1.0/i8r8")
 #set(PARMETIS_BASE  "/lrz/sys/libraries/parmetis/4.0.3/ibmmpi/i8r8")
 
-message("${METIS_BASE}/lib")
 
-#find_library( METIS_LIB libmetis.so "${METIS_BASE}/lib"  NO_DEFAULT_PATH)
 find_library( PARMETIS_LIB libparmetis.so "${PARMETIS_BASE}/lib"  NO_DEFAULT_PATH)
+
+if( PARMETIS_LIB AND NOT METIS_INCLUDE)
+    message( FATAL_ERROR "PARMETIS_BASE was specified but not METIS_INCLUDE. Use -DMETIS_INCLUDE=<path_to_directory_that_contains_metis.h>. Probably, a candidate directory is parmetis/metis/include")
+endif()
 
 
 ###
@@ -49,10 +51,10 @@ find_library( PARMETIS_LIB libparmetis.so "${PARMETIS_BASE}/lib"  NO_DEFAULT_PAT
 ### for more info see the Zoltan2 documentation and https://trilinos.org/oldsite/Finding_Trilinos.txt
 ### see also in Trilinos_install_path/install/include/Makefile.export.Zoltan2
 
-if( Zoltan2_FOUND AND METIS_LIB AND PARMETIS_LIB )
+if( Zoltan2_FOUND AND PARMETIS_LIB )
 	message( "\n\tFound package Zoltan2" )
-	message( "\tFound library metis in " ${METIS_LIB} )
-	message( "\tFound library parmetis in " ${PARMETIS_LIB} )
+	message( "\tFound metis inlude in " ${METIS_INCLUDE} )
+	message( "\tFound parmetis library in " ${PARMETIS_LIB} )
 	message( "\n" )
 	
 	#WARNING: if we use ${Zoltan2_LIBRARIES}, it tries to link to the .a library and this creates an error. We need the .so library
@@ -60,10 +62,10 @@ if( Zoltan2_FOUND AND METIS_LIB AND PARMETIS_LIB )
 	find_library( ZOLTAN_LIB libzoltan.so ${Zoltan_LIBRARY_DIRS} )
 
 	#TODO: link_directories is probably not needed; there is a better way to do this; at least, this works for now
-	link_directories( ${Zoltan2_LIBRARY_DIRS} ${METIS_BASE}/lib ${PARMETIS_BASE}/lib )
+	#link_directories( ${Zoltan2_LIBRARY_DIRS} ${METIS_BASE}/lib ${PARMETIS_BASE}/lib )
 	
 	add_library( wrappers SHARED  Wrappers.cpp)
-	target_include_directories( wrappers PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} "${METIS_BASE}/include" "${PARMETIS_BASE}/include" )
+	target_include_directories( wrappers PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} ${METIS_INCLUDE} "${PARMETIS_BASE}/include" )
 	target_link_libraries( wrappers ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${ZOLTAN2_LIB}  ${ZOLTAN_LIB} ${Zoltan2_LIBRARIES} ) # libzoltan2.so metis parmetis
 	
 	set( EXTRA_LIBRARIES_FOUND "true" )
@@ -73,14 +75,14 @@ if( Zoltan2_FOUND AND METIS_LIB AND PARMETIS_LIB )
     add_executable( allCompetitors allCompetitorsPart.cpp parseArgs.cpp)
 	target_include_directories( allCompetitors PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} )
 	# include parmetis and metis 
-	target_include_directories( allCompetitors PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" ${CXXOPTS_DIR})
+	target_include_directories( allCompetitors PUBLIC ${METIS_INCLUDE} "${PARMETIS_BASE}/include" ${CXXOPTS_DIR})
 	target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
 
 
     add_executable( testMetisRefine testMetisRefinement.cpp parseArgs.cpp)
     target_include_directories( testMetisRefine PUBLIC ${Zoltan2_INCLUDE_DIRS}  ${Zoltan2_TPL_INCLUDE_DIRS} )
     # include parmetis and metis 
-    target_include_directories( testMetisRefine PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" ${CXXOPTS_DIR})
+    target_include_directories( testMetisRefine PUBLIC ${METIS_INCLUDE} "${PARMETIS_BASE}/include" ${CXXOPTS_DIR})
     target_link_libraries( testMetisRefine geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${Zoltan2_TPL_LIBRARIES} ${METIS_LIB} ${PARMETIS_LIB} ${MPI_CXX_LIBRARIES} )# metis parmetis)
 
 	
@@ -89,14 +91,15 @@ if( Zoltan2_FOUND AND METIS_LIB AND PARMETIS_LIB )
     install(TARGETS testMetisRefine DESTINATION "${BIN_DEST}") # executable
 	install(FILES Wrappers.h DESTINATION "${HEADER_DEST}")
 elseif( PARMETIS_LIB )
-     message( "\tFound library parmetis in " ${PARMETIS_LIB} )
+    message( "\tFound metis inlude in " ${METIS_INCLUDE} )
+    message( "\tFound parmetis library in " ${PARMETIS_LIB} )
     message( "\n" )
 
     #TODO: link_directories is probably not needed; there is a better way to do this; at least, this works for now
-    link_directories( ${METIS_BASE}/lib ${PARMETIS_BASE}/lib )
-    
+    link_directories( ${PARMETIS_BASE}/lib )
+
     add_library( wrappers SHARED  Wrappers.cpp)
-    target_include_directories( wrappers PUBLIC "${METIS_BASE}/include" "${PARMETIS_BASE}/include" )
+    target_include_directories( wrappers PUBLIC ${METIS_INCLUDE} "${PARMETIS_BASE}/include" )
     target_link_libraries( wrappers ${RBC_LIBRARY} ${PARMETIS_LIB} ) 
     
     set( EXTRA_LIBRARIES_FOUND "true" )

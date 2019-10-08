@@ -81,7 +81,6 @@ int main(int argc, char** argv) {
     IndexType N = readInput<ValueType>( vm, settings, comm, graph, coords, nodeWeights );
 
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-    std::string graphFile = vm["graphFile"].as<std::string>();
 
     //---------------------------------------------------------------------------------
     //
@@ -168,7 +167,6 @@ int main(int argc, char** argv) {
         } 
         
         std::string outFile = "-";
-
         if( vm.count("outDir") and vm.count("storeInfo") ) {
             //set the graphName in order to create the outFile name
             std::string copyName;
