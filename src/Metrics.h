@@ -68,6 +68,12 @@ public:
         return *this;
     }
 
+    /**Wrapper function to call metrics depending on setting.metricsDetail
+
+    */
+
+    void getMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings);
+
 
     /** @brief Get all possible metrics.
 

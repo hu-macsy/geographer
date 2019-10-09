@@ -292,12 +292,7 @@ int main(int argc, char** argv) {
 
         std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
 
-        if( settings.metricsDetail=="all" ) {
-            metricsVec[r].getAllMetrics( graph, partition, nodeWeights, settings );
-        }
-        if( settings.metricsDetail=="easy" ) {
-            metricsVec[r].getEasyMetrics( graph, partition, nodeWeights, settings );
-        }
+        metricsVec[r].getMetrics(graph, partition, nodeWeights, settings );
 
         metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
         metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));

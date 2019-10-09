@@ -3,6 +3,19 @@
 using namespace ITI;
 
 template<typename ValueType>
+void Metrics<ValueType>::getMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings){
+
+    if( settings.metricsDetail=="all" ) {
+        getAllMetrics( graph, partition, nodeWeights, settings );
+    }
+    if( settings.metricsDetail=="easy" ) {
+        getEasyMetrics( graph, partition, nodeWeights, settings );
+    }
+}
+
+//---------------------------------------------------------------------------
+
+template<typename ValueType>
 void Metrics<ValueType>::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
 
     getEasyMetrics( graph, partition, nodeWeights, settings );

@@ -86,10 +86,10 @@ int main(int argc, char** argv) {
     DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coords, nodeWeights, settings, metricsBefore );
 
 
-    metricsBefore.getAllMetrics( graph, partition, nodeWeights, settings );
+    metricsBefore.getMetrics( graph, partition, nodeWeights, settings );
     if (comm->getRank() == 0 && settings.metricsDetail.compare("no") != 0) {
         metricsBefore.print( std::cout );
-/*
+
         if( settings.storeInfo && settings.outFile!="-" ){
             std::ofstream outF( settings.outFile, std::ios::out);
             if(outF.is_open()) {
@@ -101,8 +101,7 @@ int main(int argc, char** argv) {
             }else{
                 std::cout<< "Could not open file " << settings.outFile << " information not stored"<< std::endl;
             }
-        }
-*/        
+        }        
     }
 
 
@@ -132,8 +131,6 @@ int main(int argc, char** argv) {
     }
 
     if( willRedistribute ){
-        
-        PRINT0("will redistribute input");
 
         //TODO: is this redistribution needed?
         //redistribute
@@ -151,17 +148,33 @@ int main(int argc, char** argv) {
     //-----------------------------------------
     //
     //refine partition using metisRefine
+
     Metrics<ValueType> metrics(settings);
 
     DenseVector<IndexType> refinedPartition = Wrappers<IndexType,ValueType>::refine( graph, coords, nodeWeights, partition, settings, metrics );
 
-    metrics.getAllMetrics( graph, refinedPartition, nodeWeights, settings );
+    metrics.getMetrics( graph, refinedPartition, nodeWeights, settings );
     if (comm->getRank() == 0 && settings.metricsDetail.compare("no") != 0) {
         metrics.print( std::cout );
+
+        if( settings.storeInfo && settings.outFile!="-" ){
+            std::ofstream outF( settings.outFile, std::ios::out);
+            if(outF.is_open()) {
+                outF << "Running " << __FILE__ << std::endl;
+                settings.print( outF, comm);
+
+                metricsBefore.print( outF );
+                std::cout<< "Output information written to file " << settings.outFile << std::endl;
+            }else{
+                std::cout<< "Could not open file " << settings.outFile << " information not stored"<< std::endl;
+            }
+        }        
     }
 
-    //this is needed for supermuc
-    //std::exit(0);
+    if (vm.count("callExit")) {
+        //this is needed for supermuc
+        std::exit(0);
+    }
 
     return 0;    
 
