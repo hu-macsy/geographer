@@ -105,47 +105,6 @@ int main(int argc, char** argv) {
         }        
     }
 
-
-    //-----------------------------------------
-    //
-    // if distribution do not agree, redistribute
-
-    const scai::dmemo::DistributionPtr graphDist = graph.getRowDistributionPtr();
-
-    bool willRedistribute = false;
-
-    if( not coords[0].getDistributionPtr()->isEqual(*graphDist) ){
-        PRINT0("Coordinate and graph distribution do not agree; will redistribute input");
-        willRedistribute = true;
-    }
-    if( not nodeWeights[0].getDistributionPtr()->isEqual(*graphDist) ){
-        PRINT0("nodeWeights and graph distribution do not agree; will redistribute input");
-        willRedistribute = true;        
-    }
-    if( not partition.getDistributionPtr()->isEqual(*graphDist) ){
-        PRINT0("nodeWeights and graph distribution do not agree; will redistribute input");
-        willRedistribute = true;        
-    }
-    if( not graphDist->isBlockDistributed(comm) ){
-        PRINT0("Input does not have a suitable distribution; will redistribute");
-        willRedistribute = true;            
-    }
-
-    if( willRedistribute ){
-
-        //TODO: is this redistribution needed?
-        //redistribute
-        scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, false, true);        
-
-        //TODO?: can also redistribute everything based on a block or genBlock distribution
-        const  scai::dmemo::DistributionPtr newGenBlockDist = GraphUtils<IndexType, ValueType>::genBlockRedist(graph);
-        
-        aux<IndexType,ValueType>::redistributeInput( newGenBlockDist, partition, graph, coords, nodeWeights);
-        
-    }
-    
-    PRINT0("\tStarting metis refinement\n");
-
     //-----------------------------------------
     //
     //refine partition using metisRefine
@@ -155,6 +114,10 @@ int main(int argc, char** argv) {
     DenseVector<IndexType> refinedPartition = Wrappers<IndexType,ValueType>::refine( graph, coords, nodeWeights, partition, settings, metrics );
     
     PRINT0("\tFinished metis refinement\n");
+
+    //-----------------------------------------
+    //
+    // gather and print metrics
 
     metrics.getMetrics( graph, refinedPartition, nodeWeights, settings );
     if (comm->getRank() == 0 && settings.metricsDetail.compare("no") != 0) {

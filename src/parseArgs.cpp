@@ -45,7 +45,7 @@ Options populateOptions() {
     ("useGeometricTieBreaking", "Tuning Parameter: Use distances to block center for tie breaking", value<bool>())
     ("skipNoGainColors", "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round", value<bool>())
     ("nnCoarsening", "When coarsening, pick the nearest neighbor based on the euclidean distance", value<bool>())
-    ("localRefAlgo", "With which algorithm to do local refinement.", value<Tool>)
+    ("localRefAlgo", "With which algorithm to do local refinement.", value<Tool>() )
     //multisection
     ("bisect", "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached", value<bool>())
     ("cutsPerDim", "If MultiSection is chosen, then provide d values that define the number of cuts per dimension.", value<std::string>())
@@ -214,6 +214,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("initialPartition")) {
         settings.initialPartition = vm["initialPartition"].as<Tool>();
     }
+PRINT0( vm["initialPartition"].as<Tool>() << "  " << settings.initialPartition )  ;    
     if (vm.count("multiLevelRounds")) {
         settings.multiLevelRounds = vm["multiLevelRounds"].as<IndexType>();
     }
@@ -229,6 +230,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("localRefAlgo")) {
         settings.localRefAlgo = vm["localRefAlgo"].as<Tool>();
     }
+PRINT0( to_string(vm["localRefAlgo"].as<Tool>()) << "  " << to_string( settings.localRefAlgo) )  ;    
     if (vm.count("cutsPerDim")) {
         std::stringstream ss( vm["cutsPerDim"].as<std::string>() );
         std::string item;

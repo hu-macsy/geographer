@@ -168,6 +168,9 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
         struct Settings &settings,
         Metrics<ValueType> &metrics
     ){
+    
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    PRINT0("\tStarting metis refinement\n");
 
     //only parmetis refinement is available
     return parmetisWrapper<IndexType,ValueType>::refine( graph, coords, nodeWeights, partition, settings, metrics );

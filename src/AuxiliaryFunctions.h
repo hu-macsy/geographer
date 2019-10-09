@@ -389,6 +389,16 @@ public:
 		const Settings settings);
 	
 	
+    /**@brief Check if distributions align and redistribute if not. Return if redistribution occurred.
+    */
+
+    static bool alignDistributions(
+        scai::lama::CSRSparseMatrix<ValueType>& graph,
+        std::vector<scai::lama::DenseVector<ValueType>>& coords,
+        std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights,
+        scai::lama::DenseVector<IndexType>& partition,
+        const Settings settings);
+
 	
 private:
 

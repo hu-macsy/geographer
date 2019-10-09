@@ -56,6 +56,9 @@ std::ostream& ITI::operator<<( std::ostream& out, const ITI::Tool tool) {
     case Tool::none:
         token = "none";
         break;
+    case Tool::unknown:
+    default:
+        token = "unknown";
     }
 
     out << token;
@@ -97,6 +100,8 @@ std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool) {
         tool = ITI::Tool::parMetisGeom;
     else if( token=="parMetisSFC" or token=="parMetisSfc" or token=="parmetisSFC")
         tool = ITI::Tool::parMetisSFC;
+    else if( token=="parMetisRefine" or token=="parMetisrfc" or token=="parmetisRefine")
+        tool = ITI::Tool::parMetisRefine;
     else if( token=="zoltanRIB" or token=="zoltanRib" or token=="zoltanrib")
         tool = ITI::Tool::zoltanRIB;
     else if( token=="zoltanRCB" or token=="zoltanRcb" or token=="zoltanrcb")
@@ -109,6 +114,8 @@ std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool) {
 		tool = ITI::Tool::myAlgo;
     else if( token=="None" or token=="none")
         tool = ITI::Tool::none;
+    else
+        tool = ITI::Tool::unknown;
 
     return in;
 }
@@ -131,6 +138,9 @@ ITI::Settings::Settings() {
 bool ITI::Settings::checkValidity() {
     if( this->storeInfo && this->outFile=="-" ) {
         this->isValid = false;
+        return false;
+    }
+    if( initialPartition==Tool::unknown or initialPartition==Tool::unknown){
         return false;
     }
 

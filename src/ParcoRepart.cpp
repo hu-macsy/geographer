@@ -292,6 +292,16 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
         //WARNING: the result  is not redistributed. must redistribute afterwards
         if( !settings.noRefinement ) {
 			
+            //store some metrics before local refinement
+            if( settings.metricsDetail.compare("no")!=0 ){
+                Metrics<ValueType> tmpMetrics(settings);
+                Settings tmpSettings = settings;
+                tmpSettings.computeDiameter = false;
+                tmpMetrics.getEasyMetrics( input, result, nodeWeights, tmpSettings);
+                metrics.MM["preliminaryMaxCommVol"] = tmpMetrics.MM["maxCommVolume"];
+                metrics.MM["preliminaryTotalCommVol"] = tmpMetrics.MM["totalCommVolume"];
+            }
+
 			doLocalRefinement( result,  input, coordinates, nodeWeights, comm, settings, metrics );
 
         }
@@ -530,11 +540,14 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 			std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
 		}
 	}
-	
+PRINT0(to_string( settings.localRefAlgo) )	;
     if( settings.localRefAlgo==Tool::parMetisRefine){
 #ifdef PARMETIS_FOUND
 //TODO: get rid of constexpr
         if constexpr ( std::is_same<ValueType,real_t>() ){
+
+            [[maybe_unused]] bool didRedistribution = aux<IndexType,ValueType>::alignDistributions( input, coordinates, nodeWeights, result, settings );
+
             result =  Wrappers<IndexType,ValueType>::refine( input, coordinates, nodeWeights, result, settings, metrics );
         }else{
             //TODO: with constexpr this is not even compiled; does it make sense to have it here or should it be removed?

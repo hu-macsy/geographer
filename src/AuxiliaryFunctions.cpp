@@ -595,7 +595,54 @@ bool ITI::aux<IndexType, ValueType>::checkConsistency(
     }
 
 	return true;
-}
+}//checkConsistency
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+bool aux<IndexType, ValueType>::alignDistributions(
+        scai::lama::CSRSparseMatrix<ValueType> &graph,
+        std::vector<scai::lama::DenseVector<ValueType>> &coords,
+        std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        scai::lama::DenseVector<IndexType>& partition,
+        const Settings settings){
+    //-----------------------------------------
+    //
+    // if distribution do not agree, redistribute
+
+    const scai::dmemo::DistributionPtr graphDist = graph.getRowDistributionPtr();
+    scai::dmemo::CommunicatorPtr comm = graphDist->getCommunicatorPtr();
+
+    bool willRedistribute = false;
+
+    if( not coords[0].getDistributionPtr()->isEqual(*graphDist) ){
+        PRINT0("Coordinate and graph distribution do not agree; will redistribute input");
+        willRedistribute = true;
+    }
+    if( not nodeWeights[0].getDistributionPtr()->isEqual(*graphDist) ){
+        PRINT0("nodeWeights and graph distribution do not agree; will redistribute input");
+        willRedistribute = true;        
+    }
+    if( not partition.getDistributionPtr()->isEqual(*graphDist) ){
+        PRINT0("nodeWeights and graph distribution do not agree; will redistribute input");
+        willRedistribute = true;        
+    }
+    if( not graphDist->isBlockDistributed(comm) ){
+        PRINT0("Input does not have a suitable distribution; will redistribute");
+        willRedistribute = true;            
+    }
+
+    if( willRedistribute ){
+        //TODO: is this redistribution needed?
+        //redistribute
+        //scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, false, true);        
+
+        //TODO?: can also redistribute everything based on a block or genBlock distribution
+        const scai::dmemo::DistributionPtr newGenBlockDist = GraphUtils<IndexType, ValueType>::genBlockRedist(graph);
+        
+        aux<IndexType,ValueType>::redistributeInput( newGenBlockDist, partition, graph, coords, nodeWeights);
+    }
+    return willRedistribute;
+}//alignDistributions
 
 
 template class aux<IndexType, double>;
