@@ -122,6 +122,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::refine
     std::chrono::duration<double> partitionKwayTime = std::chrono::system_clock::now() - startTime;
     double partKwayTime= comm->max(partitionKwayTime.count() );
     metrics.MM["timeFinalPartition"] = partKwayTime;
+    metrics.MM["timeTotal"] = partKwayTime;
 
     //
     // convert partition to a DenseVector
@@ -130,7 +131,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::refine
     scai::lama::DenseVector<IndexType> partitionKway(dist, scai::hmemo::HArray<IndexType>(localN, partKway.data()) );
 
     return partitionKway;
-}
+}//refine
 //-----------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
@@ -406,6 +407,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::repart
     return partition;
 }
 
-template class parmetisWrapper<IndexType, double>;
+template class parmetisWrapper<IndexType, real_t>;
+//template class parmetisWrapper<IndexType, float>;
 
 }//namespace ITI

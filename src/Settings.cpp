@@ -35,6 +35,9 @@ std::ostream& ITI::operator<<( std::ostream& out, const ITI::Tool tool) {
     case Tool::parMetisSFC:
         token = "parMetisSFC";
         break;
+    case Tool::parMetisRefine:
+        token = "parMetisRefine";
+        break;
     case Tool::zoltanRIB:
         token = "zoltanRIB";
         break;

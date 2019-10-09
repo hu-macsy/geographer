@@ -34,6 +34,10 @@
 #include "GraphUtils.h"
 #include "Mapping.h"
 
+#if PARMETIS_FOUND
+#include "Wrappers.h"
+#include <parmetis.h>
+#endif
 
 namespace ITI {
 
@@ -438,17 +442,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         SCAI_ASSERT_EQ_ERROR( result.max(), settings.numBlocks -1, "Wrong index in partition" );
         //assert(result.max() == settings.numBlocks -1);
         assert(result.min() == 0);
-/*        
-{
-    scai::hmemo::HArray< IndexType > myGlobalInd;
-    coordinates[0].getDistributionPtr()->getOwnedIndexes(myGlobalInd);
-    //std::cout<< myGlobalInd[0] << std::endl;
-    PRINT(*comm << ": coords " << myGlobalInd[0] );
-    scai::hmemo::HArray< IndexType > myGlobalIndCopy;
-    coordinateCopy[0].getDistributionPtr()->getOwnedIndexes(myGlobalIndCopy);
-    PRINT(*comm << ": coordsCopy " << myGlobalIndCopy[0] );
-}
-*/
         SCAI_ASSERT_ERROR( result.getDistributionPtr()->isEqual(coordinateCopy[0].getDistribution()), "Distribution mismatch");
 
     } else if (settings.initialPartition == ITI::Tool::geoMS) {// multisection
@@ -478,17 +471,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
     }else {
         throw std::runtime_error("Initial Partitioning mode unsupported.");
     }
-/*    
-{
-    scai::hmemo::HArray< IndexType > myGlobalInd;
-    coordinates.getDistributionPtr()->getOwnedIndexes(myGlobalInd);
-    //std::cout<< myGlobalInd[0] << std::endl;
-    PRINT(*comm << ": coords " << myGlobalInd[0] );
-    scai::hmemo::HArray< IndexType > myGlobalIndCopy;
-    coordinateCopy.getDistributionPtr()->getOwnedIndexes(myGlobalInd);
-    PRINT(*comm << ": coordsCopy " << myGlobalIndCopy[0] );
-}     
-*/
+
     //if using k-means the result has different distribution
     if( not result.getDistributionPtr()->isEqual( coordinates[0].getDistribution()) ){
         result.redistribute( coordinates[0].getDistributionPtr() );
@@ -548,10 +531,49 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 		}
 	}
 	
-	SCAI_REGION_START("ParcoRepart.doLocalRefinement.multiLevelStep")
-	scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
-	ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights[0], coordinates, halo, settings, metrics);
-	SCAI_REGION_END("ParcoRepart.doLocalRefinement.multiLevelStep")
+    if( settings.localRefAlgo==Tool::parMetisRefine){
+#ifdef PARMETIS_FOUND
+//TODO: get rid of constexpr
+        if constexpr ( std::is_same<ValueType,real_t>() ){
+            result =  Wrappers<IndexType,ValueType>::refine( input, coordinates, nodeWeights, result, settings, metrics );
+        }else{
+            //TODO: with constexpr this is not even compiled; does it make sense to have it here or should it be removed?
+            PRINT0("*** WARNING: Requested local refinement with parmetis. Parmetis is found but compiled with a different type for ValueType. Will cast everything to real_t.");
+            //TODO: not tested code
+            /*
+            scai::lama::CSRSparseMatrix<real_t> copyGraph;
+            std::vector<DenseVector<real_t>> copyCoords;
+            std::vector<DenseVector<real_t>> copyWeights;
+            //TODO: convert properly to Metrics<float>
+            Metrics<real_t> copyMetrics;// = metrics;
+            copyGraph.assign(input);
+
+            for(int d=0; d<settings.dimensions; d++){
+                copyCoords[d].assign( coordinates[d] );
+            }
+            for(int w=0; w<nodeWeights.size(); w++ ){
+                copyWeights[w].assign( nodeWeights[w] );
+            }
+            result =  Wrappers<IndexType,real_t>::refine( copyGraph, copyCoords, copyWeights, result, settings, copyMetrics );
+            */
+        }
+        if( not std::is_same<ValueType,real_t>() ){
+            PRINT0("*** ERROR: Requested local refinement with parmetis. Parmetis is found but compiled with a different type for ValueType. Local refinement will not take place. Either compile geographer and parmetis so that real_t=ValueType or choose some other local refinement algorithm.\nAborting...");
+            std::exit(-1);
+        }
+#else
+        PRINT0("*** ERROR: requested local refinement using parmetis (settings.localRefAlgo) but parmetis was not installed. Either install parmetis or pick another local refinement method.\nAborting...");
+        //TODO: is this the best way to abort?
+        std::exit(-1);
+#endif
+    } else if( settings.localRefAlgo==Tool::parMetisRefine){
+    	SCAI_REGION("ParcoRepart.doLocalRefinement.multiLevelStep")
+    	scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
+    	ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights[0], coordinates, halo, settings, metrics);
+    }else{
+        PRINT("Provided algorithm for local refinement is "<< to_string(settings.localRefAlgo) << " but is not currently supported. Pick geographer or parMetisRefine. \nAborting...");
+        std::exit(-1);
+    }
 			
 }//doLocalRefinement
 //---------------------------------------------------------------------------------------

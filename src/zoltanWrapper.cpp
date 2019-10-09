@@ -239,5 +239,6 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
 //---------------------------------------------------------------------------------------
 
 template class zoltanWrapper<IndexType, double>;
+template class zoltanWrapper<IndexType, float>;
 
 }//namespace ITI

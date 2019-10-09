@@ -95,6 +95,7 @@ int main(int argc, char** argv) {
             if(outF.is_open()) {
                 outF << "Running " << __FILE__ << std::endl;
                 settings.print( outF, comm);
+                outF << "Metrics after the first partition with " << settings.initialPartition << std::endl;
 
                 metricsBefore.print( outF );
                 std::cout<< "Output information written to file " << settings.outFile << std::endl;
@@ -152,18 +153,18 @@ int main(int argc, char** argv) {
     Metrics<ValueType> metrics(settings);
 
     DenseVector<IndexType> refinedPartition = Wrappers<IndexType,ValueType>::refine( graph, coords, nodeWeights, partition, settings, metrics );
+    
+    PRINT0("\tFinished metis refinement\n");
 
     metrics.getMetrics( graph, refinedPartition, nodeWeights, settings );
     if (comm->getRank() == 0 && settings.metricsDetail.compare("no") != 0) {
         metrics.print( std::cout );
 
         if( settings.storeInfo && settings.outFile!="-" ){
-            std::ofstream outF( settings.outFile, std::ios::out);
+            std::ofstream outF( settings.outFile, std::ios::app);
             if(outF.is_open()) {
-                outF << "Running " << __FILE__ << std::endl;
-                settings.print( outF, comm);
-
-                metricsBefore.print( outF );
+                outF << "\n### Metrics after the metis local refinement\n" << std::endl;
+                metrics.print( outF );
                 std::cout<< "Output information written to file " << settings.outFile << std::endl;
             }else{
                 std::cout<< "Could not open file " << settings.outFile << " information not stored"<< std::endl;

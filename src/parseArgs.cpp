@@ -231,7 +231,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         std::vector<IndexType> cutsPerDim;
         IndexType product = 1;
 
-        while (!std::getline(ss, item, ' ').fail()) {
+        while (!std::getline(ss, item, ',').fail()) {
             IndexType cutsInDim = std::stoi(item);
             cutsPerDim.push_back(cutsInDim);
             product *= cutsInDim;

@@ -18,7 +18,6 @@
 
 namespace ITI {
 
-//using ValueType= real_t;
 
 template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
@@ -174,8 +173,8 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
     return parmetisWrapper<IndexType,ValueType>::refine( graph, coords, nodeWeights, partition, settings, metrics );
 }
 
-//template class Wrappers<IndexType, double>;
+template class Wrappers<IndexType, double>;
 //template class Wrappers<IndexType, float>;
-template class Wrappers<IndexType, real_t>;
+//template class Wrappers<IndexType, real_t>;
 
 }//namespace

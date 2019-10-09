@@ -128,7 +128,7 @@ inline std::ostream& operator<<(std::ostream& out, Format method) {
 - zoltanMJ Partition a point set (no graph is needed) using the Multijagged algorithm of zoltan2.
 - zoltanMJ Partition a point set (no graph is needed) using the space filling curves algorithm of zoltan2.
 */
-enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, myAlgo, none};
+enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, parMetisRefine, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, myAlgo, none};
 
 
 std::istream& operator>>(std::istream& in, ITI::Tool& tool);
@@ -196,6 +196,7 @@ struct Settings {
     bool useGeometricTieBreaking = false;	///< if distance from center should be used for tie braking
     bool gainOverBalance = false;
     bool skipNoGainColors = false;			///< if we should skip some rounds if there is no gain
+    ITI::Tool localRefAlgo = ITI::Tool::geographer; ///< with which algorithm to do local refinement
     //@}
 
     /** @name Space filling curve parameters
