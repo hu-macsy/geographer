@@ -2086,7 +2086,12 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
     }
 
     file.close();
-    std::cout << "Read file, found or created " << nodeMap.size() << " nodes and pending edges for " << pendingEdges.size() << " ghost nodes." << std::endl;
+
+    //only used form printing messaged
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    if(comm->getRank()==0){
+        std::cout << "Read file, found or created " << nodeMap.size() << " nodes and pending edges for " << pendingEdges.size() << " ghost nodes." << std::endl;
+    }
     if (duplicateNeighbors > 0) {
         std::cout << "Found " << duplicateNeighbors << " duplicate neighbors." << std::endl;
     }
@@ -2102,8 +2107,9 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
         nodesInForest += root->countNodes();
     }
 
-    std::cout << "Found " << roots.size() << " roots with " << nodesInForest << " nodes hanging from them." << std::endl;
-
+    if(comm->getRank()==0){
+        std::cout << "Found " << roots.size() << " roots with " << nodesInForest << " nodes hanging from them." << std::endl;
+    }
     assert(nodesInForest == nodeMap.size());
 
     //check whether all nodes have either no or the full amount of children
@@ -2144,8 +2150,10 @@ CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readQuadTree( std::stri
         i++;
     }
     assert(nodeMap.size() == i++);
-    std::cout << "Read " << totalEdges << " confirmed edges, among them " << leafEdges << " edges between " << numLeaves << " leaves." << std::endl;
-
+    if(comm->getRank()==0){
+        std::cout << "Read " << totalEdges << " confirmed edges, among them " << leafEdges << " edges between " << numLeaves << " leaves." << std::endl;
+    }
+    
     /*
      * now convert into CSRSparseMatrix
      */

@@ -288,7 +288,7 @@ TYPED_TEST(FileIOTest, testReadCoordsOcean) {
 TYPED_TEST(FileIOTest, testReadQuadTree) {
     using ValueType = TypeParam;
 
-    std::string filename = FileIOTest<ValueType>::graphPath + "cells.dat";
+    std::string filename = FileIOTest<ValueType>::graphPath + "cells_small.dat";
 
     scai::lama::CSRSparseMatrix<ValueType> matrix = FileIO<IndexType, ValueType>::readQuadTree(filename);
 

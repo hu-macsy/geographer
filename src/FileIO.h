@@ -215,8 +215,6 @@ public:
     static std::vector<DenseVector<ValueType>> readCoordsTEEC ( std::string filename, IndexType numberOfCoords, IndexType dimension, std::vector<DenseVector<ValueType>>& nodeWeights);
 
 
-    //static DenseVector<IndexType> readPartition(const std::string filename);
-
     /**
      * Reads a quadtree as specified in the format of Michael Selzer.
      @param[in] filename The name of the file to read from.

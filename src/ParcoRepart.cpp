@@ -566,12 +566,12 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
         //TODO: is this the best way to abort?
         std::exit(-1);
 #endif
-    } else if( settings.localRefAlgo==Tool::parMetisRefine){
+    } else if( settings.localRefAlgo==Tool::geographer){
     	SCAI_REGION("ParcoRepart.doLocalRefinement.multiLevelStep")
     	scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
     	ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights[0], coordinates, halo, settings, metrics);
     }else{
-        PRINT("Provided algorithm for local refinement is "<< to_string(settings.localRefAlgo) << " but is not currently supported. Pick geographer or parMetisRefine. \nAborting...");
+        PRINT0("Provided algorithm for local refinement is "<< to_string(settings.localRefAlgo) << " but is not currently supported. Pick geographer or parMetisRefine. \nAborting...");
         std::exit(-1);
     }
 			
