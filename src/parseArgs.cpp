@@ -216,7 +216,6 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("initialPartition")) {
         settings.initialPartition = vm["initialPartition"].as<Tool>();
     }
-PRINT0( vm["initialPartition"].as<Tool>() << "  " << settings.initialPartition )  ;    
     if (vm.count("multiLevelRounds")) {
         settings.multiLevelRounds = vm["multiLevelRounds"].as<IndexType>();
     }
@@ -232,7 +231,6 @@ PRINT0( vm["initialPartition"].as<Tool>() << "  " << settings.initialPartition )
     if (vm.count("localRefAlgo")) {
         settings.localRefAlgo = vm["localRefAlgo"].as<Tool>();
     }
-PRINT0( to_string(vm["localRefAlgo"].as<Tool>()) << "  " << to_string( settings.localRefAlgo) )  ;    
     if (vm.count("cutsPerDim")) {
         std::stringstream ss( vm["cutsPerDim"].as<std::string>() );
         std::string item;
@@ -279,11 +277,10 @@ PRINT0( to_string(vm["localRefAlgo"].as<Tool>()) << "  " << to_string( settings.
         std::vector<IndexType> hierLevels;
         IndexType product = 1;
 
-        while (!std::getline(ss, item, ' ').fail()) {
+        while (!std::getline(ss, item, ',').fail()) {
             IndexType blocksInLevel = std::stoi(item);
             hierLevels.push_back(blocksInLevel);
             product *= blocksInLevel;
-            std::cout << product << std::endl;
         }
 
         settings.hierLevels = hierLevels;

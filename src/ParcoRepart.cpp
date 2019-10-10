@@ -399,7 +399,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         }
 
         // vector of size k, each element represents the size of one block
-        std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors(1);
+        std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
         SCAI_ASSERT_EQ_ERROR( blockSizes.size(), nodeWeights.size(), "Wrong number of weights");
         SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of weights" );
         if( blockSizes.empty() ) {
