@@ -184,7 +184,7 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 template <typename IndexType, typename ValueType>
 void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights ) {
 
-    if( areWeightsAdapted ) {
+    if( areWeightsAdaptedV ) {
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
         if( comm->getRank()==0 )
             std::cout<< " Tree node weights are already adapted, skipping adaptWeights " << std::endl;
@@ -225,7 +225,7 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
         tree.clear();
         [[maybe_unused]] IndexType size = createTreeFromLeaves( hierLevel );
 
-        areWeightsAdapted = true;
+        areWeightsAdaptedV = true;
     }
 }//adaptWeights
 
@@ -428,7 +428,7 @@ std::vector<ValueType> CommTree<IndexType,ValueType>::computeImbalance(
     const IndexType numLeaves = leaves.size();
     SCAI_ASSERT_EQ_ERROR( numLeaves, k, "Number of blocks of the partition and number of leaves of the tree do not agree" );
 
-    if( not areWeightsAdapted ) {
+    if( not areWeightsAdaptedV ) {
         std::cout<<"Warning, tree weights are not adapted according to the input graph node weights. Will adapt first and then calculate imbalances." << std::endl;
         //this line can change the tree. Without it the function can be const
         this->adaptWeights( nodeWeights );

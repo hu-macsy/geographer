@@ -416,17 +416,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         } else if (settings.initialPartition == ITI::Tool::geoKmeans) {
             result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
         } else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart) {
-            const IndexType numWeights = nodeWeightCopy.size();
-            SCAI_ASSERT_GT_ERROR( settings.hierLevels.size(), 0, "Must provide the tree level sizes in order to call hierarchical KMeans" );
-            //TODO: adapt also for when tree is given in a file
 
-            CommTree<IndexType,ValueType> commTree( settings.hierLevels, numWeights );
-            const IndexType numLeaves = commTree.getNumLeaves();
-            PRINT0("About to call hierarchical kmeans with " << settings.hierLevels.size() << " levels and " << numLeaves << " leaves." );
-            SCAI_ASSERT_EQ_ERROR( numLeaves, settings.numBlocks, "The number of leaves and blocks should agree" );
-
-            commTree.adaptWeights( nodeWeightCopy );
-
+            SCAI_ASSERT_ERROR( commTree.areWeightsAdapted(), "The weight of the tree are not adapted; should call tree.adaptWeights()" );
+            SCAI_ASSERT_EQ_ERROR( commTree.getNumLeaves(), settings.numBlocks, "The number of leaves and blocks should agree" );            
             if (settings.initialPartition == ITI::Tool::geoHierKM) {
                 result = ITI::KMeans<IndexType,ValueType>::computeHierarchicalPartition( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
             }
@@ -434,8 +426,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
                 //settings.debugMode = true;
                 result = ITI::KMeans<IndexType,ValueType>::computeHierPlusRepart( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
             }
-            SCAI_ASSERT_EQ_ERROR( nodeWeightCopy[0].getDistributionPtr()->getLocalSize(),\
-                                  result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
+            SCAI_ASSERT_EQ_ERROR( nodeWeightCopy[0].getDistributionPtr()->getLocalSize(), \
+                result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
         }
 
         std::chrono::duration<double>  kMeansTime = std::chrono::steady_clock::now() - beforeKMeans;
@@ -501,7 +493,6 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 	Metrics<ValueType>& metrics){
 
 	SCAI_REGION("ParcoRepart.doLocalRefinement");		
-	std::chrono::time_point<std::chrono::steady_clock> start =  std::chrono::steady_clock::now();
 	
 	//uncomment to store the first, geometric partition into a file that then can be visualized using matlab and GPI's code
 	//std::string filename = "geomPart.mtx";
@@ -510,7 +501,9 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 	if (nodeWeights.size() > 1) {
 		throw std::logic_error("Local refinement not yet implemented for multiple weights.");
 	}
-	
+
+    std::chrono::time_point<std::chrono::steady_clock> start =  std::chrono::steady_clock::now();	
+
 	/*
 	 * redistribute to prepare for local refinement
 	 */
