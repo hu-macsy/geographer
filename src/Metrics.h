@@ -36,7 +36,7 @@ public:
     //MM, metrics map
     std::map<std::string,ValueType> MM = {
         {"timeMigrationAlgo",-1.0}, {"timeFirstDistribution",-1.0}, {"timeTotal",-1.0}, {"timeSpMV",-1.0}, {"timeComm",-1.0}, {"reportTime",-1.0},
-        {"inputTime",-1.0}, {"timeFinalPartition",-1.0}, {"timeSecondDistribution",-1.0}, {"timePreliminary",-1.0},
+        {"inputTime",-1.0}, {"timeFinalPartition",-1.0}, {"timeSecondDistribution",-1.0}, {"timePreliminary",-1.0}, {"timeLocalRef",-1.0},
         {"preliminaryCut",-1.0}, {"preliminaryImbalance",-1.0}, {"finalCut",-1.0}, {"finalImbalance",-1.0}, {"maxBlockGraphDegree",-1.0},
         {"preliminaryMaxCommVol",-1.0},{"preliminaryTotalCommVol",-1.0},
         {"totalBlockGraphEdges",-1.0}, {"maxCommVolume",-1.0}, {"totalCommVolume",-1.0}, {"maxBoundaryNodes",-1.0}, {"totalBoundaryNodes",-1.0},

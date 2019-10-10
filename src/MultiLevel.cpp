@@ -50,7 +50,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         SCAI_REGION_START( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
         CSRSparseMatrix<ValueType> coarseGraph;
         DenseVector<IndexType> fineToCoarseMap;
-        std::chrono::time_point<std::chrono::system_clock> beforeCoarse =  std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> beforeCoarse =  std::chrono::steady_clock::now();
 
         if (comm->getRank() == 0) {
             std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
@@ -81,7 +81,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
         assert(coarseWeights.sum() == nodeWeights.sum());
 
-        std::chrono::duration<double> coarseningTime =  std::chrono::system_clock::now() - beforeCoarse;
+        std::chrono::duration<double> coarseningTime =  std::chrono::steady_clock::now() - beforeCoarse;
         ValueType timeForCoarse = ValueType ( comm->max(coarseningTime.count() ));
         if (comm->getRank() == 0) std::cout << "Time for coarsening:" << timeForCoarse << std::endl;
 
@@ -97,7 +97,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         {
             SCAI_REGION( "MultiLevel.multiLevelStep.uncoarsen" )
             // uncoarsening/refinement
-            std::chrono::time_point<std::chrono::system_clock> beforeUnCoarse =  std::chrono::system_clock::now();
+            std::chrono::time_point<std::chrono::steady_clock> beforeUnCoarse =  std::chrono::steady_clock::now();
             DenseVector<IndexType> fineTargets = getFineTargets(coarseOrigin, fineToCoarseMap);
             auto redistributor = scai::dmemo::redistributePlanByNewOwners( fineTargets.getLocalValues(), fineTargets.getDistributionPtr());
             scai::dmemo::DistributionPtr projectedFineDist = redistributor.getTargetDistributionPtr();
@@ -118,7 +118,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
             origin.redistribute(redistributor);
 
-            std::chrono::duration<double> uncoarseningTime =  std::chrono::system_clock::now() - beforeUnCoarse;
+            std::chrono::duration<double> uncoarseningTime =  std::chrono::steady_clock::now() - beforeUnCoarse;
             ValueType time = ValueType ( comm->max(uncoarseningTime.count() ));
             if (comm->getRank() == 0) std::cout << "Time for uncoarsening:" << time << std::endl;
         }
@@ -135,23 +135,23 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
             //TODO: this workos only for 12 rounds
             PRINT0( "thisRound= " << settings.thisRound << " , multiLevelRounds= " << settings.multiLevelRounds);
             if( settings.thisRound==0) {
-                std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
+                std::chrono::time_point<std::chrono::steady_clock> before =  std::chrono::steady_clock::now();
                 std::string filename = settings.fileName+ "_k"+ std::to_string(settings.numBlocks)+ ".PEgraph";
                 if( not FileIO<IndexType,ValueType>::fileExists(filename) ) {
                     FileIO<IndexType,ValueType>::writeGraph(processGraph, filename, 1);
                 }
-                std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - before;
+                std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - before;
                 PRINT0("time to write PE graph: :" << elapTime.count() );
             }
         }
 
-        std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> before =  std::chrono::steady_clock::now();
 
         std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph, settings);
 
         std::vector<IndexType> nodesWithNonLocalNeighbors = GraphUtils<IndexType, ValueType>::getNodesWithNonLocalNeighbors(input);
 
-        std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - before;
+        std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - before;
         ValueType maxTime = comm->max( elapTime.count() );
         ValueType minTime = comm->min( elapTime.count() );
         if (settings.verbose) PRINT0("getCommPairs and border nodes: time " << minTime << " -- " << maxTime );
@@ -167,14 +167,14 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         ValueType gain = 0;
         while (numRefinementRounds == 0 || gain >= settings.minGainForNextRound) {
 
-            std::chrono::time_point<std::chrono::system_clock> beforeFMStep =  std::chrono::system_clock::now();
+            std::chrono::time_point<std::chrono::steady_clock> beforeFMStep =  std::chrono::steady_clock::now();
 
             /* TODO: if getting the graph is fast, maybe doing it in every step might help
             // get graph before every step
             processGraph = GraphUtils::getPEGraph<IndexType, ValueType>(input);
             communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph, settings);
             nodesWithNonLocalNeighbors = GraphUtils::getNodesWithNonLocalNeighbors<IndexType, ValueType>(input);
-            elapTime = std::chrono::system_clock::now() - beforeFMStep;
+            elapTime = std::chrono::steady_clock::now() - beforeFMStep;
             maxTime = comm->max( elapTime.count() );
             minTime = comm->min( elapTime.count() );
 
@@ -200,7 +200,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
                 }
             }
 
-            std::chrono::duration<double> elapTimeFMStep = std::chrono::system_clock::now() - beforeFMStep;
+            std::chrono::duration<double> elapTimeFMStep = std::chrono::steady_clock::now() - beforeFMStep;
             ValueType FMStepTime = comm->max( elapTimeFMStep.count() );
             //PRINT0(" one FM step time: " << FMStepTime );
 
@@ -228,7 +228,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
             }
 
         }
-        std::chrono::duration<double> elapTime2 = std::chrono::system_clock::now() - before;
+        std::chrono::duration<double> elapTime2 = std::chrono::steady_clock::now() - before;
         //ValueType refineTime = comm->max( elapTime2.count() );
         //PRINT0("local refinement time: " << refineTime );
     }

@@ -401,19 +401,19 @@ TYPED_TEST(FileIOTest, testReadMatrixMarketFormat) {
     
     ITI::Format ff = ITI::Format::MATRIXMARKET;
 
-    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
     std::tie( N, dimensions) = FileIO<IndexType, ValueType>::getMatrixMarketCoordsInfos( coordFile );
     PRINT0(" number of points= " << N << ", dimensions= " << dimensions);
 
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions, ff);
 
-    std::chrono::duration<double> readTime =  std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> readTime =  std::chrono::steady_clock::now() - startTime;
     PRINT0("Read " << coords.size() << " coordinates in time " << readTime.count() );
 
-    startTime = std::chrono::system_clock::now();
+    startTime = std::chrono::steady_clock::now();
     scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( graphFile, ff);
-    readTime =  std::chrono::system_clock::now() - startTime;
+    readTime =  std::chrono::steady_clock::now() - startTime;
 
     PRINT0("Read  graph in time " << readTime.count() );
 

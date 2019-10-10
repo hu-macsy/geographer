@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
     /* timing information
      */
 
-    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
     if (comm->getRank() == 0) {
         std::string inputstring;
@@ -203,7 +203,7 @@ int main(int argc, char** argv) {
     //
 
     comm->synchronize();
-    std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> inputTime = std::chrono::steady_clock::now() - startTime;
 
     assert(N > 0);
 
@@ -270,13 +270,13 @@ int main(int argc, char** argv) {
         //metricsVec.push_back( Metrics( comm->getSize()) );
         metricsVec.push_back( Metrics<ValueType>( settings ) );
 
-        std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> beforePartTime =  std::chrono::steady_clock::now();
 
         partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, commTree, settings, metricsVec[r] );
         assert( partition.size() == N);
         assert( coordinates[0].size() == N);
 
-        std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
+        std::chrono::duration<double> partitionTime =  std::chrono::steady_clock::now() - beforePartTime;
 
         //WARNING: with the noRefinement flag the partition is not distributed
         if (!comm->all(partition.getDistribution().isEqual(graph.getRowDistribution()))) {
@@ -290,14 +290,14 @@ int main(int argc, char** argv) {
         // Get metrics
         //
 
-        std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> beforeReport = std::chrono::steady_clock::now();
 
         metricsVec[r].getMetrics(graph, partition, nodeWeights, settings );
 
         metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
-        metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));
+        //metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));
 
-        std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
+        std::chrono::duration<double> reportTime =  std::chrono::steady_clock::now() - beforeReport;
 
         //---------------------------------------------
         //
@@ -338,7 +338,7 @@ int main(int argc, char** argv) {
         comm->synchronize();
     }// repeat loop
 
-    std::chrono::duration<double> totalTime =  std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> totalTime =  std::chrono::steady_clock::now() - startTime;
     ValueType totalT = ValueType ( comm->max(totalTime.count() ));
 
     //
@@ -394,11 +394,11 @@ int main(int argc, char** argv) {
 
 
     if( settings.outFile!="-" and settings.storePartition ) {
-        std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> beforePartWrite = std::chrono::steady_clock::now();
         std::string partOutFile = settings.outFile+".part";
         ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
 
-        std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
+        std::chrono::duration<double> writePartTime =  std::chrono::steady_clock::now() - beforePartWrite;
         if( comm->getRank()==0 ) {
             std::cout << " and last partition of the series in file " << partOutFile << std::endl;
             std::cout<< " Time needed to write .part file: " << writePartTime.count() <<  std::endl;

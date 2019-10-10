@@ -23,7 +23,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     const std::vector<DenseVector<IndexType>>& communicationScheme,
     Settings settings) {
 
-    std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
 
     SCAI_REGION( "LocalRefinement.distributedFMStep" )
     const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
@@ -83,7 +83,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
         }
     }
 
-    std::chrono::duration<double> beforeLoop = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> beforeLoop = std::chrono::steady_clock::now() - startTime;
     if(settings.verbose) {
         //ValueType t1 = comm->max(beforeLoop.count());
         //PRINT0("time elapsed before main loop: " << t1 );

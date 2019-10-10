@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
     using namespace ITI;
     typedef double ValueType;   //use double
 
-    std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     if (comm->getType() != scai::dmemo::CommunicatorType::MPI) {
@@ -197,7 +197,7 @@ int main(int argc, char** argv) {
         //get the partition
         partition = ITI::Wrappers<IndexType,ValueType>::partition ( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
 
-        PRINT0("time to get the partition: " <<  metrics.MM["timeFinalPartition"] );
+        PRINT0("time to get the partition: " <<  metrics.MM["timeTotal"] );
 
         // partition has the the same distribution as the graph rows
         SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
@@ -250,11 +250,11 @@ int main(int argc, char** argv) {
         }
 
         if( outFile!="-" and settings.storePartition ) {
-            std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
+            std::chrono::time_point<std::chrono::steady_clock> beforePartWrite = std::chrono::steady_clock::now();
             std::string partOutFile = outFile+".part";
             ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
 
-            std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
+            std::chrono::duration<double> writePartTime =  std::chrono::steady_clock::now() - beforePartWrite;
             if( comm->getRank()==0 ) {
                 std::cout << " and last partition of the series in file " << partOutFile << std::endl;
                 std::cout<< " Time needed to write .partition file: " << writePartTime.count() <<  std::endl;
@@ -288,7 +288,7 @@ int main(int argc, char** argv) {
 
     } // for wantedTools.size()
 
-    std::chrono::duration<ValueType> totalTimeLocal = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<ValueType> totalTimeLocal = std::chrono::steady_clock::now() - startTime;
     ValueType totalTime = comm->max( totalTimeLocal.count() );
     if( thisPE==0 ) {
         std::cout<<"Exiting file " << __FILE__ << " , total time= " << totalTime <<  std::endl;

@@ -91,18 +91,18 @@ TYPED_TEST(MultiSectionTest, testComputePartitionNonUniformFromFile) {
     //
     // get the partition with multisection and one with bisection
     //
-    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
     scai::lama::DenseVector<IndexType> partitionMS =  MultiSection<IndexType, ValueType>::computePartition( adjM, coordinates, nodeWeights, settings);
 
-    std::chrono::duration<double> partitionMSTime = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> partitionMSTime = std::chrono::steady_clock::now() - startTime;
 
-    startTime = std::chrono::system_clock::now();
+    startTime = std::chrono::steady_clock::now();
 
     settings.bisect = 1;
     scai::lama::DenseVector<IndexType> partitionBS =  MultiSection<IndexType, ValueType>::computePartition( adjM, coordinates, nodeWeights, settings);
 
-    std::chrono::duration<double> partitionBSTime = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> partitionBSTime = std::chrono::steady_clock::now() - startTime;
 
     if (comm->getRank() == 0) {
         std::cout<< "Time to partition with multisection: "<< partitionMSTime.count() << std::endl;
@@ -147,13 +147,13 @@ TYPED_TEST(MultiSectionTest, testGetRectangles) {
     settings.dimensions = dim;
     settings.numBlocks = 125;
 
-    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
     std::shared_ptr<rectCell<IndexType,ValueType>> root= MultiSection<IndexType, ValueType>::getRectangles( nodeWeights, sideLen, settings);
 
     std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> rectangles = root->getAllLeaves();
 
-    std::chrono::duration<double> partitionTime = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> partitionTime = std::chrono::steady_clock::now() - startTime;
 
     if (comm->getRank() == 0) {
         std::cout<< "Time to partition: "<< partitionTime.count() << std::endl;
@@ -888,13 +888,13 @@ TYPED_TEST(MultiSectionTest, testGetRectanglesNonUniform) {
     settings.numBlocks = k;
     settings.useIter = false;
 
-    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
     std::shared_ptr<rectCell<IndexType,ValueType>> root = MultiSection<IndexType, ValueType>::getRectanglesNonUniform( adjM, coords, nodeWeights, minCoords, maxCoords, settings);
 
     std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> rectangles = root->getAllLeaves();
 
-    std::chrono::duration<double> partitionTime = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> partitionTime = std::chrono::steady_clock::now() - startTime;
 
     if (comm->getRank() == 0) {
         std::cout<< "Time to partition: "<< partitionTime.count() << std::endl;
@@ -1086,13 +1086,13 @@ TYPED_TEST(MultiSectionTest, testGetRectanglesNonUniformFile) {
     settings.dimensions = dimensions;
     settings.numBlocks = k;
 
-    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
     std::shared_ptr<rectCell<IndexType,ValueType>> root = MultiSection<IndexType, ValueType>::getRectanglesNonUniform( adjM, scaledCoords, nodeWeights, scaledMin, scaledMax, settings);
 
     std::vector<std::shared_ptr<rectCell<IndexType,ValueType>>> rectangles = root->getAllLeaves();
 
-    std::chrono::duration<double> partitionTime = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> partitionTime = std::chrono::steady_clock::now() - startTime;
 
     if (comm->getRank() == 0) {
         std::cout<< "Time to partition: "<< partitionTime.count() << std::endl;

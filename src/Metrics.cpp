@@ -212,7 +212,7 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
     //get the distribution from the partition
     scai::dmemo::DistributionPtr distFromPartition = scai::dmemo::generalDistributionByNewOwners( partition.getDistribution(), partition.getLocalValues() );
 
-    std::chrono::time_point<std::chrono::system_clock> beforeRedistribution = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> beforeRedistribution = std::chrono::steady_clock::now();
 
     // redistribute graph according to partition distribution
     // distribute only rows for the diameter calculation
@@ -222,7 +222,7 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
     scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph );
     copyGraph.redistribute(distFromPartition, noDistPtr);
 
-    std::chrono::duration<ValueType> redistributionTime =  std::chrono::system_clock::now() - beforeRedistribution;
+    std::chrono::duration<ValueType> redistributionTime =  std::chrono::steady_clock::now() - beforeRedistribution;
 
     ValueType time = 0;
     time = comm->max( redistributionTime.count() );
@@ -258,12 +258,12 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
         comm->synchronize();
 
         // perfom the actual multiplication
-        std::chrono::time_point<std::chrono::system_clock> beforeSpMVTime = std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> beforeSpMVTime = std::chrono::steady_clock::now();
         for(IndexType r=0; r<repeatTimes; r++) {
             y = copyGraph *x +y;
         }
         comm->synchronize();
-        std::chrono::duration<ValueType> SpMVTime = std::chrono::system_clock::now() - beforeSpMVTime;
+        std::chrono::duration<ValueType> SpMVTime = std::chrono::steady_clock::now() - beforeSpMVTime;
         //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
 
         time = comm->max(SpMVTime.count());
@@ -286,12 +286,12 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
         scai::hmemo::HArray<ValueType> recvData;
 
         comm->synchronize();
-        std::chrono::time_point<std::chrono::system_clock> beforeCommTime = std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> beforeCommTime = std::chrono::steady_clock::now();
         for ( IndexType i = 0; i < repeatTimes; ++i ) {
             comm->exchangeByPlan( recvData, recvPlan, sendData, sendPlan );
         }
         //comm->synchronize();
-        std::chrono::duration<ValueType> commTime = std::chrono::system_clock::now() - beforeCommTime;
+        std::chrono::duration<ValueType> commTime = std::chrono::steady_clock::now() - beforeCommTime;
 
         //PRINT(*comm << ": "<< sendPlan );
         time = comm->max(commTime.count());

@@ -312,7 +312,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeCut(const CSRSparseMatrix<Valu
     const IndexType localN = inputDist->getLocalSize();
     //const IndexType maxBlockID = part.max();
 
-    std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
 
     if (partDist->getLocalSize() != localN) {
         PRINT(comm->getRank() << ": Local mismatch for matrix and partition");
@@ -369,7 +369,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeCut(const CSRSparseMatrix<Valu
         result = inputDist->getCommunicatorPtr()->sum(result);
     }
 
-    std::chrono::duration<double> endTime = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> endTime = std::chrono::steady_clock::now() - startTime;
     double totalTime= comm->max(endTime.count() );
 
     if( comm->getRank()==0 ) {
@@ -713,7 +713,7 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> GraphUtils<IndexType, V
     if( comm->getRank()==0 ) {
         std::cout<<"Computing the border and inner nodes..." << std::endl;
     }
-    std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
 
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
     const IndexType localN = dist->getLocalSize();
@@ -777,7 +777,7 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> GraphUtils<IndexType, V
 
     comm->sumImpl( innerNodesPerBlock.data(), innerNodesPerBlock.data(), max+1, scai::common::TypeTraits<IndexType>::stype);
 
-    std::chrono::duration<double> endTime = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> endTime = std::chrono::steady_clock::now() - startTime;
     double totalTime= comm->max(endTime.count() );
     if( comm->getRank()==0 ) {
         std::cout<<"\t\t\t time to get number of border and inner nodes : " << totalTime <<  std::endl;
@@ -796,7 +796,7 @@ std::vector<IndexType> GraphUtils<IndexType, ValueType>::computeCommVolume( cons
         std::cout<<"Computing the communication volume ...";
         std::cout.flush();
     }
-    std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
 
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
     const IndexType localN = dist->getLocalSize();
@@ -854,7 +854,7 @@ std::vector<IndexType> GraphUtils<IndexType, ValueType>::computeCommVolume( cons
     // sum local volume
     comm->sumImpl( commVolumePerBlock.data(), commVolumePerBlock.data(), numBlocks, scai::common::TypeTraits<IndexType>::stype);
 
-    std::chrono::duration<double> endTime = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> endTime = std::chrono::steady_clock::now() - startTime;
     double totalTime= comm->max(endTime.count() );
     if( comm->getRank()==0 && settings.verbose) {
         std::cout<<" done in " << totalTime <<  std::endl;
@@ -878,7 +878,7 @@ Settings settings) {
         std::cout<<"Computing the communication volume, number of border and inner nodes ...";
         std::cout.flush();
     }
-    std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
 
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
     const IndexType localN = dist->getLocalSize();
@@ -953,7 +953,7 @@ Settings settings) {
     // sum inner nodes
     comm->sumImpl( innerNodesPerBlock.data(), innerNodesPerBlock.data(), numBlocks, scai::common::TypeTraits<IndexType>::stype);
 
-    std::chrono::duration<double> endTime = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> endTime = std::chrono::steady_clock::now() - startTime;
     double totalTime= comm->max(endTime.count() );
     if( comm->getRank()==0 && settings.verbose) {
         std::cout<<" done in " << totalTime <<  std::endl;
@@ -1483,11 +1483,11 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     //
     // globally sort edges
     //
-    std::chrono::time_point<std::chrono::system_clock> beforeSort =  std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> beforeSort =  std::chrono::steady_clock::now();
     MPI_Comm mpi_comm = MPI_COMM_WORLD;
     JanusSort::sort(mpi_comm, localPairs, MPI_2INT);
 
-    std::chrono::duration<double> sortTmpTime = std::chrono::system_clock::now() - beforeSort;
+    std::chrono::duration<double> sortTmpTime = std::chrono::steady_clock::now() - beforeSort;
     ValueType sortTime = comm->max( sortTmpTime.count() );
     PRINT0("time to sort edges: " << sortTime);
 

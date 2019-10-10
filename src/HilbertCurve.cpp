@@ -786,7 +786,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
         return;
     }
 
-    std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> beforeInitPart =  std::chrono::steady_clock::now();
     const IndexType numNodeWeights = nodeWeights.size();
 
     bool nodesUnweighted = true;
@@ -818,9 +818,9 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
     //JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>() );
     
-    migrationCalculation = std::chrono::system_clock::now() - beforeInitPart;
+    migrationCalculation = std::chrono::steady_clock::now() - beforeInitPart;
     metrics.MM["timeMigrationAlgo"] = migrationCalculation.count();
-    std::chrono::time_point < std::chrono::system_clock > beforeMigration = std::chrono::system_clock::now();
+    std::chrono::time_point < std::chrono::steady_clock > beforeMigration = std::chrono::steady_clock::now();
     assert(localPairs.size() > 0);
     SCAI_REGION_END("HilbertCurve.redistribute.sort")
 
@@ -951,7 +951,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
             }
         }
     }
-    migrationTime = std::chrono::system_clock::now() - beforeMigration;
+    migrationTime = std::chrono::steady_clock::now() - beforeMigration;
     metrics.MM["timeFirstDistribution"] = migrationTime.count();
     assert( confirmHilbertDistribution(coordinates, nodeWeights[0], settings) );
 }

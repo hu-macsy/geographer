@@ -253,7 +253,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
     SCAI_REGION( "ParcoRepart.partitionGraph" )
 
-    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
     /*
     * check input arguments for sanity
@@ -272,15 +272,14 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     
 	// timing info
     std::chrono::duration<double> partitionTime= std::chrono::duration<double>(0.0);
-	std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
+	std::chrono::time_point<std::chrono::steady_clock> beforeInitPart =  std::chrono::steady_clock::now();
     
 	/*
 	* get an initial partition
 	*/
 	DenseVector<IndexType> result = initialPartition( input, coordinates, nodeWeights, previous, commTree, comm, settings, metrics);
 
-    // if noRefinement then these are the times, if we do refinement they will be overwritten
-    partitionTime =  std::chrono::system_clock::now() - beforeInitPart;
+    partitionTime =  std::chrono::steady_clock::now() - beforeInitPart;
     metrics.MM["timePreliminary"] = partitionTime.count();
 
     //-----------------------------------------------------------
@@ -317,13 +316,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 
     }
 
-    std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - startTime;
     metrics.MM["timeTotal"] = elapTime.count();
 
     //possible mapping at the end
     if( settings.mappingRenumbering ) {
         PRINT0("Applying renumbering of blocks based on the SFC index of their centers.");
-        std::chrono::time_point<std::chrono::system_clock> startRnb = std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> startRnb = std::chrono::steady_clock::now();
 
         if( not result.getDistribution().isEqual(coordinates[0].getDistribution()) ) {
             PRINT0("WARNING:\nCoordinates and partition do not have the same distribution.\nRedistributing coordinates to match distribution");
@@ -333,7 +332,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
         }
         Mapping<IndexType,ValueType>::applySfcRenumber( coordinates, nodeWeights, result, settings );
 
-        std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - startRnb;
+        std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - startRnb;
         PRINT0("renumbering time " << elapTime.count() );
     }
 
@@ -357,7 +356,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
 	SCAI_REGION( "ParcoRepart.initialPartition" )
 
 	const IndexType k = settings.numBlocks;
-	std::chrono::time_point<std::chrono::system_clock> beforeInitPart =  std::chrono::system_clock::now();
+	std::chrono::time_point<std::chrono::steady_clock> beforeInitPart =  std::chrono::steady_clock::now();
 
     //to be returned
     DenseVector<IndexType> result;
@@ -365,7 +364,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
     if( settings.initialPartition==ITI::Tool::geoSFC) {
         PRINT0("Initial partition with SFCs");
         result= HilbertCurve<IndexType, ValueType>::computePartition(coordinates, settings);
-        std::chrono::duration<double> sfcTime = std::chrono::system_clock::now() - beforeInitPart;
+        std::chrono::duration<double> sfcTime = std::chrono::steady_clock::now() - beforeInitPart;
         if ( settings.verbose ) {
             ValueType totSFCTime = ValueType(comm->max(sfcTime.count()) );
             if(comm->getRank() == 0)
@@ -410,7 +409,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
             }
         }
 
-        std::chrono::time_point<std::chrono::system_clock> beforeKMeans =  std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> beforeKMeans =  std::chrono::steady_clock::now();
 
         if (settings.repartition) {
             result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
@@ -439,7 +438,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
                                   result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
         }
 
-        std::chrono::duration<double>  kMeansTime = std::chrono::system_clock::now() - beforeKMeans;
+        std::chrono::duration<double>  kMeansTime = std::chrono::steady_clock::now() - beforeKMeans;
         assert(scai::utilskernel::HArrayUtils::min(result.getLocalValues()) >= 0);
         SCAI_ASSERT_LT_ERROR(scai::utilskernel::HArrayUtils::max(result.getLocalValues()),k, "");
 
@@ -467,7 +466,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
 
         DenseVector<ValueType> convertedWeights(nodeWeights[0]);
         result = ITI::MultiSection<IndexType, ValueType>::computePartition(input, coordinates, convertedWeights, settings);
-        std::chrono::duration<double> msTime = std::chrono::system_clock::now() - beforeInitPart;
+        std::chrono::duration<double> msTime = std::chrono::steady_clock::now() - beforeInitPart;
 
         if ( settings.verbose ) {
             ValueType totMsTime = ValueType ( comm->max(msTime.count()) );
@@ -502,7 +501,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 	Metrics<ValueType>& metrics){
 
 	SCAI_REGION("ParcoRepart.doLocalRefinement");		
-	std::chrono::time_point<std::chrono::system_clock> start =  std::chrono::system_clock::now();
+	std::chrono::time_point<std::chrono::steady_clock> start =  std::chrono::steady_clock::now();
 	
 	//uncomment to store the first, geometric partition into a file that then can be visualized using matlab and GPI's code
 	//std::string filename = "geomPart.mtx";
@@ -518,7 +517,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 	bool useRedistributor = true;
 	aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, useRedistributor);
 	
-	std::chrono::duration<double> redistTime =  std::chrono::system_clock::now() - start;
+	std::chrono::duration<double> redistTime =  std::chrono::steady_clock::now() - start;
 	
 	const IndexType k = settings.numBlocks;
 	
@@ -540,7 +539,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 			std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
 		}
 	}
-PRINT0(to_string( settings.localRefAlgo) )	;
+
     if( settings.localRefAlgo==Tool::parMetisRefine){
 #ifdef PARMETIS_FOUND
 //TODO: get rid of constexpr
@@ -581,8 +580,13 @@ PRINT0(to_string( settings.localRefAlgo) )	;
 #endif
     } else if( settings.localRefAlgo==Tool::geographer){
     	SCAI_REGION("ParcoRepart.doLocalRefinement.multiLevelStep")
+        std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
+
     	scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
     	ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights[0], coordinates, halo, settings, metrics);
+
+        std::chrono::duration<double> LRtime = std::chrono::steady_clock::now() - start;
+        metrics.MM["timeLocalRef"] = comm->max( LRtime.count() );
     }else{
         PRINT0("Provided algorithm for local refinement is "<< to_string(settings.localRefAlgo) << " but is not currently supported. Pick geographer or parMetisRefine. \nAborting...");
         std::exit(-1);
@@ -954,7 +958,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
     IndexType colors;
     std::vector<std::vector<IndexType>> coloring;
     {
-        std::chrono::time_point<std::chrono::system_clock> beforeColoring =  std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> beforeColoring =  std::chrono::steady_clock::now();
         if (!adjM.getRowDistributionPtr()->isReplicated()) {
             //PRINT0("***WARNING: In getCommunicationPairs_local: given graph is not replicated; will replicate now");
             const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
@@ -965,7 +969,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
 
         coloring = GraphUtils<IndexType, ValueType>::mecGraphColoring( adjM, colors); // our implementation
 
-        std::chrono::duration<double> coloringTime = std::chrono::system_clock::now() - beforeColoring;
+        std::chrono::duration<double> coloringTime = std::chrono::steady_clock::now() - beforeColoring;
         ValueType maxTime = comm->max( coloringTime.count() );
         ValueType minTime = comm->min( coloringTime.count() );
         if (settings.verbose) PRINT0("coloring done in time " << minTime << " -- " << maxTime << ", using " << colors << " colors" );

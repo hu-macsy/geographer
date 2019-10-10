@@ -184,10 +184,10 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     int r=0;
 
     for( r=0; r<repeatTimes; r++) {
-        std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> beforePartTime =  std::chrono::steady_clock::now();
         problem->solve();
 
-        std::chrono::duration<double> partitionTmpTime = std::chrono::system_clock::now() - beforePartTime;
+        std::chrono::duration<double> partitionTmpTime = std::chrono::steady_clock::now() - beforePartTime;
         double partitionTime= comm->max(partitionTmpTime.count() );
         sumPartTime += partitionTime;
         if( comm->getRank()==0 ) {
@@ -206,7 +206,7 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
         std::cout<<"Number of runs: " << repeatTimes << std::endl;
     }
 
-    metrics.MM["timeFinalPartition"] = sumPartTime/(ValueType)repeatTimes;
+    metrics.MM["timeTotal"] = sumPartTime/(ValueType)repeatTimes;
 
     //
     // convert partition to a DenseVector

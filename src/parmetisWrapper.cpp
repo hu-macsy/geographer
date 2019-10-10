@@ -114,15 +114,14 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::refine
     options2[1] = 0; //verbosity
     options2[3] = PARMETIS_PSR_UNCOUPLED; //if k=p (coupled) or not (uncoupled); 2 is always uncoupled
 
-    std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
 
     ParMETIS_V3_RefineKway(
         vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, tpwgts.data() , ubvec.data(), options2.data(), &edgecut, partKway.data(), &metisComm );
 
-    std::chrono::duration<double> partitionKwayTime = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> partitionKwayTime = std::chrono::steady_clock::now() - startTime;
     double partKwayTime= comm->max(partitionKwayTime.count() );
-    metrics.MM["timeFinalPartition"] = partKwayTime;
-    metrics.MM["timeTotal"] = partKwayTime;
+    metrics.MM["timeLocalRef"] = partKwayTime;
 
     //
     // convert partition to a DenseVector
@@ -256,7 +255,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
         // get the partitions with parMetis
         //
 
-        std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> beforePartTime =  std::chrono::steady_clock::now();
 
         if( parMetisGeom==0) {
             /*metisRet = */ParMETIS_V3_PartKway( 
@@ -290,7 +289,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
         }
         PRINT0("\n\t\tedge cut returned by parMetis: " << edgecut <<"\n");
 
-        std::chrono::duration<double> partitionKwayTime = std::chrono::system_clock::now() - beforePartTime;
+        std::chrono::duration<double> partitionKwayTime = std::chrono::steady_clock::now() - beforePartTime;
         double partKwayTime= comm->max(partitionKwayTime.count() );
         sumKwayTime += partKwayTime;
 
@@ -311,7 +310,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
         std::cout<<"Number of runs: " << repeatTimes << std::endl;
     }
 
-    metrics.MM["timeFinalPartition"] = sumKwayTime/(ValueType)repeatTimes;
+    metrics.MM["timeTotal"] = sumKwayTime/(ValueType)repeatTimes;
 
 
     //
