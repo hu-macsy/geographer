@@ -65,6 +65,7 @@ Options populateOptions() {
     //debug
     ("writeDebugCoordinates", "Write Coordinates of nodes in each block", value<bool>())
     ("verbose", "Increase output.")
+    ("debugMode", "Increase output and more expensive checks")
     ("storeInfo", "Store timing and other metrics in file.")
     ("storePartition", "Store the partition file.")
     ("callExit", "Call std::exit after finishing partitioning, useful in case of lingering MPI data structures.")
@@ -161,6 +162,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
 
     using std::vector;
     settings.verbose = vm.count("verbose");
+    settings.debugMode = vm.count("debugMode");
     settings.storeInfo = vm.count("storeInfo");
     settings.storePartition = vm.count("storePartition");
     settings.erodeInfluence = vm.count("erodeInfluence");
@@ -214,7 +216,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("initialPartition")) {
         settings.initialPartition = vm["initialPartition"].as<Tool>();
     }
-
+PRINT0( vm["initialPartition"].as<Tool>() << "  " << settings.initialPartition )  ;    
     if (vm.count("multiLevelRounds")) {
         settings.multiLevelRounds = vm["multiLevelRounds"].as<IndexType>();
     }
@@ -230,7 +232,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("localRefAlgo")) {
         settings.localRefAlgo = vm["localRefAlgo"].as<Tool>();
     }
- 
+PRINT0( to_string(vm["localRefAlgo"].as<Tool>()) << "  " << to_string( settings.localRefAlgo) )  ;    
     if (vm.count("cutsPerDim")) {
         std::stringstream ss( vm["cutsPerDim"].as<std::string>() );
         std::string item;
@@ -277,11 +279,11 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         std::vector<IndexType> hierLevels;
         IndexType product = 1;
 
-        while (!std::getline(ss, item, ',').fail()) {
+        while (!std::getline(ss, item, ' ').fail()) {
             IndexType blocksInLevel = std::stoi(item);
             hierLevels.push_back(blocksInLevel);
             product *= blocksInLevel;
-            //std::cout << product << std::endl;
+            std::cout << product << std::endl;
         }
 
         settings.hierLevels = hierLevels;

@@ -822,15 +822,13 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     metrics.MM["timeMigrationAlgo"] = migrationCalculation.count();
     std::chrono::time_point < std::chrono::steady_clock > beforeMigration = std::chrono::steady_clock::now();
     assert(localPairs.size() > 0);
+
     SCAI_REGION_END("HilbertCurve.redistribute.sort")
 
     sort_pair minLocalIndex = localPairs[0];
     std::vector<double> sendThresholds(comm->getSize(), minLocalIndex.value);
     std::vector<double> recvThresholds(comm->getSize());
 
-    //hardcoded the sfc index to double
-    //MPI_Datatype MPI_ValueType = getMPIType<double>();
-    //MPI_Alltoall(sendThresholds.data(), 1, MPI_ValueType, recvThresholds.data(), 1, MPI_ValueType, mpi_comm); //TODO: replace this monstrosity with a proper call to LAMA
     comm->all2all(recvThresholds.data(), sendThresholds.data());//TODO: maybe speed up with hypercube
     SCAI_ASSERT_LT_ERROR(recvThresholds[comm->getSize() - 1], 1, "invalid hilbert index");
     // merge to get quantities //Problem: nodes are not sorted according to their hilbert indices, so accesses are not aligned.
@@ -867,7 +865,11 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
 
     // allocate recvPlan - either with allocateTranspose, or directly
     scai::dmemo::CommunicationPlan recvPlan = comm->transpose( sendPlan );
-    IndexType newLocalN = recvPlan.totalQuantity();
+    const IndexType newLocalN = recvPlan.totalQuantity();
+
+    //in some rare cases it can happen that some PE(s) do not get
+    //any new local points; TODO: debug/investigate
+
     SCAI_REGION_END("HilbertCurve.redistribute.communicationPlan")
 
     if (settings.verbose) {
@@ -978,11 +980,18 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
 
     //sort local indices
     std::sort( localSFCInd.begin(), localSFCInd.end() );
-
-    //the min and max local sfc value
-    double sfcMinMax[2] = { localSFCInd.front(), localSFCInd.back() };
+    double sfcMinMax[2]= {0, 0};
 
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
+
+    //if( localSFCInd.size()==0) {
+    if( coordinates[0].getLocalValues().size()==0) {
+        PRINT("\n***\tWarning: PE " << comm->getRank() << " has no local points. This probably cause problems later." );
+    }else{
+        //the min and max local sfc value
+        sfcMinMax[0] = localSFCInd.front();
+        sfcMinMax[1] = localSFCInd.back();
+    }
 
     if( settings.debugMode ) {
         PRINT(*comm <<": sending "<< sfcMinMax[0] << ", " << sfcMinMax[1] )	;
