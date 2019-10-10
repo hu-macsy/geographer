@@ -287,8 +287,7 @@ struct Settings {
 
         out<< "Git commit: " << version << " and machine: "<< machine << std::endl;
 
-        IndexType numPoints = numX* numY* numZ;
-        out<< "Setting: number of points= " << numPoints<< ", dimensions= "<< dimensions << ", filename: " << fileName << std::endl;
+        out<< "Setting: dimensions= "<< dimensions << ", filename: " << fileName << std::endl;
         if( outFile!="-" ) {
             out<< "outFile: " << outFile << std::endl;
         }
@@ -347,7 +346,11 @@ struct Settings {
         }
     }
 
+    template <typename ValueType>
+    Settings setDefault( const scai::lama::CSRSparseMatrix<ValueType>& graph );
+
 }; //struct Settings
+
 
 /** @cond INTERNAL
 */

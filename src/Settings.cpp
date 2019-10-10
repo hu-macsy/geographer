@@ -1,5 +1,7 @@
 #include <unistd.h>
 
+#include <scai/lama/matrix/all.hpp>
+
 #include "Settings.h"
 
 
@@ -147,3 +149,27 @@ bool ITI::Settings::checkValidity() {
     return isValid;
 }
 
+template <typename ValueType>
+ITI::Settings ITI::Settings::setDefault( const scai::lama::CSRSparseMatrix<ValueType>& graph){
+    Settings retSet = *this;
+
+    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    const long int localN = dist->getLocalSize();
+
+    retSet.minBorderNodes = std::max( int(localN*0.1), 1); //10% of local nodes
+    retSet.stopAfterNoGainRounds = 5;
+    long int localCut =  graph.getHaloStorage().getNumValues();
+    retSet.minGainForNextRound = std::max( int(localCut*0.1), 1); //10% of local halo
+
+    //TODO: when we set the minSamplingNodes, kmeans hangs after roundsTillAl rounds
+    //long int roundsTillAll = 6; //in how many rounds we get all local points
+    //retSet.minSamplingNodes = localN/std::pow(2,roundsTillAll);
+
+    retSet.multiLevelRounds = 9; //no reason...
+
+    return retSet;
+}
+
+//instantiation
+template ITI::Settings ITI::Settings::setDefault<double>( const scai::lama::CSRSparseMatrix<double>& graph );
+template ITI::Settings ITI::Settings::setDefault( const scai::lama::CSRSparseMatrix<float>& graph );
