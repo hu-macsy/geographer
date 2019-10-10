@@ -163,6 +163,9 @@ int main(int argc, char** argv) {
         }
 
         commTree.createFlatHeterogeneous( blockSizes );
+    }else if( settings.hierLevels.size()!=0 ){
+        const IndexType numWeights = nodeWeights.size();
+        commTree.createFromLevels(settings.hierLevels, numWeights );
     } else {
         commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
     }

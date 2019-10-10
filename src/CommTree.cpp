@@ -90,6 +90,15 @@ CommTree<IndexType, ValueType>::CommTree( const std::vector<IndexType> &levels, 
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
+void CommTree<IndexType, ValueType>::createFromLevels( const std::vector<IndexType> &levels, const IndexType numWeights ) {
+
+    CommTree tmpTree( levels, numWeights );
+
+    *this = tmpTree;
+}
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
 IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vector<commNode> leaves) {
 
     hierarchyLevels = leaves.front().hierarchy.size()+1; //+1 is for the root

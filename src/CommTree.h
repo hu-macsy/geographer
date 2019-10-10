@@ -271,6 +271,12 @@ public:
         return areWeightsAdaptedV;
     }
 
+
+    /** Creates a homogeneous tree with levels.size() number of levels
+    and each node in level i has levels[i] children. \sa CommTree()
+    */
+    void createFromLevels( const std::vector<IndexType> &levels, const IndexType numWeights );
+
     /** Takes a vector of leaves and creates the tree. The hierarchy vector in every node is used
     to construct the level above until we reach the root.
 

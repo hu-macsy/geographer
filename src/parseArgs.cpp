@@ -48,7 +48,7 @@ Options populateOptions() {
     ("localRefAlgo", "With which algorithm to do local refinement.", value<Tool>() )
     //multisection
     ("bisect", "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached", value<bool>())
-    ("cutsPerDim", "If MultiSection is chosen, then provide d values that define the number of cuts per dimension.", value<std::string>())
+    ("cutsPerDim", "If MultiSection is chosen, then provide d values that define the number of cuts per dimension. You must provide as many numbers as the dimensions separated with commas. For example, --cutsPerDim=3,4,10 for 3 dimensions resulting in 3*4*10=120 blocks", value<std::string>())
     ("pixeledSideLen", "The resolution for the pixeled partition or the spectral", value<IndexType>())
     // K-Means
     ("minSamplingNodes", "Tuning parameter for K-Means", value<IndexType>())
@@ -59,7 +59,7 @@ Options populateOptions() {
     ("tightenBounds", "Tuning parameter for K-Means")
     ("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
     // using '/' to separate the lines breaks the output message
-    ("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3 4 10, there are 3 levels. In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
+    ("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3,4,10 there are 3 levels. In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
     //output
     ("outFile", "write result partition into file", value<std::string>())
     //debug
