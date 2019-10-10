@@ -74,6 +74,7 @@ Options populateOptions() {
     ("noComputeDiameter", "Compute diameter of resulting block files.")
     ("maxDiameterRounds", "abort diameter algorithm after that many BFS rounds", value<IndexType>())
     ("metricsDetail", "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV", value<std::string>())
+    ("autoSettings", "Set some settings automatically to some values possibly overwriting some user passed parameters. ", value<bool>() )
     //used for the competitors main
     ("outDir", "write result partition into folder", value<std::string>())
     ("tools", "choose which supported tools to use. See in Settings::Tools for the supported tools and how to call them.", value<std::string>() )
@@ -176,6 +177,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.nnCoarsening = vm.count("nnCoarsening");
     settings.bisect = vm.count("bisect");
     settings.writeDebugCoordinates = vm.count("writeDebugCoordinates");
+    settings.setAutoSettings = vm.count("autoSettings");
 
     if (vm.count("fileFormat")) {
         settings.fileFormat = vm["fileFormat"].as<ITI::Format>();

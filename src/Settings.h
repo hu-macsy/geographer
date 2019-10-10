@@ -264,6 +264,9 @@ struct Settings {
     /** @name Various parameters
     */
     //@{
+
+    /// use some default settings; will overwrite other arguments given in the command line
+    bool setAutoSettings;
     ///this is used by the competitors main to set the tools we are gonna use
     std::vector<std::string> tools;
 

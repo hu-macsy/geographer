@@ -126,10 +126,11 @@ int main(int argc, char** argv) {
 
     N = readInput<ValueType>( vm, settings, comm, graph, coordinates, nodeWeights );
 
-    settings = settings.setDefault( graph );
-    if( !settings.isValid )
-        return -1;
-settings.print( std::cout, comm );
+    if( settings.setAutoSettings ){
+        settings = settings.setDefault( graph );
+        if( !settings.isValid )
+               return -1;
+    }
 
     //
     // read the communication graph or the block sizes if provided

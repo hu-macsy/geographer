@@ -161,7 +161,7 @@ ITI::Settings ITI::Settings::setDefault( const scai::lama::CSRSparseMatrix<Value
     long int localCut =  graph.getHaloStorage().getNumValues();
     retSet.minGainForNextRound = std::max( int(localCut*0.1), 1); //10% of local halo
 
-    //TODO: when we set the minSamplingNodes, kmeans hangs after roundsTillAl rounds
+    //TODO: when we set the minSamplingNodes, kmeans hangs after roundsTillAll rounds
     //long int roundsTillAll = 6; //in how many rounds we get all local points
     //retSet.minSamplingNodes = localN/std::pow(2,roundsTillAll);
 

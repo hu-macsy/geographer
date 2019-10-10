@@ -986,7 +986,7 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
 
     //if( localSFCInd.size()==0) {
     if( coordinates[0].getLocalValues().size()==0) {
-        PRINT("\n***\tWarning: PE " << comm->getRank() << " has no local points. This probably cause problems later." );
+        PRINT("\n***\tWarning: PE " << comm->getRank() << " has no local points. This probably will cause problems later. Maybe input is too small for this number of PEs." );
     }else{
         //the min and max local sfc value
         sfcMinMax[0] = localSFCInd.front();
