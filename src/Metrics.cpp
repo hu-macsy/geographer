@@ -30,7 +30,7 @@ void Metrics<ValueType>::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueTy
 template<typename ValueType>
 void Metrics<ValueType>::print( std::ostream& out) const {
 
-    //out<<"TEST print" << std::endl;
+    out<<"\nMetrics:" << std::endl;
     for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ) {
         if( mapIt->second!=-1)
             out<< mapIt->first <<": " << mapIt->second << std::endl;
@@ -267,7 +267,7 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
         //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
 
         time = comm->max(SpMVTime.count());
-        MM["timeSpMV"] = time/repeatTimes;
+        MM["SpMVtime"] = time/repeatTimes;
 
         ValueType minTime = comm->min( SpMVTime.count() );
         PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
@@ -295,7 +295,7 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
 
         //PRINT(*comm << ": "<< sendPlan );
         time = comm->max(commTime.count());
-        MM["timeComm"] = time/repeatTimes;
+        MM["commTime"] = time/repeatTimes;
 
         ValueType minTime = comm->min( commTime.count() );
         PRINT0("max time for " << repeatTimes <<" communications: " << time << " , min time " << minTime);

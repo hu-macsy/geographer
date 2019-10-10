@@ -329,6 +329,13 @@ struct Settings {
         } else {
             out<< "initial partition undefined" << std::endl;
         }
+        out << "local refinement algo: ";
+        if( noRefinement ){
+            out << "none" << std::endl;
+        }else{
+            out << localRefAlgo << std::endl;
+        }
+
         out << "epsilon= "<< epsilon << std::endl;
         out << "numBlocks= " << numBlocks << std::endl;
     }

@@ -1525,6 +1525,8 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     ValueType time = comm->max(KMeansTime.count());
 
     PRINT0("total KMeans time: " << time << " , number of iterations: " << iter);
+    //special time for the core kmeans
+    metrics.MM["timeKmeans"] = time;
 
     return result;
 }// computePartition
