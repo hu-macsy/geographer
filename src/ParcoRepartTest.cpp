@@ -929,8 +929,7 @@ TYPED_TEST (ParcoRepartTest, testGetLocalWeightedGraphColoring_2D) {
 
 //WARNING: disabled test because the setRawData() seems to not work properly
 
-TYPED_TEST (ParcoRepartTest, 
-    DISABLED_testGetLocalCommunicationWithColoring_2D) {
+TYPED_TEST (ParcoRepartTest, testGetLocalCommunicationWithColoring_2D) {
     using ValueType = TypeParam;
 
     std::string file = ParcoRepartTest<ValueType>::graphPath + "Grid16x16";
@@ -989,6 +988,7 @@ TYPED_TEST (ParcoRepartTest,
         scai::lama::CSRSparseMatrix<ValueType> blockGraph;
         blockGraph.setRawDenseData( 6, 6, adjArray);
         SCAI_ASSERT( blockGraph.checkSymmetry(), true );
+        /*
         PRINT0(">> "<< blockGraph.getLocalStorage().getValues().size());
         PRINT0(">> "<< blockGraph.getLocalStorage().getIA().size());
         PRINT0(">> "<< blockGraph.getLocalStorage().getJA().size());
@@ -996,18 +996,19 @@ TYPED_TEST (ParcoRepartTest,
             for(int j=0; j<6; j++)
                 PRINT0(i<<", " << j << " = " << blockGraph.getValue(i,j));
         }
+        */
         // get the communication pairs
         std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph,settings );
 
         // print the pairs
-
+        /*    
         for(IndexType i=0; i<commScheme.size(); i++) {
             for(IndexType j=0; j<commScheme[i].size(); j++) {
                 PRINT( "round :"<< i<< " , PEs talking: "<< j << " with "<< commScheme[i].getValue(j));
             }
             std::cout << std::endl;
         }
-
+        */
     }
 
 

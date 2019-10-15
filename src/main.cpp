@@ -95,6 +95,7 @@ int main(int argc, char** argv) {
     std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
     if (comm->getRank() == 0) {
+        /*
         std::string inputstring;
         if (vm.count("graphFile")) {
             inputstring = vm["graphFile"].as<std::string>();
@@ -103,7 +104,7 @@ int main(int argc, char** argv) {
         } else {
             inputstring = "generate";
         }
-
+*/
         std::cout<< "commit:"<< version<< " main file: "<< __FILE__ << " machine:" << machine << " p:"<< comm->getSize();
 
         auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);

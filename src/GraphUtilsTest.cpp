@@ -172,20 +172,8 @@ TYPED_TEST(GraphUtilsTest, benchConstructLaplacian) {
 
     CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
 }
-//-----------------------------------------------------------------
-
-TYPED_TEST(GraphUtilsTest, DISABLED_benchConstructLaplacianBig) {
-    using ValueType = TypeParam;
-
-    std::string fileName = "hugebubbles-00000.graph";
-    std::string file = GraphUtilsTest<ValueType>::graphPath + fileName;
-    const scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
-
-    CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
-}
 
 //TODO: test also with edge weights
-
 //-----------------------------------------------------------------
 
 TYPED_TEST (GraphUtilsTest, testLocalDijkstra) {
