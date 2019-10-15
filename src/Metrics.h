@@ -159,6 +159,14 @@ public:
         const scai::lama::DenseVector<IndexType> partition,
         const scai::lama::CSRSparseMatrix<ValueType> PEGraph );
 
+    /** Given a distributed matrix (aka graph) it operates a multiplication with a vector for the
+        given number of repetitions and returns the average running time. The matrix is not const
+        because inside we set: matrix.setCommunicationKind( scai::lama::SyncKind::ASYNC_COMM );
+    */
+    ValueType getSPMVtime(
+    scai::lama::CSRSparseMatrix<ValueType> matrix,
+    const IndexType repeatTimes);
+
     //@{
     /** @name Print metrics
 

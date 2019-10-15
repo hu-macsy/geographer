@@ -248,30 +248,7 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
     // redistribute for SpMV and commTime
     copyGraph.redistribute( distFromPartition, distFromPartition );
 
-    // SpMV
-    {
-        PRINT0("starting SpMV...");
-        // vector for multiplication
-        scai::lama::DenseVector<ValueType> x ( copyGraph.getColDistributionPtr(), 1.0 );
-        scai::lama::DenseVector<ValueType> y ( copyGraph.getRowDistributionPtr(), 0.0 );
-        copyGraph.setCommunicationKind( scai::lama::SyncKind::ASYNC_COMM );
-        comm->synchronize();
-
-        // perfom the actual multiplication
-        std::chrono::time_point<std::chrono::steady_clock> beforeSpMVTime = std::chrono::steady_clock::now();
-        for(IndexType r=0; r<repeatTimes; r++) {
-            y = copyGraph *x +y;
-        }
-        comm->synchronize();
-        std::chrono::duration<ValueType> SpMVTime = std::chrono::steady_clock::now() - beforeSpMVTime;
-        //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
-
-        time = comm->max(SpMVTime.count());
-        MM["SpMVtime"] = time/repeatTimes;
-
-        ValueType minTime = comm->min( SpMVTime.count() );
-        PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
-    }
+    MM["SpMVtime"] = getSPMVtime(copyGraph, repeatTimes);
 
     //TODO: maybe extract this time from the actual SpMV above
     // comm time in SpMV
@@ -301,8 +278,6 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
         PRINT0("max time for " << repeatTimes <<" communications: " << time << " , min time " << minTime);
     }
 
-    //redistibute back to initial distributions
-    //graph.redistribute( initRowDistPtr, initColDistPtr );
 }
 
 
@@ -471,6 +446,39 @@ void Metrics<ValueType>::getMappingMetrics(
 
     getMappingMetrics( blockGraph, PEGraph, identityMapping);
 }//getMappingMetrics
+//---------------------------------------------------------------------------------------
+template<typename ValueType>
+ValueType Metrics<ValueType>::getSPMVtime(
+    scai::lama::CSRSparseMatrix<ValueType> graph,
+    const IndexType repeatTimes){
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    PRINT0("starting SpMV...");
+
+    // vector for multiplication
+    scai::lama::DenseVector<ValueType> x ( graph.getColDistributionPtr(), 1.0 );
+    scai::lama::DenseVector<ValueType> y ( graph.getRowDistributionPtr(), 0.0 );
+    graph.setCommunicationKind( scai::lama::SyncKind::ASYNC_COMM );
+    comm->synchronize();
+    
+    // perfom the actual multiplication
+    std::chrono::time_point<std::chrono::steady_clock> beforeSpMVTime = std::chrono::steady_clock::now();
+    for(IndexType r=0; r<repeatTimes; r++) {
+        y = graph *x +y;
+    }
+    comm->synchronize();
+    std::chrono::duration<ValueType> SpMVTime = std::chrono::steady_clock::now() - beforeSpMVTime;
+    //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
+
+    ValueType time = comm->max(SpMVTime.count());
+    time = time/repeatTimes;
+
+    ValueType minTime = comm->min( SpMVTime.count() );
+    PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
+
+    return time;
+}
+
 
 template class Metrics<double>;
 template class Metrics<float>;
