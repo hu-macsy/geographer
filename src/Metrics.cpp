@@ -239,7 +239,7 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
     PRINT0("minLocalN= "<< minLocalN <<", maxLocalN= " << maxLocalN << ", imbalance= " << imbalance);
 
     // diameter
-    if( MM["maxBlockDiameter"]==0 or MM["harmMeanDiam"]==0) {
+    if( MM["maxBlockDiameter"]==0 or MM["harmMeanDiam"]==0 and settings.computeDiameter) {
         scai::lama::DenseVector<IndexType> copyPartition( partition );
         copyPartition.redistribute( distFromPartition );
         std::tie( MM["maxBlockDiameter"], MM["harmMeanDiam"], MM["numDisconBlocks"] ) = getDiameter(copyGraph, copyPartition, settings);

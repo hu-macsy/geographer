@@ -166,7 +166,9 @@ int main(int argc, char** argv) {
             settings.repeatTimes = 2;
         } 
         
-        std::string outFile = "-";
+        //set outFile depending if we get outDir or outFile parameter
+        std::string outFile = settings.outFile;
+		
         if( vm.count("outDir") and vm.count("storeInfo") ) {
             //set the graphName in order to create the outFile name
             std::string copyName;
@@ -227,7 +229,7 @@ int main(int argc, char** argv) {
             std::cout << "\n >>>> " << toolName[thisTool];
             std::cout<<  "\033[0m" << std::endl;
 
-            //printMetricsShort( metrics, std::cout);
+            metrics.print( std::cout );
 
             // write in a file
             if( outFile!= "-" ) {

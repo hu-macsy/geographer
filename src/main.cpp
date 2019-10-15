@@ -338,6 +338,8 @@ int main(int argc, char** argv) {
             if( comm->getRank()==0 ) {
                 std::ofstream outF( fileName, std::ios::out);
                 if(outF.is_open()) {
+					outF << "Calling command:" << std::endl;
+					outF<< callingCommand << std::endl << std::endl;
                     settings.print( outF, comm);
                     metricsVec[r].print( outF );
                 }
