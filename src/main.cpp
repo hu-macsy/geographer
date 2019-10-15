@@ -87,24 +87,15 @@ int main(int argc, char** argv) {
     }
 
     IndexType N = -1; 		// total number of points
-
-    std::string machine = settings.machine;
-    /* timing information
-     */
+    std::string machine = settings.machine; //machine name
+    
+    // timing information
+    //
 
     std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
     if (comm->getRank() == 0) {
-        /*
-        std::string inputstring;
-        if (vm.count("graphFile")) {
-            inputstring = vm["graphFile"].as<std::string>();
-        } else if (vm.count("quadTreeFile")) {
-            inputstring = vm["quadTreeFile"].as<std::string>();
-        } else {
-            inputstring = "generate";
-        }
-*/
+
         std::cout<< "commit:"<< version<< " main file: "<< __FILE__ << " machine:" << machine << " p:"<< comm->getSize();
 
         auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
@@ -133,6 +124,7 @@ int main(int argc, char** argv) {
                return -1;
     }
 
+    //---------------------------------------------------------------
     //
     // read the communication graph or the block sizes if provided
     //
@@ -178,13 +170,6 @@ int main(int argc, char** argv) {
     }
 
     commTree.adaptWeights( nodeWeights );
-
-    //---------------------------------------------------------------------
-    //
-    //  read block sizes from a file if it is passed as an argument
-    //
-
-    //std::vector<std::vector<ValueType> > blockSizes;
 
 
     //---------------------------------------------------------------
