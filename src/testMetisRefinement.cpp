@@ -23,6 +23,7 @@
 #include "Wrappers.h"
 #include "ParcoRepart.h"
 #include "parseArgs.h"
+#include "parmetisWrapper.h"
 
 #include "mainHeader.h"
 
@@ -111,7 +112,8 @@ int main(int argc, char** argv) {
 
     Metrics<ValueType> metrics(settings);
 
-    DenseVector<IndexType> refinedPartition = Wrappers<IndexType,ValueType>::refine( graph, coords, nodeWeights, partition, settings, metrics );
+    Wrappers<IndexType,ValueType>* parMetis = new parmetisWrapper<IndexType,ValueType>;
+    DenseVector<IndexType> refinedPartition = parMetis->refine( graph, coords, nodeWeights, partition, settings, metrics );
     
     PRINT0("\tFinished metis refinement\n");
 

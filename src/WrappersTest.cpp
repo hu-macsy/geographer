@@ -1,6 +1,7 @@
 #include "FileIO.h"
 #include "Wrappers.h"
 #include "AuxiliaryFunctions.h"
+#include "parmetisWrapper.h"
 
 #include "gtest/gtest.h"
 
@@ -72,7 +73,8 @@ TEST_F( WrappersTest, testRefine ){
 
     PRINT0("First cut is " << cut << " and imbalance " << imbalance );
 
-    DenseVector<IndexType> refinedPartition = Wrappers<IndexType,ValueType>::refine( graph, coordinates, uniformWeights, firstPartition, settings, metrics );
+    Wrappers<IndexType,ValueType>* parMetis = new parmetisWrapper<IndexType,ValueType>;
+    DenseVector<IndexType> refinedPartition = parMetis->refine( graph, coordinates, uniformWeights, firstPartition, settings, metrics );
 
     aux<IndexType,ValueType>::print2DGrid( graph, refinedPartition );
 

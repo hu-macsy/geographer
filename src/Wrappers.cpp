@@ -28,7 +28,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
     Tool tool,
     struct Settings &settings,
     Metrics<ValueType> &metrics	) {
-
+/*
     using ITI::parmetisWrapper;
     using ITI::zoltanWrapper;
 
@@ -76,6 +76,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
     }
 
     return partition;
+*/    
 }
 //-----------------------------------------------------------------------------------------
 template<typename IndexType, typename ValueType>
@@ -86,7 +87,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
     Tool tool,
     struct Settings &settings,
     Metrics<ValueType> &metrics	) {
-
+/*
     //create dummy graph as the these tools do not use it.
     const scai::dmemo::DistributionPtr distPtr = coordinates[0].getDistributionPtr();
     const scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution(distPtr->getGlobalSize()) );
@@ -113,6 +114,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
     }//switch
 
     return retPart;
+*/    
 }
 //-----------------------------------------------------------------------------------------
 
@@ -125,7 +127,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::repartition (
     Tool tool,
     struct Settings &settings,
     Metrics<ValueType> &metrics) {
-
+/*
     using ITI::parmetisWrapper;
     using ITI::zoltanWrapper;
 
@@ -156,6 +158,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::repartition (
         throw std::runtime_error("Wrong tool given to repartition.\nAborting...");
         return scai::lama::DenseVector<IndexType>(graph.getLocalNumRows(), -1 );
     }
+*/    
 }
 //-----------------------------------------------------------------------------------------
 
@@ -168,12 +171,13 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
         struct Settings &settings,
         Metrics<ValueType> &metrics
     ){
-    
+/*    
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     PRINT0("\tStarting metis refinement\n");
 
     //only parmetis refinement is available
     return parmetisWrapper<IndexType,ValueType>::refine( graph, coords, nodeWeights, partition, settings, metrics );
+*/    
 }
 
 template class Wrappers<IndexType, double>;

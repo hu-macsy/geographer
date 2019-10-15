@@ -36,6 +36,7 @@
 
 #if PARMETIS_FOUND
 #include "Wrappers.h"
+#include "parmetisWrapper.h"
 #include <parmetis.h>
 #endif
 
@@ -540,7 +541,11 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 
             [[maybe_unused]] bool didRedistribution = aux<IndexType,ValueType>::alignDistributions( input, coordinates, nodeWeights, result, settings );
 
-            result =  Wrappers<IndexType,ValueType>::refine( input, coordinates, nodeWeights, result, settings, metrics );
+            //result =  Wrappers<IndexType,ValueType>::refine( input, coordinates, nodeWeights, result, settings, metrics );
+
+            Wrappers<IndexType,ValueType>* parMetis = new parmetisWrapper<IndexType,ValueType>;
+            result =  parMetis->refine( input, coordinates, nodeWeights, result, settings, metrics );
+            
         }else{
             //TODO: with constexpr this is not even compiled; does it make sense to have it here or should it be removed?
             PRINT0("*** WARNING: Requested local refinement with parmetis. Parmetis is found but compiled with a different type for ValueType. Will cast everything to real_t.");

@@ -29,6 +29,16 @@
 #include "parseArgs.h"
 #include "mainHeader.h"
 
+#if PARMETIS_FOUND
+#include "parmetisWrapper.h"
+#include <parmetis.h>
+#endif
+
+#if ZOLTAN_FOUND
+#include "zoltanWrapper.h"
+#endif
+
+
 
 //---------------------------------------------------------------------------------------------
 
@@ -197,7 +207,27 @@ int main(int argc, char** argv) {
         }
 
         //get the partition
-        partition = ITI::Wrappers<IndexType,ValueType>::partition ( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
+        ITI::Wrappers<IndexType,ValueType>* partitioner;
+        if( toolName[thisTool].rfind("zoltan",0) ){
+#if ZOLTAN_FOUND            
+            partitioner = new zoltanWrapper<IndexType,ValueType>;
+#else
+            std::cout<<"Requested a zoltan tool but zoltan is not found. Pick another tool.\nAborting..."<<std::endl;
+            exit(-1);
+#endif            
+        }else if( toolName[thisTool].rfind("parMetis",0) ){
+#if PARMETIS_FOUND            
+            partitioner = new parmetisWrapper<IndexType,ValueType>;
+#else
+            std::cout<<"Requested a zoltan tool but zoltan is not found. Pick another tool.\nAborting..."<<std::endl;
+            exit(-1);
+#endif               
+        }else{
+            std::cout<<"Provided tool: "<< toolName[thisTool] << " not supported.\nAborting..."<<std::endl;
+            exit(-1);
+        }
+
+        partition = partitioner->partition( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
 
         PRINT0("time to get the partition: " <<  metrics.MM["timeTotal"] );
 

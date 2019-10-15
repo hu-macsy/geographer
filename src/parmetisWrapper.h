@@ -4,9 +4,9 @@
 namespace ITI {
 
 template <typename IndexType, typename ValueType>
-class parmetisWrapper{ 
+class parmetisWrapper : public Wrappers<IndexType,ValueType> { 
 
-friend class Wrappers<IndexType,ValueType>;
+//friend class Wrappers<IndexType,ValueType>;
 
 /** @brief Class for external partitioning parmetis tool.
 */
@@ -18,7 +18,7 @@ friend class Wrappers<IndexType,ValueType>;
 
     Returns the new, refined partition;
     */
-    static scai::lama::DenseVector<IndexType> refine(
+    virtual scai::lama::DenseVector<IndexType> refine(
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
@@ -27,7 +27,7 @@ friend class Wrappers<IndexType,ValueType>;
         Metrics<ValueType> &metrics
     );
 
-protected:
+//protected:
 
     //metis wrapper
 
@@ -45,7 +45,7 @@ protected:
      *
      * @return A DenseVector of size N with the partition calcualted: 0<= return[i] < k with the block that point i belongs to
      */
-    static scai::lama::DenseVector<IndexType> partition (
+    virtual scai::lama::DenseVector<IndexType> partition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
@@ -55,10 +55,10 @@ protected:
         Metrics<ValueType> &metrics);
 
 //
-//TODO: parMetis assumes that vertices are stores in a consecutive manner. This is not true for a
+//TODO: parMetis assumes that vertices are stored in a consecutive manner. This is not true for a
 //      general distribution. Must reindex vertices for parMetis repartition
 //
-    static scai::lama::DenseVector<IndexType> repartition (
+    virtual scai::lama::DenseVector<IndexType> repartition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,

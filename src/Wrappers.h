@@ -41,7 +41,7 @@ public:
      *
      * @return A DenseVector of size N with the partition calculated: 0<= return[i] < k with the block that point i belongs to
      */
-    static scai::lama::DenseVector<IndexType> partition(
+    virtual scai::lama::DenseVector<IndexType> partition(
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
@@ -54,7 +54,7 @@ public:
 
     /** @brief Version for tools that do not need the graph as input.
      */
-    static scai::lama::DenseVector<IndexType> partition(
+    virtual scai::lama::DenseVector<IndexType> partition(
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
         bool nodeWeightsFlag,
@@ -75,7 +75,7 @@ public:
      *
      * @return A DenseVector of size N with the partition calculated: 0<= return[i] < k with the block that point i belongs to
      */
-    static scai::lama::DenseVector<IndexType> repartition (
+    virtual scai::lama::DenseVector<IndexType> repartition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
@@ -92,7 +92,7 @@ public:
 
     Returns the new, refined partition;
     */
-    static scai::lama::DenseVector<IndexType> refine(
+    virtual scai::lama::DenseVector<IndexType> refine(
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
