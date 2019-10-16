@@ -569,13 +569,10 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
             */
         }
         if( not std::is_same<ValueType,real_t>() ){
-            PRINT0("*** ERROR: Requested local refinement with parmetis. Parmetis is found but compiled with a different type for ValueType. Local refinement will not take place. Either compile geographer and parmetis so that real_t=ValueType or choose some other local refinement algorithm.\nAborting...");
-            std::exit(-1);
+            throw std::runtime_error("*** ERROR: Requested local refinement with parmetis. Parmetis is found but compiled with a different type for ValueType. Local refinement will not take place. Either compile geographer and parmetis so that real_t=ValueType or choose some other local refinement algorithm.\nAborting...");
         }
 #else
-        PRINT0("*** ERROR: requested local refinement using parmetis (settings.localRefAlgo) but parmetis was not installed. Either install parmetis or pick another local refinement method.\nAborting...");
-        //TODO: is this the best way to abort?
-        std::exit(-1);
+        throw std::runtime_error("*** ERROR: requested local refinement using parmetis (settings.localRefAlgo) but parmetis was not installed. Either install parmetis or pick another local refinement method.\nAborting...");
 #endif
     } else if( settings.localRefAlgo==Tool::geographer){
     	SCAI_REGION("ParcoRepart.doLocalRefinement.multiLevelStep")
@@ -587,8 +584,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
         std::chrono::duration<double> LRtime = std::chrono::steady_clock::now() - start;
         metrics.MM["timeLocalRef"] = comm->max( LRtime.count() );
     }else{
-        PRINT0("Provided algorithm for local refinement is "<< to_string(settings.localRefAlgo) << " but is not currently supported. Pick geographer or parMetisRefine. \nAborting...");
-        std::exit(-1);
+        throw std::runtime_error("Provided algorithm for local refinement is "+ to_string(settings.localRefAlgo) + " but is not currently supported. Pick geographer or parMetisRefine. \nAborting...");
     }
 			
 }//doLocalRefinement

@@ -212,19 +212,16 @@ int main(int argc, char** argv) {
 #if ZOLTAN_FOUND            
             partitioner = new zoltanWrapper<IndexType,ValueType>;
 #else
-            std::cout<<"Requested a zoltan tool but zoltan is not found. Pick another tool.\nAborting..."<<std::endl;
-            exit(-1);
+            throw std::runtime_error("Requested a zoltan tool but zoltan is not found. Pick another tool.\nAborting...");
 #endif            
         }else if( toolName[thisTool].rfind("parMetis",0)==0 ){
 #if PARMETIS_FOUND            
             partitioner = new parmetisWrapper<IndexType,ValueType>;
 #else
-            std::cout<<"Requested a parmetis tool but parmetis is not found. Pick another tool.\nAborting..."<<std::endl;
-            exit(-1);
+            throw std::runtime_error("Requested a parmetis tool but parmetis is not found. Pick another tool.\nAborting...");
 #endif               
         }else{
-            std::cout<<"Provided tool: "<< toolName[thisTool] << " not supported.\nAborting..."<<std::endl;
-            exit(-1);
+            throw std::runtime_error("Provided tool: "+ toolName[thisTool] + " not supported.\nAborting..." );
         }
 
         partition = partitioner->partition( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
@@ -326,8 +323,10 @@ int main(int argc, char** argv) {
         std::cout<<"Exiting file " << __FILE__ << " , total time= " << totalTime <<  std::endl;
     }
 
-    //this is needed for supermuc
-    std::exit(0);
+    if (vm.count("callExit")) {
+        //this is needed for supermuc
+        std::exit(0);
+    }
 
     return 0;
 }

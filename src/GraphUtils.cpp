@@ -308,6 +308,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeCut(const CSRSparseMatrix<Valu
         std::cout.flush();
     }
 
+    [[maybe_unused]] const IndexType n = inputDist->getGlobalSize();
     const IndexType localN = inputDist->getLocalSize();
 
     std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
@@ -520,6 +521,7 @@ template<typename IndexType, typename ValueType>
 std::vector<IndexType> GraphUtils<IndexType, ValueType>::nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input) {
     SCAI_REGION( "ParcoRepart.nonLocalNeighbors" )
     const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
+    [[maybe_unused]] const IndexType n = inputDist->getGlobalSize();
     const IndexType localN = inputDist->getLocalSize();
 
     const CSRStorage<ValueType>& localStorage = input.getLocalStorage();

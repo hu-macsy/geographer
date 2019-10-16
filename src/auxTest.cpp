@@ -68,8 +68,7 @@ TYPED_TEST (auxTest, testInitialPartitions) {
     std::string command = "mkdir -p " + destPath;
     const int dir_err = system( command.c_str() );
     if (-1 == dir_err){
-        std::cout << "Error creating directory " << destPath << std::endl;
-        std::exit(1);
+        throw std::runtime_error("Error creating directory " + destPath );
     }
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
