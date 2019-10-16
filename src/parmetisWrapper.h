@@ -5,8 +5,7 @@ namespace ITI {
 
 template <typename IndexType, typename ValueType>
 class parmetisWrapper : public Wrappers<IndexType,ValueType> { 
-
-//friend class Wrappers<IndexType,ValueType>;
+public:
 
 /** @brief Class for external partitioning parmetis tool.
 */
@@ -18,7 +17,7 @@ class parmetisWrapper : public Wrappers<IndexType,ValueType> {
 
     Returns the new, refined partition;
     */
-    virtual scai::lama::DenseVector<IndexType> refine(
+    scai::lama::DenseVector<IndexType> refine(
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
@@ -27,9 +26,6 @@ class parmetisWrapper : public Wrappers<IndexType,ValueType> {
         Metrics<ValueType> &metrics
     );
 
-//protected:
-
-    //metis wrapper
 
     /** Returns a partition with one of the metis methods
      *
@@ -49,9 +45,10 @@ class parmetisWrapper : public Wrappers<IndexType,ValueType> {
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-        bool nodeWeightsFlag,
-        int parMetisGeom,
-        struct Settings &settings,
+        const bool nodeWeightsFlag,
+        const Tool tool,
+        //int parMetisGeom,
+        const struct Settings &settings,
         Metrics<ValueType> &metrics);
 
 //
@@ -62,8 +59,9 @@ class parmetisWrapper : public Wrappers<IndexType,ValueType> {
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-        bool nodeWeightsFlag,
-        struct Settings &settings,
+        const bool nodeWeightsFlag,
+        const Tool tool,
+        const struct Settings &settings,
         Metrics<ValueType> &metrics);
 }; //class parmetisWrapper
 }//namespace ITI

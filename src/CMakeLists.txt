@@ -30,8 +30,7 @@ set(FILES_TEST test_main.cpp quadtree/test/QuadTreeTest.cpp    auxTest.cpp CommT
 FIND_PACKAGE( Zoltan2 PATHS "/home/hpc/pr87si/di36qin/Code/Trilinos/build/packages/zoltan2/")
 
 ### find metis and parmetis
-
-find_library( PARMETIS_LIB libparmetis.so "${PARMETIS_BASE}/lib"  NO_DEFAULT_PATH)
+find_library( PARMETIS_LIB libparmetis.a "${PARMETIS_BASE}/lib"  NO_DEFAULT_PATH)
 
 if( PARMETIS_LIB AND NOT METIS_INCLUDE)
     message( FATAL_ERROR "PARMETIS_BASE was specified but not METIS_INCLUDE. Use -DMETIS_INCLUDE=<path_to_directory_that_contains_metis.h>. Probably, a candidate directory is parmetis/metis/include")
@@ -68,16 +67,25 @@ if(Zoltan2_FOUND OR PARMETIS_LIB )
         message( "\tFound metis inlude in " ${METIS_INCLUDE} )
         message( "\tFound parmetis library in " ${PARMETIS_LIB} )
         add_definitions(-DPARMETIS_FOUND)
+        set(CMAKE_CXX_STANDARD 17)
 
         set(PARMETIS_WRAP_CPP parmetisWrapper.cpp)
         set(PARMETIS_WRAP_H parmetisWrapper.h)
         set(PARMETIS_INCLUDES ${METIS_INCLUDE} "${PARMETIS_BASE}/include")
-        set(PARMETIS_LIBS ${PARMETIS_LIB} ${METIS_LIB})
+
+        if( NOT DEFINED METIS_BASE )
+            message("Not given a path to metis, will use default. To give a custom path provide variable METIS_BASE")
+            find_library( METIS_LIB libmetis.a )
+        else()
+            set(METIS_BASE "/lrz/sys/libraries/metis/5.1.0/i8r8/")
+            find_library( METIS_LIB libmetis.a "${METIS_BASE}/lib"  NO_DEFAULT_PATH)            
+        endif()
+
+        set(PARMETIS_LIBS ${PARMETIS_LIB} ${METIS_LIB} )
     endif()
     message( "\n" )
     
-    
-    add_library( wrappers SHARED  Wrappers.cpp ${PARMETIS_WRAP_CPP} ${ZOLTAN_WRAP_CPP} )
+    add_library( wrappers SHARED ${PARMETIS_WRAP_CPP} ${ZOLTAN_WRAP_CPP} )
     target_include_directories( wrappers PUBLIC ${ZOLTAN_INCLUDES} ${PARMETIS_INCLUDES} )
     target_link_libraries( wrappers ${RBC_LIBRARY} ${ZOLTAN_LIBS} ${PARMETIS_LIBS} ) # libzoltan2.so metis parmetis
     
@@ -112,7 +120,6 @@ add_library(geographer SHARED ${FILES_COMMON})
 target_compile_options(geographer PRIVATE -fPIC)
 target_link_libraries(geographer ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 if(PARMETIS_LIB)
-    target_sources(geographer PRIVATE Wrappers.cpp )
     target_include_directories( geographer PUBLIC ${PARMETIS_INCLUDES} )
     target_link_libraries(geographer wrappers)
 endif()

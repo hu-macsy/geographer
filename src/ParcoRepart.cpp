@@ -543,8 +543,9 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 
             //result =  Wrappers<IndexType,ValueType>::refine( input, coordinates, nodeWeights, result, settings, metrics );
 
-            Wrappers<IndexType,ValueType>* parMetis = new parmetisWrapper<IndexType,ValueType>;
-            result =  parMetis->refine( input, coordinates, nodeWeights, result, settings, metrics );
+            //Wrappers<IndexType,ValueType>* parMetis = new parmetisWrapper<IndexType,ValueType>;
+            parmetisWrapper<IndexType,ValueType> parMetis;
+            result =  parMetis.refine( input, coordinates, nodeWeights, result, settings, metrics );
             
         }else{
             //TODO: with constexpr this is not even compiled; does it make sense to have it here or should it be removed?

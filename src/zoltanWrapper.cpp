@@ -21,15 +21,18 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::partitio
     const scai::lama::CSRSparseMatrix<ValueType> &graph,
     const std::vector<scai::lama::DenseVector<ValueType>> &coords,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-    bool nodeWeightsFlag,
-    std::string algo,
-    struct Settings &settings,
+    const bool nodeWeightsFlag,
+    const Tool tool,
+    const struct Settings &settings,
     Metrics<ValueType> &metrics) {
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    PRINT0("\t\tStarting the zoltan wrapper for partition with "<< algo);
 
     bool repart = false;
+    std::string algo= tool2String(tool);
+    assert( algo!="" );
+
+    PRINT0("\t\tStarting the zoltan wrapper for partition with "<< algo);
 
     return zoltanWrapper<IndexType, ValueType>::zoltanCore( coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);
 }
@@ -40,15 +43,18 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::repartit
     const scai::lama::CSRSparseMatrix<ValueType> &graph,
     const std::vector<scai::lama::DenseVector<ValueType>> &coords,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-    bool nodeWeightsFlag,
-    std::string algo,
-    struct Settings &settings,
+    const bool nodeWeightsFlag,
+    const Tool tool,
+    const struct Settings &settings,
     Metrics<ValueType> &metrics) {
 
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    PRINT0("\t\tStarting the zoltan wrapper for repartition with " << algo);
 
     bool repart = true;
+    std::string algo= tool2String(tool);
+    assert( algo!="" );
+
+    PRINT0("\t\tStarting the zoltan wrapper for repartition with " << algo);
 
     return zoltanWrapper<IndexType, ValueType>::zoltanCore( coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);
 }
@@ -60,10 +66,10 @@ template<typename IndexType, typename ValueType>
 scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCore (
     const std::vector<scai::lama::DenseVector<ValueType>> &coords,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-    bool nodeWeightsFlag,
-    std::string algo,
-    bool repart,
-    struct Settings &settings,
+    const bool nodeWeightsFlag,
+    const std::string algo,
+    const bool repart,
+    const struct Settings &settings,
     Metrics<ValueType> &metrics) {
 
     typedef Zoltan2::BasicUserTypes<ValueType, IndexType, IndexType> myTypes;
@@ -234,6 +240,25 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
 
     return partitionZoltan;
     
+}
+
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::string zoltanWrapper<IndexType, ValueType>::tool2String( ITI::Tool tool){
+    std::string algo="";
+    if( tool==Tool::zoltanRIB )
+        algo="rib";
+    else if( tool==Tool::zoltanRCB )
+        algo="rcb";
+    else if (tool==Tool::zoltanMJ)
+        algo="multijagged";
+    else if (tool==Tool::zoltanSFC)
+        algo="hsfc";
+    else{
+        std::cout << "***Error, given tool " << tool << " does not exist." << std::endl;
+    }
+    return algo;
 }
 
 //---------------------------------------------------------------------------------------
