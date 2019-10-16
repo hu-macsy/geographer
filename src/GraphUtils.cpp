@@ -308,9 +308,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeCut(const CSRSparseMatrix<Valu
         std::cout.flush();
     }
 
-    const IndexType n = inputDist->getGlobalSize();
     const IndexType localN = inputDist->getLocalSize();
-    //const IndexType maxBlockID = part.max();
 
     std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
 
@@ -522,7 +520,6 @@ template<typename IndexType, typename ValueType>
 std::vector<IndexType> GraphUtils<IndexType, ValueType>::nonLocalNeighbors(const CSRSparseMatrix<ValueType>& input) {
     SCAI_REGION( "ParcoRepart.nonLocalNeighbors" )
     const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
-    const IndexType n = inputDist->getGlobalSize();
     const IndexType localN = inputDist->getLocalSize();
 
     const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
@@ -665,7 +662,7 @@ DenseVector<IndexType> GraphUtils<IndexType, ValueType>::getBorderNodes( const C
     scai::hmemo::HArray<IndexType>& localBorder= border.getLocalValues();
 
     //const IndexType globalN = dist->getGlobalSize();
-    IndexType max = part.max();
+    [[maybe_unused]] IndexType max = part.max();
 
     if( !dist->isEqual( part.getDistribution() ) ) {
         std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and partition dist: "<< part.getDistribution() << std::endl;
@@ -1817,7 +1814,7 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(
         }
 
         //edge weights are summed, can now enter value at diagonal
-        bool foundDiagonal = false;
+        [[maybe_unused]] bool foundDiagonal = false;
         for (IndexType j = newIA[i]; j < newIA[i+1]; j++) {
             if (newJA[j] == globalI) {
                 assert(!foundDiagonal);

@@ -75,7 +75,7 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(con
 
     //making sure that the source is the same on all processors
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType sourceSum = comm->sum(source);
+    [[maybe_unused]] IndexType sourceSum = comm->sum(source);
     assert(sourceSum == source*comm->getSize());
 
     ValueType weightSum = nodeWeights.sum();
@@ -101,7 +101,7 @@ DenseMatrix<ValueType> Diffusion<IndexType, ValueType>::multiplePotentials(const
     }
 
     const IndexType l = sources.size();
-    const IndexType n = laplacian.getNumRows();
+    [[maybe_unused]] const IndexType n = laplacian.getNumRows();
     const IndexType localN = laplacian.getLocalNumRows();
 
     HArray<ValueType> resultContainer(localN*l);
