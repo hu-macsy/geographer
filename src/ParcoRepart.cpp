@@ -471,7 +471,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         assert(comm->getSize() == settings.numBlocks);
         result = DenseVector<IndexType>(input.getRowDistributionPtr(), comm->getRank());
     }else {
-        throw std::runtime_error("Initial Partitioning mode unsupported.");
+        throw std::runtime_error("Initial Partitioning mode " + to_string(settings.initialPartition) +" unsupported.");
     }
 
     //if using k-means the result has different distribution

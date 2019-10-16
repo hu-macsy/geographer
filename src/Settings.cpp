@@ -52,6 +52,15 @@ std::ostream& ITI::operator<<( std::ostream& out, const ITI::Tool tool) {
     case Tool::zoltanSFC:
         token = "zoltanSFC";
         break;
+    case Tool::parhipFastMesh:
+        token = "parhipFastMesh";
+        break;
+    case Tool::parhipUltraFastMesh:
+        token = "parhipUltraFastMesh";
+        break;
+    case Tool::parhipEcoMesh:
+        token = "parhipEcoMesh";
+        break;
 	case Tool::myAlgo:
 		token = "myAlgo";
 		break;
@@ -83,38 +92,46 @@ std::string ITI::to_string(const ITI::Format& f) {
 std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool) {
     std::string token;
     in >> token;
+    std::string tokenLower=token;
+    std::transform(token.begin(), token.end(), tokenLower.begin(), ::tolower);
 
-    if( token=="Geographer" or token=="geographer" )
+    if( token=="Geographer" or tokenLower=="geographer" )
         tool = ITI::Tool::geographer;
-    else if( token=="geoSFC" or token=="geoSfc" or token=="SFC")
+    else if( token=="geoSFC" or tokenLower=="geosfc")
         tool = ITI::Tool::geoSFC;
-    else if( token=="geoKmeans" or token=="geoKMeans" or token=="Kmeans")
+    else if( token=="geoKmeans" or tokenLower=="geokmeans")
         tool = ITI::Tool::geoKmeans;
-    else if( token=="geoHierKM" or token=="geoHierKmeans" or token=="geoHierKMeans")
+    else if( token=="geoHierKM" or tokenLower=="geohierkmeans" )
         tool = ITI::Tool::geoHierKM;
-    else if( token=="geoHierRepart" or token=="geohierrepart" or token=="geoHieRepart")
+    else if( token=="geoHierRepart" or tokenLower=="geohierrepart")
         tool = ITI::Tool::geoHierRepart;
-    else if( token=="geoMS" or token=="geoMultiSection" or token=="geoMultisection")
+    else if( token=="geoMS" or tokenLower=="geoms")
         tool = ITI::Tool::geoMS;
-    else if( token=="parMetisGraph" or token=="parMetisgraph" or token=="parmetisGraph")
+    else if( token=="parMetisGraph" or tokenLower=="parmetisgraph")
         tool = ITI::Tool::parMetisGraph;
-    else if( token=="parMetisGeom" or token=="parMetisgeom" or token=="parmetisGeom")
+    else if( token=="parMetisGeom" or tokenLower=="parmetisgeom" )
         tool = ITI::Tool::parMetisGeom;
-    else if( token=="parMetisSFC" or token=="parMetisSfc" or token=="parmetisSFC")
+    else if( token=="parMetisSFC" or tokenLower=="parmetissfc")
         tool = ITI::Tool::parMetisSFC;
-    else if( token=="parMetisRefine" or token=="parMetisrfc" or token=="parmetisRefine")
+    else if( token=="parmetisRefine" or tokenLower=="parmetisrefine")
         tool = ITI::Tool::parMetisRefine;
-    else if( token=="zoltanRIB" or token=="zoltanRib" or token=="zoltanrib")
+    else if( token=="zoltanRIB" or tokenLower=="zoltanrib")
         tool = ITI::Tool::zoltanRIB;
-    else if( token=="zoltanRCB" or token=="zoltanRcb" or token=="zoltanrcb")
+    else if( token=="zoltanRCB" or tokenLower=="zoltanrcb")
         tool = ITI::Tool::zoltanRCB;
-    else if( token=="zoltanMJ" or token=="zoltanMj" or token=="zoltanmj")
+    else if( token=="zoltanMJ" or tokenLower=="zoltanmj")
         tool = ITI::Tool::zoltanMJ;
-    else if( token=="zoltanSFC" or token=="zoltanSfc" or token=="zoltansfc")
-        tool = ITI::Tool::zoltanRIB;
+    else if( token=="zoltanSFC" or tokenLower=="zoltansfc")
+        tool = ITI::Tool::zoltanSFC;
+    else if( token=="parhipFastMesh" or tokenLower=="parhipfastmesh" )
+        tool = ITI::Tool::parhipFastMesh;
+    else if( token=="parhipUltraFastMesh" or tokenLower=="parhipultrafastmesh")
+        tool = ITI::Tool::parhipUltraFastMesh;
+    else if( token=="parhipEcoMesh" or tokenLower=="parhipecomesh")
+        tool = ITI::Tool::parhipEcoMesh;
 	else if( token=="myAlgo")
 		tool = ITI::Tool::myAlgo;
-    else if( token=="None" or token=="none")
+    else if( token=="None" or tokenLower=="none")
         tool = ITI::Tool::none;
     else
         tool = ITI::Tool::unknown;
@@ -122,7 +139,7 @@ std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool) {
     return in;
 }
 
-ITI::Tool ITI::toTool(const std::string& s) {
+ITI::Tool ITI::to_tool(const std::string& s) {
     std::stringstream ss;
     ss << s;
     ITI::Tool t;

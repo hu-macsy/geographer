@@ -646,6 +646,7 @@ bool aux<IndexType, ValueType>::alignDistributions(
 
 
 template class aux<IndexType, double>;
+//template class aux<long long unsigned int, double>; //rewuired for the parhip wrapper
 template class aux<IndexType, float>;
 
 }//namespace ITI

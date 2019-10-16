@@ -30,11 +30,15 @@ set(FILES_TEST test_main.cpp quadtree/test/QuadTreeTest.cpp    auxTest.cpp CommT
 FIND_PACKAGE( Zoltan2 PATHS "/home/hpc/pr87si/di36qin/Code/Trilinos/build/packages/zoltan2/")
 
 ### find metis and parmetis
-find_library( PARMETIS_LIB libparmetis.a "${PARMETIS_BASE}/lib"  NO_DEFAULT_PATH)
+find_library( PARMETIS_LIB NAMES libparmetis.so libparmetis.a HINTS "${PARMETIS_BASE}/lib" )
 
-if( PARMETIS_LIB AND NOT METIS_INCLUDE)
-    message( FATAL_ERROR "PARMETIS_BASE was specified but not METIS_INCLUDE. Use -DMETIS_INCLUDE=<path_to_directory_that_contains_metis.h>. Probably, a candidate directory is parmetis/metis/include")
+if( PARMETIS_LIB AND NOT DEFINED METIS_INCLUDE)
+    message(WARNING "PARMETIS_BASE was specified but not METIS_INCLUDE. Use -DMETIS_INCLUDE=<path_to_directory_that_contains_metis.h>. Setting path to parmetis/metis/include")
+    set( METIS_INCLUDE "${PARMETIS_BASE}/../../../metis/include")
 endif()
+
+### find parhip ###
+find_library( PARHIP_LIB libparhip.a "${PARHIP_BASE}" NO_DEFAULT_PATH)
 
 
 ###
@@ -45,8 +49,8 @@ endif()
 ### for more info see the Zoltan2 documentation and https://trilinos.org/oldsite/Finding_Trilinos.txt
 ### see also in Trilinos_install_path/install/include/Makefile.export.Zoltan2
 
-if(Zoltan2_FOUND OR PARMETIS_LIB )
-    if(Zoltan2_FOUND )
+if(Zoltan2_FOUND OR PARMETIS_LIB OR PARHIP_LIB )
+    if(Zoltan2_FOUND)
         message( "\n\tFound package Zoltan2" )
         add_definitions(-DZOLTAN_FOUND)
 
@@ -61,9 +65,10 @@ if(Zoltan2_FOUND OR PARMETIS_LIB )
         set(ZOLTAN_WRAP_H zoltanWrapper.h)
         set(ZOLTAN_INCLUDES ${Zoltan2_INCLUDE_DIRS} ${Zoltan2_TPL_INCLUDE_DIRS})
         set(ZOLTAN_LIBS  ${Zoltan2_TPL_LIBRARIES} ${ZOLTAN2_LIB}  ${ZOLTAN_LIB} ${Zoltan2_LIBRARIES})
-
+    else()
+        message(WARNING "zoltan was not found")
     endif()
-    if(PARMETIS_LIB )
+    if(PARMETIS_LIB)
         message( "\tFound metis inlude in " ${METIS_INCLUDE} )
         message( "\tFound parmetis library in " ${PARMETIS_LIB} )
         add_definitions(-DPARMETIS_FOUND)
@@ -74,40 +79,62 @@ if(Zoltan2_FOUND OR PARMETIS_LIB )
         set(PARMETIS_INCLUDES ${METIS_INCLUDE} "${PARMETIS_BASE}/include")
 
         if( NOT DEFINED METIS_BASE )
-            message("Not given a path to metis, will use path: ${PARMETIS_BASE}/../libmetis. To give a custom path provide variable METIS_BASE")
+            message("\t\tNot given a path to metis, will use path: ${PARMETIS_BASE}/../libmetis. To give a custom path provide variable METIS_BASE")
             set(METIS_LIB_DIR "${PARMETIS_BASE}/../libmetis")
         else()
             set(METIS_LIB_DIR "${METIS_BASE}/lib")
         endif()
         find_library( METIS_LIB libmetis.a ${METIS_LIB_DIR}  NO_DEFAULT_PATH)
         set(PARMETIS_LIBS ${PARMETIS_LIB} ${METIS_LIB} )
+    else()
+        message(WARNING "parmetis was not found")        
+    endif()
+    if(PARHIP_LIB)
+        message("\tFound ParHip base in " ${PARHIP_BASE})
+        message("\t\tFound parhip lib in " ${PARHIP_LIB} )
+        add_definitions(-DPARHIP_FOUND)
+
+        set(PARHIP_WRAP_CPP parhipWrapper.cpp)
+        set(PARHIP_WRAP_H parhipWrapper.h)
+        set(PARHIP_INCLUDES ${PARHIP_BASE} )
+        
+        find_library( KAHIP_LIB libkahip.a "${PARHIP_BASE}/parallel" NO_DEFAULT_PATH)
+        if(KAHIP_LIB)
+            message("\t\tFound kahip lib in " ${KAHIP_LIB} )
+        else()
+            message(FATAL_ERROR "kahip library not found")
+        endif()
+
+        set(PARHIP_LIBS ${PARHIP_LIB} ${KAHIP_LIB})
+    else()
+        message(WARNING "parhip was not found")
     endif()
     message( "\n" )
     
-    add_library( wrappers SHARED ${PARMETIS_WRAP_CPP} ${ZOLTAN_WRAP_CPP} )
-    target_include_directories( wrappers PUBLIC ${ZOLTAN_INCLUDES} ${PARMETIS_INCLUDES} )
-    target_link_libraries( wrappers ${RBC_LIBRARY} ${ZOLTAN_LIBS} ${PARMETIS_LIBS} ) # libzoltan2.so metis parmetis
+    add_library( wrappers SHARED ${PARMETIS_WRAP_CPP} ${ZOLTAN_WRAP_CPP} ${PARHIP_WRAP_CPP} )
+    target_include_directories( wrappers PUBLIC ${ZOLTAN_INCLUDES} ${PARMETIS_INCLUDES} ${PARHIP_INCLUDES} )
+    target_link_libraries( wrappers ${RBC_LIBRARY} ${ZOLTAN_LIBS} ${PARMETIS_LIBS} ${PARHIP_LIBS} ) # libzoltan2.so metis parmetis
     
     
     add_executable( allCompetitors allCompetitorsPart.cpp parseArgs.cpp)
     target_include_directories( allCompetitors PUBLIC ${ZOLTAN_INCLUDES} ${PARMETIS_INCLUDES} ${CXXOPTS_DIR} )
     target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES} )
 
-
-    add_executable( testMetisRefine testMetisRefinement.cpp parseArgs.cpp)
-    target_include_directories( testMetisRefine PUBLIC ${ZOLTAN_INCLUDES} ${PARMETIS_INCLUDES} ${CXXOPTS_DIR})
-    target_link_libraries( testMetisRefine geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES} )
-
+    if( PARMETIS_FOUND )
+        add_executable( testMetisRefine testMetisRefinement.cpp parseArgs.cpp)
+        target_include_directories( testMetisRefine PUBLIC ${ZOLTAN_INCLUDES} ${PARMETIS_INCLUDES} ${CXXOPTS_DIR})
+        target_link_libraries( testMetisRefine geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES} )
+        install(TARGETS testMetisRefine DESTINATION "${BIN_DEST}") # executable
+    endif()
 
     set( EXTRA_LIBRARIES_FOUND "true" )
     set( EXTRA_LIBRARIES ${PARMETIS_LIBS} ${ZOLTAN2_LIB} ${ZOLTAN_LIBS}  PARENT_SCOPE )
     
     install(TARGETS wrappers EXPORT wrappers DESTINATION "${LIB_DEST}") 
     install(TARGETS allCompetitors DESTINATION "${BIN_DEST}") # executable
-    install(TARGETS testMetisRefine DESTINATION "${BIN_DEST}") # executable
-    install(FILES Wrappers.h ${PARMETIS_WRAP_H} ${ZOLTAN_WRAP_H} DESTINATION "${HEADER_DEST}")   
+    install(FILES Wrappers.h ${PARMETIS_WRAP_H} ${ZOLTAN_WRAP_H} ${PARHIP_H} DESTINATION "${HEADER_DEST}")   
 else()
-    message( "Some of the packages Zoltan2, metis or parmetis were not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
+    #message( "Some of the packages Zoltan2, metis or parmetis were not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
 endif()
 
 
@@ -141,9 +168,9 @@ option(COMPILE_TESTS "Compile the tests using googletest." ON)
 if (GTEST_FOUND AND COMPILE_TESTS)
 
     # add the wrappers test if zoltan and parmetis is found
-    if( EXTRA_LIBRARIES_FOUND )
+    if( PARMETIS_FOUND )
         set(FILES_TEST ${FILES_TEST} WrappersTest.cpp )
-    endif( EXTRA_LIBRARIES_FOUND )
+    endif( PARMETIS_FOUND )
 
     add_executable(GeographerTest ${FILES_TEST})
     

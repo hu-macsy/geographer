@@ -139,7 +139,7 @@ std::string to_string(const ITI::Tool& t);
 
 std::string to_string(const ITI::Format& f);
 
-ITI::Tool toTool(const std::string& s);
+ITI::Tool to_tool(const std::string& s);
 
 
 /** @brief A structure that holds several options for partitioning, input, output, metrics e.t.c.

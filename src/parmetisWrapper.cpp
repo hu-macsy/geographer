@@ -152,7 +152,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
 
     if( comm->getRank()==0 ) {
         std::cout << "\033[1;31m";
-        std::cout << "IndexType size: " << sizeof(IndexType) << " , ValueType size: "<< sizeof(ValueType) << std::endl;
+        //std::cout << "IndexType size: " << sizeof(IndexType) << " , ValueType size: "<< sizeof(ValueType) << std::endl;
         if( int(sizeof(IndexType)) != int(sizeof(idx_t)) ) {
             std::cout<< "WARNING: IndexType size= " << sizeof(IndexType) << " and idx_t size=" << sizeof(idx_t) << "  do not agree, this may cause problems (even if this print looks OK)." << std::endl;
         }
