@@ -73,8 +73,8 @@ TEST_F( WrappersTest, testRefine ){
 
     PRINT0("First cut is " << cut << " and imbalance " << imbalance );
 
-    Wrappers<IndexType,ValueType>* parMetis = new parmetisWrapper<IndexType,ValueType>;
-    DenseVector<IndexType> refinedPartition = parMetis->refine( graph, coordinates, uniformWeights, firstPartition, settings, metrics );
+    parmetisWrapper<IndexType,ValueType> parMetis;
+    DenseVector<IndexType> refinedPartition = parMetis.refine( graph, coordinates, uniformWeights, firstPartition, settings, metrics );
 
     aux<IndexType,ValueType>::print2DGrid( graph, refinedPartition );
 
