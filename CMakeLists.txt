@@ -16,8 +16,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
 if(NOT CMAKE_BUILD_TYPE) 
-    #set(CMAKE_BUILD_TYPE Release)
-    set(CMAKE_BUILD_TYPE Debug)
+    set(CMAKE_BUILD_TYPE Release)
 endif(NOT CMAKE_BUILD_TYPE)
 
 # ### add code coverage
