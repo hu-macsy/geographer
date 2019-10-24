@@ -77,7 +77,7 @@ Options populateOptions() {
     ("autoSettings", "Set some settings automatically to some values possibly overwriting some user passed parameters. ", value<bool>() )
     //used for the competitors main
     ("outDir", "write result partition into folder", value<std::string>())
-    ("tools", "choose which supported tools to use. See in Settings::Tools for the supported tools and how to call them.", value<std::string>() )
+    ("tools", "choose which supported tools to use. For multiple tool use comma to separate without spaces. See in Settings::Tools for the supported tools and how to call them.", value<std::string>() )
     //mesh generation
     ("generate", "generate uniform mesh as input graph")
     ("numX", "Number of points in x dimension of generated graph", value<IndexType>())
@@ -350,14 +350,12 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
 
     //used (mainly) from allCompetitors to define which tools to use
     if (vm.count("tools")) {  
-        std::stringstream ss( vm["tools"].as<std::string>() );
-std::cout << ss.str() << std::endl;        
+        std::stringstream ss( vm["tools"].as<std::string>() );       
         std::string item;
         std::vector<std::string> tools;
 
         while (!std::getline(ss, item, ',').fail()) {
             tools.push_back( item );
-std::cout << item << std::endl;
         }
 
         settings.tools = tools;
