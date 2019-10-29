@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
     
     Metrics<ValueType> metricsBefore(settings);
 
-    DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coords, nodeWeights, settings, metricsBefore );
+    DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coords, nodeWeights, comm, settings, metricsBefore );
 
 
     metricsBefore.getMetrics( graph, partition, nodeWeights, settings );
