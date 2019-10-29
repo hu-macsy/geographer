@@ -16,7 +16,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     bool useRedistributor,
     bool renumberPEs ) {
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const IndexType numPEs = comm->getSize();
     const IndexType thisPE = comm->getRank();
     const IndexType globalN = coordinates[0].getDistributionPtr()->getGlobalSize();
@@ -307,7 +307,7 @@ IndexType aux<IndexType, ValueType>::toMetisInterface(
     std::vector<IndexType>& options){
     SCAI_REGION( "aux.toMetisInterface");
 
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     const IndexType N = graph.getNumRows();
     const IndexType localN= dist->getLocalSize();    

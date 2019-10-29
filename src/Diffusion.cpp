@@ -74,7 +74,7 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::potentialsFromSource(con
     scai::dmemo::DistributionPtr dist(laplacian.getRowDistributionPtr());
 
     //making sure that the source is the same on all processors
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = laplacian.getRowDistributionPtr()->getCommunicatorPtr();
     IndexType sourceSum = comm->sum(source);
     assert(sourceSum == source*comm->getSize());
 

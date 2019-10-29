@@ -50,6 +50,7 @@ public:
         CSRSparseMatrix<ValueType> &input,
         std::vector<DenseVector<ValueType>> &coordinates,
         std::vector<DenseVector<ValueType>> &nodeWeights,
+        const scai::dmemo::CommunicatorPtr comm,
         Settings settings,
         Metrics<ValueType>& metrics);
 
@@ -94,6 +95,7 @@ public:
         std::vector<DenseVector<ValueType>> &nodeWeights,
         DenseVector<IndexType>& previous,
         CommTree<IndexType,ValueType> commTree,
+        const scai::dmemo::CommunicatorPtr comm,
         Settings settings,
         Metrics<ValueType>& metrics);
 
@@ -115,8 +117,9 @@ public:
      */
 
     static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights, Settings settings) {
+        const scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
         Metrics<ValueType> metrics(settings);
-        return partitionGraph( input, coordinates, nodeWeights, settings, metrics);
+        return partitionGraph( input, coordinates, nodeWeights, comm, settings, metrics);
     }
 
     /**
@@ -166,6 +169,7 @@ public:
     static std::vector<IndexType> partitionGraph(
         IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
         IndexType *vwgt, ValueType *xyz,
+        const scai::dmemo::CommunicatorPtr comm,
         Settings settings, Metrics<ValueType>& metrics);
 
     /**

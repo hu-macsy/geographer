@@ -49,8 +49,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     Metrics<ValueType>& metrics)
 {
     std::vector<DenseVector<ValueType> > uniformWeights(1);
+    const scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
     uniformWeights[0] = fill<DenseVector<ValueType>>(input.getRowDistributionPtr(), 1);
-    return partitionGraph(input, coordinates, uniformWeights, settings, metrics);
+    return partitionGraph(input, coordinates, uniformWeights, comm, settings, metrics);
 }
 //---------------------------------------------------------------------------------------
 
@@ -75,7 +76,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     struct Settings settings,
     Metrics<ValueType>& metrics) {
 
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
     if( settings.initialPartition!=ITI::Tool::geoSFC ) {
         if( comm->getRank()==0) {
             std::cout<< "Called ParcoRepart::partitionGraph without the graph as input argument but the tool to partition is "\
@@ -98,7 +99,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     //generate dummy matrix
     scai::lama::CSRSparseMatrix<ValueType> graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDistPointer);
 
-    return partitionGraph( graph, coordinates, nodeWeights, settings, metrics );
+    return partitionGraph( graph, coordinates, nodeWeights, comm, settings, metrics );
 }
 
 
@@ -108,6 +109,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     CSRSparseMatrix<ValueType> &input,
     std::vector<DenseVector<ValueType>> &coordinates,
     std::vector<DenseVector<ValueType>> &nodeWeights,
+    const scai::dmemo::CommunicatorPtr comm,
     Settings settings,
     Metrics<ValueType>& metrics) {
 
@@ -118,7 +120,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     commTree.createFlatHomogeneous( settings.numBlocks );
     commTree.adaptWeights( nodeWeights );
 
-    return partitionGraph(input, coordinates, nodeWeights, previous, commTree, settings, metrics);
+    return partitionGraph(input, coordinates, nodeWeights, previous, commTree, comm, settings, metrics);
 
 }
 //---------------------------------------------------------------------------------------
@@ -127,12 +129,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 // the settings.blockSizes anymore?
 //overloaded with blocksizes
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSparseMatrix<ValueType> &input,
+DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
+        CSRSparseMatrix<ValueType> &input,
         std::vector<DenseVector<ValueType>> &coordinates,
         std::vector<DenseVector<ValueType>> &nodeWeights,
         std::vector<std::vector<ValueType>> &blockSizes,
         Settings settings,
         Metrics<ValueType>& metrics) {
+
+    const scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
 
     DenseVector<IndexType> previous;
     assert(!settings.repartition);
@@ -140,7 +145,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(CSRSpar
     CommTree<IndexType,ValueType> commTree;
     commTree.createFlatHeterogeneous( blockSizes );
 
-    return partitionGraph(input, coordinates, nodeWeights, previous, commTree, settings, metrics);
+    return partitionGraph(input, coordinates, nodeWeights, previous, commTree, comm, settings, metrics);
 
 }
 
@@ -157,9 +162,10 @@ template<typename IndexType, typename ValueType>
 std::vector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
     IndexType *vwgt, ValueType *xyz,
+    const scai::dmemo::CommunicatorPtr comm,
     Settings  settings, Metrics<ValueType>& metrics ) {
 
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    //const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const IndexType numPEs = comm->getSize();
     const IndexType thisPE = comm->getRank();
 
@@ -224,7 +230,7 @@ std::vector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     //
     std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, scai::lama::DenseVector<ValueType>(genBlockDistPtr, scai::hmemo::HArray<ValueType>(localN, *vwgt)));
 
-    scai::lama::DenseVector<IndexType> localPartitionDV = partitionGraph( graph, coordinates, nodeWeights, settings, metrics);
+    scai::lama::DenseVector<IndexType> localPartitionDV = partitionGraph( graph, coordinates, nodeWeights, comm, settings, metrics);
 
     //WARNING: must check that is correct
     localPartitionDV.redistribute( graph.getRowDistributionPtr() );
@@ -245,6 +251,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     std::vector<DenseVector<ValueType>> &nodeWeights,
     DenseVector<IndexType>& previous,
     CommTree<IndexType,ValueType> commTree,
+    const scai::dmemo::CommunicatorPtr comm,
     Settings settings,
     Metrics<ValueType>& metrics)
 {
@@ -268,7 +275,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
 	const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
     const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
-    const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
+    //const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
     
 	// timing info
     std::chrono::duration<double> partitionTime= std::chrono::duration<double>(0.0);
@@ -945,7 +952,7 @@ std::vector<DenseVector<IndexType>> ParcoRepart<IndexType, ValueType>::getCommun
     // coloring.size()=3: coloring(i,j,c) means that edge with endpoints i and j is colored with color c.
     // and coloring[i].size()= number of edges in input graph
 
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::CommunicatorPtr comm = adjM.getRowDistributionPtr()->getCommunicatorPtr();
 
     assert(adjM.getNumColumns() == adjM.getNumRows() );
     IndexType colors;
