@@ -73,10 +73,10 @@ TYPED_TEST (auxTest, testInitialPartitions) {
     }
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file, comm);
     graph.redistribute(dist, noDistPointer);
 
-    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions, comm);
     EXPECT_TRUE(coordinates[0].getDistributionPtr()->isEqual(*dist));
 
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
@@ -372,9 +372,9 @@ TYPED_TEST(auxTest, testRedistributeFromPartition) {
     const IndexType k = comm->getSize();
     //
 
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file, comm);
     const IndexType N = graph.getNumRows();
-    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions, comm);
 
     const scai::dmemo::DistributionPtr inputDist  = graph.getRowDistributionPtr();
     const IndexType localN = inputDist->getLocalSize();
@@ -501,9 +501,9 @@ TYPED_TEST(auxTest, benchmarkRedistributeFromPartition) {
     const IndexType k = comm->getSize();
     //
 
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file, comm);
     const IndexType N = graph.getNumRows();
-    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions, comm);
 
     const scai::dmemo::DistributionPtr inputDist  = graph.getRowDistributionPtr();
     const IndexType localN = inputDist->getLocalSize();
@@ -593,9 +593,9 @@ TYPED_TEST (auxTest, testMetisInterface) {
     const IndexType k = comm->getSize();
     //
 
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file, comm );
     const IndexType N = graph.getNumRows();
-    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions, comm);
 
     const scai::dmemo::DistributionPtr inputDist  = graph.getRowDistributionPtr();
     const IndexType localN = inputDist->getLocalSize();

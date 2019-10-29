@@ -65,7 +65,7 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::partition(
     }
 
     if( settings.mappingRenumbering ) {
-        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
         PRINT0("Applying renumbering of blocks based on the SFC index of their centers.");
         std::chrono::time_point<std::chrono::steady_clock> startRnb = std::chrono::steady_clock::now();
 
@@ -168,9 +168,10 @@ scai::lama::DenseVector<IndexType> Wrappers<IndexType, ValueType>::refine(
         struct Settings &settings,
         Metrics<ValueType> &metrics
     ){
-    
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    PRINT0("\tStarting metis refinement\n");
+    {
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        PRINT0("\tStarting metis refinement\n");
+    }
 
     //only parmetis refinement is available
     return parmetisWrapper<IndexType,ValueType>::refine( graph, coords, nodeWeights, partition, settings, metrics );

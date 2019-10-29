@@ -90,8 +90,9 @@ int main(int argc, char** argv) {
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     //std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
 
-    std::vector<DenseVector<ValueType> >  nodeWeights;
-    graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights, settings.fileFormat );
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    std::vector<DenseVector<ValueType>>  nodeWeights;
+    graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights, comm, settings.fileFormat );
 
     IndexType N = graph.getNumRows();
     scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
@@ -117,7 +118,6 @@ int main(int argc, char** argv) {
         throw std::runtime_error("Illegal minimum block ID in partition:" + std::to_string(part.min()));
     }
 
-    scai::dmemo::CommunicatorPtr comm = rowDistPtr->getCommunicatorPtr();
     if (settings.computeDiameter) {
         if (comm->getSize() != settings.numBlocks) {
             if (comm->getRank() == 0) {

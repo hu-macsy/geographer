@@ -280,9 +280,8 @@ DenseVector<IndexType> MultiLevel<IndexType, ValueType>::getFineTargets(const De
 template<typename IndexType, typename ValueType>
 void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType> &nodeWeights,  const HaloExchangePlan& halo, const std::vector<DenseVector<ValueType>>& coordinates, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, Settings settings, IndexType iterations) {
     SCAI_REGION("MultiLevel.coarsen");
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = adjM.getRowDistributionPtr()->getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-
 
     // localN= number of local nodes
     IndexType localN= adjM.getLocalNumRows();
@@ -681,8 +680,8 @@ template<typename IndexType, typename ValueType>
 std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType>& nodeWeights, const std::vector<DenseVector<ValueType>>& coordinates, bool nnCoarsening) {
     SCAI_REGION("MultiLevel.maxLocalMatching");
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = distPtr->getCommunicatorPtr();
 
     // get local data of the adjacency matrix
     const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();

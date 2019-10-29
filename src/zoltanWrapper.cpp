@@ -26,8 +26,10 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::partitio
     struct Settings &settings,
     Metrics<ValueType> &metrics) {
 
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    PRINT0("\t\tStarting the zoltan wrapper for partition with "<< algo);
+    {
+        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        PRINT0("\t\tStarting the zoltan wrapper for partition with "<< algo);
+    }
 
     bool repart = false;
 
@@ -45,8 +47,10 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::repartit
     struct Settings &settings,
     Metrics<ValueType> &metrics) {
 
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    PRINT0("\t\tStarting the zoltan wrapper for repartition with " << algo);
+    {
+        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        PRINT0("\t\tStarting the zoltan wrapper for repartition with " << algo);
+    }
 
     bool repart = true;
 
@@ -69,8 +73,8 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     typedef Zoltan2::BasicUserTypes<ValueType, IndexType, IndexType> myTypes;
     typedef Zoltan2::BasicVectorAdapter<myTypes> inputAdapter_t;
 
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = coords[0].getDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
     const IndexType thisPE = comm->getRank();
     const IndexType numBlocks = settings.numBlocks;
 

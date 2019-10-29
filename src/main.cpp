@@ -343,7 +343,7 @@ int main(int argc, char** argv) {
     //
 
     //aggregate metrics in one struct
-    const Metrics<ValueType> aggrMetrics = aggregateVectorMetrics( metricsVec );
+    const Metrics<ValueType> aggrMetrics = aggregateVectorMetrics( metricsVec, comm );
 
     if (repeatTimes > 1) {
         if (comm->getRank() == 0) {

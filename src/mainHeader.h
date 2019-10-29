@@ -53,9 +53,9 @@ IndexType readInput(
 
         // read the graph
         if (vm.count("fileFormat")) {
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights, settings.fileFormat );
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights, comm, settings.fileFormat );
         } else {
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights );
+            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights, comm );
         }
 
         N = graph.getNumRows();
@@ -93,11 +93,11 @@ IndexType readInput(
 
         //read the coordinates file
         if (vm.count("coordFormat")) {
-            coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.coordFormat);
+            coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, comm, settings.coordFormat);
         } else if (vm.count("fileFormat")) {
-            coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
+            coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, comm, settings.fileFormat);
         } else {
-            coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
+            coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, comm);
         }
         SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size(), coords[1].getLocalValues().size(), "coordinates not of same size" );      
 

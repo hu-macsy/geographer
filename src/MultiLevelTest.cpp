@@ -330,7 +330,7 @@ TYPED_TEST (MultiLevelTest, testPixeledCoarsen_2D) {
 
         scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
         scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-        CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file, ITI::Format::METIS );
+        CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file, comm, ITI::Format::METIS );
 
         //read the array locally and messed the distribution. Left as a remainder.
         EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());

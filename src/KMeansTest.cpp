@@ -31,7 +31,7 @@ TYPED_TEST(KMeansTest, testFindInitialCentersSFC) {
     const IndexType dimensions = 2;
     const IndexType k = 8;
 
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile);
     const IndexType n = graph.getNumRows();
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
