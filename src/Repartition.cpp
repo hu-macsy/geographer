@@ -104,7 +104,7 @@ void Repartition<IndexType,ValueType>::getImbalancedDistribution(
 
     struct Settings tmpSettings = settings;
 
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionsPtr()->getCommunicatorPtr();
     IndexType dimensions = settings.dimensions;
 
     scai::lama::DenseVector<IndexType> firstPartition;

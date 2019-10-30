@@ -17,7 +17,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
     SCAI_REGION( "MultiLevel.multiLevelStep" );
     scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
-    const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
+    [[maybe_unused]] const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
 
     if (coordinates.size() != settings.dimensions) {
         throw std::runtime_error("Dimensions do not agree: vector.size()= " + std::to_string(coordinates.size())  + " != settings.dimensions= " + std::to_string(settings.dimensions) );
@@ -280,9 +280,8 @@ DenseVector<IndexType> MultiLevel<IndexType, ValueType>::getFineTargets(const De
 template<typename IndexType, typename ValueType>
 void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType> &nodeWeights,  const HaloExchangePlan& halo, const std::vector<DenseVector<ValueType>>& coordinates, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, Settings settings, IndexType iterations) {
     SCAI_REGION("MultiLevel.coarsen");
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = adjM.getRowDistributionPtr()->getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-
 
     // localN= number of local nodes
     IndexType localN= adjM.getLocalNumRows();
@@ -657,7 +656,7 @@ DenseVector<ValueType> MultiLevel<IndexType, ValueType>::sumToCoarse(const Dense
     scai::dmemo::DistributionPtr fineDist = fineToCoarse.getDistributionPtr();
     const IndexType fineLocalN = fineDist->getLocalSize();
     scai::dmemo::DistributionPtr coarseDist = projectToCoarse(fineToCoarse);
-    IndexType coarseLocalN = coarseDist->getLocalSize();
+    [[maybe_unused]] const IndexType coarseLocalN = coarseDist->getLocalSize();
     assert(inputDist->getLocalSize() == fineLocalN);
 
     DenseVector<ValueType> result(coarseDist, 0);
@@ -681,8 +680,8 @@ template<typename IndexType, typename ValueType>
 std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType>& nodeWeights, const std::vector<DenseVector<ValueType>>& coordinates, bool nnCoarsening) {
     SCAI_REGION("MultiLevel.maxLocalMatching");
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = distPtr->getCommunicatorPtr();
 
     // get local data of the adjacency matrix
     const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
@@ -699,9 +698,6 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
     // ia must have size localN+1
     assert(ia.size()-1 == localN );
     SCAI_ASSERT_EQ_ERROR( rLocalNodeWeights.size(), localN, "Size mismatch" );
-
-    //mainly for debugging reasons
-    IndexType totalNbrs= 0;
 
     // the vector<vector> to return
     // matching[0][i]-matching[1][i] are the endpoints of an edge that is matched
@@ -745,7 +741,7 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
         }
     }
 
-    assert(ia[ia.size()-1] >= totalNbrs);
+    assert(ia[ia.size()-1] >= 0);
 
     return matching;
 }

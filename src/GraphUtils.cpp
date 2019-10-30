@@ -656,8 +656,8 @@ std::vector<IndexType> GraphUtils<IndexType, ValueType>::getNodesWithNonLocalNei
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> GraphUtils<IndexType, ValueType>::getBorderNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part) {
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
     const IndexType localN = dist->getLocalSize();
     const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
     DenseVector<IndexType> border(dist,0);
@@ -707,14 +707,14 @@ DenseVector<IndexType> GraphUtils<IndexType, ValueType>::getBorderNodes( const C
 template<typename IndexType, typename ValueType>
 std::pair<std::vector<IndexType>,std::vector<IndexType>> GraphUtils<IndexType, ValueType>::getNumBorderInnerNodes( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, const struct Settings settings) {
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 
     if( comm->getRank()==0 ) {
         std::cout<<"Computing the border and inner nodes..." << std::endl;
     }
     std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
 
-    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
     const IndexType localN = dist->getLocalSize();
     const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
 
@@ -788,7 +788,8 @@ std::pair<std::vector<IndexType>,std::vector<IndexType>> GraphUtils<IndexType, V
 
 template<typename IndexType, typename ValueType>
 std::vector<IndexType> GraphUtils<IndexType, ValueType>::computeCommVolume( const CSRSparseMatrix<ValueType> &adjM, const DenseVector<IndexType> &part, Settings settings) {
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
     const IndexType numBlocks = settings.numBlocks;
 
     if( comm->getRank()==0 && settings.verbose) {
@@ -797,7 +798,6 @@ std::vector<IndexType> GraphUtils<IndexType, ValueType>::computeCommVolume( cons
     }
     std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
 
-    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
     const IndexType localN = dist->getLocalSize();
     const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
 
@@ -870,8 +870,8 @@ std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType
 Settings settings) {
 
     const IndexType numBlocks = settings.numBlocks;
-
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 
     if( comm->getRank()==0 && settings.verbose) {
         std::cout<<"Computing the communication volume, number of border and inner nodes ...";
@@ -879,7 +879,6 @@ Settings settings) {
     }
     std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
 
-    const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
     const IndexType localN = dist->getLocalSize();
     const scai::hmemo::HArray<IndexType>& localPart= part.getLocalValues();
 
@@ -1018,8 +1017,8 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlockGraph( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k) {
     SCAI_REGION("ParcoRepart.getLocalBlockGraphEdges");
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();    
     const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
     //TODO/check: should dist==partDist??
     const IndexType localN = partDist->getLocalSize();
@@ -1144,8 +1143,8 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlockGraph_dist( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part, const IndexType k) {
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
     const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
     //TODO/check: should dist==partDist??
     const IndexType localN = partDist->getLocalSize();
@@ -1331,8 +1330,9 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getPEGraph( const CSRSparseMatrix<ValueType> &adjM) {
     SCAI_REGION("ParcoRepart.getPEGraph");
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
     const IndexType numPEs = comm->getSize();
 
     const std::vector<IndexType> nonLocalIndices = GraphUtils<IndexType, ValueType>::nonLocalNeighbors(adjM);
@@ -1427,9 +1427,8 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getCSRm
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList ) {
+scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList, const scai::dmemo::CommunicatorPtr comm ) {
 
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const IndexType thisPE = comm->getRank();
     IndexType localM = edgeList.size();
 
@@ -1696,7 +1695,7 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
 template<typename IndexType, typename ValueType>
 std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, ValueType>::CSR2EdgeList_local(const CSRSparseMatrix<ValueType> &graph, IndexType &maxDegree) {
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     CSRSparseMatrix<ValueType> tmpGraph(graph);
     const IndexType N= graph.getNumRows();
 
@@ -1930,7 +1929,7 @@ std::vector< std::vector<IndexType>> GraphUtils<IndexType, ValueType>::mecGraphC
     colors = -1;
 
     std::chrono::time_point<std::chrono::steady_clock> start= std::chrono::steady_clock::now();
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
 
     if (!graph.getRowDistributionPtr()->isReplicated()) {
         PRINT0("***WARNING: In getCommunicationPairs_local: given graph is not replicated;\nAborting...");

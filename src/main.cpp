@@ -267,7 +267,7 @@ int main(int argc, char** argv) {
 
         std::chrono::time_point<std::chrono::steady_clock> beforePartTime =  std::chrono::steady_clock::now();
 
-        partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, commTree, settings, metricsVec[r] );
+        partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, commTree, comm, settings, metricsVec[r] );
         assert( partition.size() == N);
         assert( coordinates[0].size() == N);
 
@@ -343,7 +343,7 @@ int main(int argc, char** argv) {
     //
 
     //aggregate metrics in one struct
-    const Metrics<ValueType> aggrMetrics = aggregateVectorMetrics( metricsVec );
+    const Metrics<ValueType> aggrMetrics = aggregateVectorMetrics( metricsVec, comm );
 
     if (repeatTimes > 1) {
         if (comm->getRank() == 0) {

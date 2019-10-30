@@ -79,9 +79,8 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::refine
     // edgecut: the size of cut
     IndexType edgecut;
 
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-    //const IndexType N = graph.getNumRows();
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
     const IndexType localN= dist->getLocalSize();   
 
     //parmetis requires weights to be integers
@@ -143,8 +142,8 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
     const struct Settings &settings,
     Metrics<ValueType> &metrics) {
 
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
     //const IndexType N = graph.getNumRows();
     const IndexType localN= dist->getLocalSize();
 

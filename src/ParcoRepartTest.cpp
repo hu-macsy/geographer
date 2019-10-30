@@ -219,13 +219,13 @@ TYPED_TEST(ParcoRepartTest, testMetisWrapper) {
     Metrics<ValueType> metrics2(settings);
 
     //scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
-    std::vector<IndexType> localPartition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, xyzLocal, settings, metrics1 );
+    std::vector<IndexType> localPartition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, xyzLocal, comm, settings, metrics1 );
 
     scai::lama::DenseVector<IndexType> partition( graph.getRowDistributionPtr(), scai::hmemo::HArray<IndexType>(  localPartition.size(), localPartition.data()) );
 
     metrics1.getAllMetrics(graph, partition, nodeWeights, settings);
 
-    scai::lama::DenseVector<IndexType> partition2 = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( graph, coords, nodeWeights, settings, metrics2);
+    scai::lama::DenseVector<IndexType> partition2 = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( graph, coords, nodeWeights, comm, settings, metrics2);
     partition2.redistribute( graph.getRowDistributionPtr() );
 
     metrics2.getAllMetrics(graph, partition2, nodeWeights, settings);
@@ -1125,7 +1125,7 @@ TYPED_TEST(ParcoRepartTest, testRedistributeFromPartition) {
     ASSERT_EQ(1, nodeWeights.size());
 
     // get partition
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, nodeWeights, settings, metrics);
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, nodeWeights, comm, settings, metrics);
     ASSERT_EQ(globalN, partition.size());
 
     bool useRedistributor = false;

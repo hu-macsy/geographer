@@ -166,7 +166,7 @@ public:
                 bordViz[i][j]=border.getValue(i*numX+j);
             }
 
-        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        scai::dmemo::CommunicatorPtr comm = adjM.getRowDistributionPtr()->getCommunicatorPtr();
         comm->synchronize();
 
         if(comm->getRank()==0 ) {

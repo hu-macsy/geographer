@@ -75,8 +75,8 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     typedef Zoltan2::BasicUserTypes<ValueType, IndexType, IndexType> myTypes;
     typedef Zoltan2::BasicVectorAdapter<myTypes> inputAdapter_t;
 
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = coords[0].getDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
     const IndexType thisPE = comm->getRank();
     const IndexType numBlocks = settings.numBlocks;
 

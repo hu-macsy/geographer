@@ -351,7 +351,7 @@ TYPED_TEST (GraphUtilsTest,testEdgeList2CSR) {
         //PRINT(thisPE << ": inserting edge " << v1 << " - " << v2 );
     }
 
-    scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils<IndexType,ValueType>::edgeList2CSR( localEdgeList );
+    scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils<IndexType,ValueType>::edgeList2CSR( localEdgeList, comm );
 
     SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
     EXPECT_TRUE( graph.checkSymmetry() );

@@ -71,7 +71,6 @@ if(Zoltan2_FOUND OR PARMETIS_LIB OR PARHIP_LIB )
     if(PARMETIS_LIB)
         message( "\tFound metis inlude in " ${METIS_INCLUDE} )
         message( "\tFound parmetis library in " ${PARMETIS_LIB} )
-        add_definitions(-DPARMETIS_FOUND)
         set(CMAKE_CXX_STANDARD 17)
 
         set(PARMETIS_WRAP_CPP parmetisWrapper.cpp)

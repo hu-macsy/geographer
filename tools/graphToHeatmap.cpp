@@ -112,7 +112,7 @@ int main(int argc, char** argv) {
 
     if (vm.count("graphFile")) {
         std::vector<DenseVector<ValueType> > vectorOfnodeWeights;
-        CSRSparseMatrix<ValueType> graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfnodeWeights, settings.fileFormat );
+        CSRSparseMatrix<ValueType> graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, vectorOfnodeWeights, comm, settings.fileFormat );
         const IndexType numReadVertices = graph.getNumRows();
         if (!vm.count("numVertices")) {
             globalN = numReadVertices;
@@ -132,7 +132,7 @@ int main(int argc, char** argv) {
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
     nodeWeights.redistribute(noDist);
 
-    std::vector<DenseVector<ValueType>> coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, globalN, settings.dimensions, settings.coordFormat);
+    std::vector<DenseVector<ValueType>> coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, globalN, settings.dimensions, comm, settings.coordFormat);
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);

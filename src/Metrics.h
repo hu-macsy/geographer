@@ -189,9 +189,7 @@ public:
 
 //TODO: add default constructor and remove Settings
 template<typename ValueType>
-inline Metrics<ValueType> aggregateVectorMetrics( const std::vector<Metrics<ValueType>>& metricsVec ) {
-
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+inline Metrics<ValueType> aggregateVectorMetrics( const std::vector<Metrics<ValueType>>& metricsVec, const scai::dmemo::CommunicatorPtr comm ) {
 
     IndexType numRuns = metricsVec.size();
 

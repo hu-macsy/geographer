@@ -283,7 +283,7 @@ public:
      * @param[in] edgeList The local list of edges for this PE; edgeList[i].first is one vertex of the edge and .second the other.
      * @return The distributed adjacency matrix.
      */
-    static scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>>& edgeList );
+    static scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>>& edgeList, const scai::dmemo::CommunicatorPtr comm );
 
 
     /** Given a CSR sparse matrix, it calculates its edge list representations.

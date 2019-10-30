@@ -20,7 +20,7 @@ void Metrics<ValueType>::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueTy
 
     getEasyMetrics( graph, partition, nodeWeights, settings );
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     if (settings.numBlocks == comm->getSize()) {
         int numIter = 100;
         getRedistRequiredMetrics( graph, partition, settings, numIter );
@@ -130,7 +130,7 @@ void Metrics<ValueType>::getEasyMetrics( const scai::lama::CSRSparseMatrix<Value
     MM["avgBorderNodesPercent"] = std::accumulate( percentBorderNodesPerBlock.begin(), percentBorderNodesPerBlock.end(), 0.0 )/(ValueType(settings.numBlocks));
 
     //get diameter if possible
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     if (settings.numBlocks == comm->getSize() && settings.computeDiameter) {
         std::tie( MM["maxBlockDiameter"], MM["harmMeanDiam"], MM["numDisconBlocks"] ) = getDiameter(graph, partition, settings);
     } else {
@@ -149,7 +149,7 @@ std::tuple<IndexType,IndexType,IndexType> Metrics<ValueType>::getDiameter( const
     IndexType numDisconBlocks = 0;
     ValueType harmMeanDiam = 0;
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     const IndexType localN = dist->getLocalSize();
     const IndexType numPEs = comm->getSize();
@@ -206,7 +206,7 @@ std::tuple<IndexType,IndexType,IndexType> Metrics<ValueType>::getDiameter( const
 template<typename ValueType>
 void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings, const IndexType repeatTimes ) {
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const IndexType N = graph.getNumRows();
 
     //get the distribution from the partition
@@ -286,7 +286,8 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
 template<typename ValueType>
 std::pair<IndexType,IndexType> Metrics<ValueType>::getRedistributionVol( const scai::dmemo::DistributionPtr newDist, const scai::dmemo::DistributionPtr oldDist) {
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    //const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::CommunicatorPtr comm = newDist->getCommunicatorPtr();
 
     //get the distribution from the partition
     scai::dmemo::RedistributePlan prepareRedist = scai::dmemo::redistributePlanByNewDistribution( newDist, oldDist );
@@ -452,7 +453,7 @@ ValueType Metrics<ValueType>::getSPMVtime(
     scai::lama::CSRSparseMatrix<ValueType> graph,
     const IndexType repeatTimes){
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     PRINT0("starting SpMV...");
 
     // vector for multiplication
