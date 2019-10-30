@@ -551,7 +551,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
             //TODO: with constexpr this is not even compiled; does it make sense to have it here or should it be removed?
             PRINT0("*** WARNING: Requested local refinement with parmetis. Parmetis is found but compiled with a different type for ValueType. Will cast everything to real_t.");
             //TODO: not tested code
-            /*
+            
             scai::lama::CSRSparseMatrix<real_t> copyGraph;
             std::vector<DenseVector<real_t>> copyCoords;
             std::vector<DenseVector<real_t>> copyWeights;
@@ -565,8 +565,9 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
             for(int w=0; w<nodeWeights.size(); w++ ){
                 copyWeights[w].assign( nodeWeights[w] );
             }
-            result =  Wrappers<IndexType,real_t>::refine( copyGraph, copyCoords, copyWeights, result, settings, copyMetrics );
-            */
+            parmetisWrapper<IndexType,real_t> parMetis;
+            result =  parMetis.refine( copyGraph, copyCoords, copyWeights, result, settings, copyMetrics );
+            
         }
         if( not std::is_same<ValueType,real_t>() ){
             throw std::runtime_error("*** ERROR: Requested local refinement with parmetis. Parmetis is found but compiled with a different type for ValueType. Local refinement will not take place. Either compile geographer and parmetis so that real_t=ValueType or choose some other local refinement algorithm.\nAborting...");
