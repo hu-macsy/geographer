@@ -355,24 +355,6 @@ struct Settings {
 }; //struct Settings
 
 
-/** @cond INTERNAL
-*/
-struct sort_pair {
-    double value;
-    int32_t index;
-    bool operator<(const sort_pair& rhs ) const {
-        return value < rhs.value || (value == rhs.value && index < rhs.index);
-    }
-    bool operator>(const sort_pair& rhs ) const {
-        return value > rhs.value || (value == rhs.value && index > rhs.index);
-    }
-    bool operator<=(const sort_pair& rhs ) const {
-        return !operator>(rhs);
-    }
-    bool operator>=(const sort_pair& rhs ) const {
-        return !operator<(rhs);
-    }
-};
 
 struct int_pair {
     int32_t first;
