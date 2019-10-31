@@ -195,7 +195,7 @@ public:
         }
         else {
             assert(children.size() > 0);
-            bool foundResponsibleChild = false;
+            [[maybe_unused]] bool foundResponsibleChild = false;
             for (index i = 0; i < children.size(); i++) {
                 if (children[i]->responsible(coords)) {
                     foundResponsibleChild = true;
@@ -233,11 +233,11 @@ public:
     virtual count getElementsProbabilistically(const Point<ValueType> &query, std::function<ValueType(ValueType)> prob, std::vector<index> &result) {
         auto distancePair = distances(query);
         ValueType probUB = prob(distancePair.first);
-        ValueType probLB = prob(distancePair.second);
+        //ValueType probLB = prob(distancePair.second);
         if (probUB > 1) {
             throw std::runtime_error("f("+std::to_string(distancePair.first)+")="+std::to_string(probUB)+" is not a probability!");
         }
-        assert(probLB <= probUB);
+        assert(prob(distancePair.second) <= probUB);
         if (probUB > 0.5) probUB = 1;//if we are going to take every second element anyway, no use in calculating expensive jumps
         if (probUB == 0) return 0;
         //TODO: return whole if probLB == 1

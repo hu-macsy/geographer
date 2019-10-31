@@ -29,6 +29,20 @@
 #include "parseArgs.h"
 #include "mainHeader.h"
 
+#if PARMETIS_FOUND
+#include "parmetisWrapper.h"
+#include <parmetis.h>
+#endif
+
+#if ZOLTAN_FOUND
+#include "zoltanWrapper.h"
+#endif
+
+#if PARHIP_FOUND
+#include "parhipWrapper.h"
+#endif
+
+
 
 //---------------------------------------------------------------------------------------------
 
@@ -89,55 +103,24 @@ int main(int argc, char** argv) {
 
     //WARNING: 1) removed parmetis sfc
     //WARNING: 2) parMetisGraph should be last because it often crashes
-    std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph };
+    std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph, ITI::Tool::parhipFastMesh, ITI::Tool::parhipUltraFastMesh, ITI::Tool::parhipEcoMesh  };
 
     //used for printing and creating filenames
     std::map<ITI::Tool, std::string> toolName = {
         {ITI::Tool::zoltanRCB,"zoltanRcb"}, {ITI::Tool::zoltanRIB,"zoltanRib"}, {ITI::Tool::zoltanMJ,"zoltanMJ"}, {ITI::Tool::zoltanSFC,"zoltanHsfc"},
-        {ITI::Tool::parMetisSFC,"parMetisSFC"}, {ITI::Tool::parMetisGeom,"parMetisGeom"}, {ITI::Tool::parMetisGraph,"parMetisGraph"}
+        {ITI::Tool::parMetisSFC,"parMetisSFC"}, {ITI::Tool::parMetisGeom,"parMetisGeom"}, {ITI::Tool::parMetisGraph,"parMetisGraph"},
+        {ITI::Tool::parhipFastMesh,"parhipFastMesh"}, {ITI::Tool::parhipUltraFastMesh,"parhipUltraFastMesh"}, {ITI::Tool::parhipEcoMesh,"parhipEcoMesh"}
     };
 
     std::vector<ITI::Tool> wantedTools;
     std::vector<std::string> tools = settings.tools; //not really needed
 
     //if no 'tools' parameter was gives, use all tools
-    if( tools.size()==0 )
-        tools.resize( 1, "all" );
-
-    if( tools[0] == "all") {
+    if( tools.size()==0 ){
         wantedTools = allTools;
     } else {
-        for( std::vector<std::string>::iterator tool=tools.begin(); tool!=tools.end(); tool++) {
-            ITI::Tool thisTool;
-            if( (*tool).substr(0,8)=="parMetis") {
-                if 		( *tool=="parMetisGraph") {
-                    thisTool = ITI::Tool::parMetisGraph;
-                }
-                else if ( *tool=="parMetisGeom") {
-                    thisTool = ITI::Tool::parMetisGeom;
-                }
-                else if	( *tool=="parMetisSfc") {
-                    thisTool = ITI::Tool::parMetisSFC;
-                }
-            } else if ( (*tool).substr(0,6)=="zoltan") {
-                std::string algo;
-                if		( *tool=="zoltanRcb") {
-                    thisTool = ITI::Tool::zoltanRCB;
-                }
-                else if ( *tool=="zoltanRib") {
-                    thisTool = ITI::Tool::zoltanRIB;
-                }
-                else if ( *tool=="zoltanMJ") {
-                    thisTool = ITI::Tool::zoltanMJ;
-                }
-                else if ( *tool=="zoltanHsfc") {
-                    thisTool = ITI::Tool::zoltanSFC;
-                }
-            } else {
-                std::cout<< "Tool "<< *tool <<" not supported.\nAborting..."<<std::endl;
-                return -1;
-            }
-            wantedTools.push_back( thisTool );
+        for( std::vector<std::string>::iterator tool=tools.begin(); tool!=tools.end(); tool++) {    
+            wantedTools.push_back( to_tool(*tool) );
         }
     }
 
@@ -195,9 +178,33 @@ int main(int argc, char** argv) {
             PRINT0("\n\tWARNING: File " << outFile << " allready exists. Skipping partition with " << toolName[thisTool]);
             continue;
         }
-
+PRINT0(toolName[thisTool]);
         //get the partition
-        partition = ITI::Wrappers<IndexType,ValueType>::partition ( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
+        ITI::Wrappers<IndexType,ValueType>* partitioner;
+        if( toolName[thisTool].rfind("zoltan",0)==0 ){
+#if ZOLTAN_FOUND            
+            partitioner = new zoltanWrapper<IndexType,ValueType>;
+#else
+            throw std::runtime_error("Requested a zoltan tool but zoltan is not found. Pick another tool.\nAborting...");
+#endif            
+        }else if( toolName[thisTool].rfind("parMetis",0)==0 ){
+#if PARMETIS_FOUND            
+            partitioner = new parmetisWrapper<IndexType,ValueType>;
+#else
+            throw std::runtime_error("Requested a parmetis tool but parmetis is not found. Pick another tool.\nAborting...");
+#endif
+        }
+        else if(toolName[thisTool].rfind("parhip",0)==0 ){
+#if PARHIP_FOUND
+            partitioner = new parhipWrapper<IndexType,ValueType>;
+#else         
+            throw std::runtime_error("Requested a parhip tool but parhip is not found. Pick another tool.\nAborting...");
+#endif   
+        }else{
+            throw std::runtime_error("Provided tool: "+ toolName[thisTool] + " not supported.\nAborting..." );
+        }
+
+        partition = partitioner->partition( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
 
         PRINT0("time to get the partition: " <<  metrics.MM["timeTotal"] );
 
@@ -296,8 +303,10 @@ int main(int argc, char** argv) {
         std::cout<<"Exiting file " << __FILE__ << " , total time= " << totalTime <<  std::endl;
     }
 
-    //this is needed for supermuc
-    std::exit(0);
+    if (vm.count("callExit")) {
+        //this is needed for supermuc
+        std::exit(0);
+    }
 
     return 0;
 }

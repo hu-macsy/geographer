@@ -41,27 +41,16 @@ public:
      *
      * @return A DenseVector of size N with the partition calculated: 0<= return[i] < k with the block that point i belongs to
      */
-    static scai::lama::DenseVector<IndexType> partition(
+    virtual scai::lama::DenseVector<IndexType> partition(
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-        bool nodeWeightsFlag,
-        Tool tool,
-        struct Settings &settings,
+        const bool nodeWeightsFlag,
+        const Tool tool,
+        const struct Settings &settings,
         Metrics<ValueType> &metrics
-    );
+    ) = 0; 
 
-
-    /** @brief Version for tools that do not need the graph as input.
-     */
-    static scai::lama::DenseVector<IndexType> partition(
-        const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
-        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-        bool nodeWeightsFlag,
-        Tool tool,
-        struct Settings &settings,
-        Metrics<ValueType> &metrics
-    );
 
     /** Returns a partition with one of the supported tools based on the current distribution of the data.
      *
@@ -75,31 +64,15 @@ public:
      *
      * @return A DenseVector of size N with the partition calculated: 0<= return[i] < k with the block that point i belongs to
      */
-    static scai::lama::DenseVector<IndexType> repartition (
+    virtual scai::lama::DenseVector<IndexType> repartition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-        bool nodeWeightsFlag,
-        Tool tool,
-        struct Settings &settings,
+        const bool nodeWeightsFlag,
+        const Tool tool,
+        const struct Settings &settings,
         Metrics<ValueType> &metrics
-    );
-
-    /** Given the input (graph, coordinates, node weights) and a partition
-    of the input, apply local refinement.
-
-    The input and the partition DenseVector should have the same distribution.
-
-    Returns the new, refined partition;
-    */
-    static scai::lama::DenseVector<IndexType> refine(
-        const scai::lama::CSRSparseMatrix<ValueType> &graph,
-        const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
-        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-        const scai::lama::DenseVector<IndexType> partition,
-        struct Settings &settings,
-        Metrics<ValueType> &metrics
-    );
+    ) = 0;
 
 };
 } /* namespace ITI */

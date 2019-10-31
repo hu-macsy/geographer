@@ -36,6 +36,7 @@
 
 #if PARMETIS_FOUND
 #include "Wrappers.h"
+#include "parmetisWrapper.h"
 #include <parmetis.h>
 #endif
 
@@ -477,7 +478,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         assert(comm->getSize() == settings.numBlocks);
         result = DenseVector<IndexType>(input.getRowDistributionPtr(), comm->getRank());
     }else {
-        throw std::runtime_error("Initial Partitioning mode unsupported.");
+        throw std::runtime_error("Initial Partitioning mode " + to_string(settings.initialPartition) +" unsupported.");
     }
 
     //if using k-means the result has different distribution
@@ -547,12 +548,17 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 
             [[maybe_unused]] bool didRedistribution = aux<IndexType,ValueType>::alignDistributions( input, coordinates, nodeWeights, result, settings );
 
-            result =  Wrappers<IndexType,ValueType>::refine( input, coordinates, nodeWeights, result, settings, metrics );
+            //result =  Wrappers<IndexType,ValueType>::refine( input, coordinates, nodeWeights, result, settings, metrics );
+
+            //Wrappers<IndexType,ValueType>* parMetis = new parmetisWrapper<IndexType,ValueType>;
+            parmetisWrapper<IndexType,ValueType> parMetis;
+            result =  parMetis.refine( input, coordinates, nodeWeights, result, settings, metrics );
+            
         }else{
             //TODO: with constexpr this is not even compiled; does it make sense to have it here or should it be removed?
             PRINT0("*** WARNING: Requested local refinement with parmetis. Parmetis is found but compiled with a different type for ValueType. Will cast everything to real_t.");
             //TODO: not tested code
-            /*
+            
             scai::lama::CSRSparseMatrix<real_t> copyGraph;
             std::vector<DenseVector<real_t>> copyCoords;
             std::vector<DenseVector<real_t>> copyWeights;
@@ -566,17 +572,15 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
             for(int w=0; w<nodeWeights.size(); w++ ){
                 copyWeights[w].assign( nodeWeights[w] );
             }
-            result =  Wrappers<IndexType,real_t>::refine( copyGraph, copyCoords, copyWeights, result, settings, copyMetrics );
-            */
+            parmetisWrapper<IndexType,real_t> parMetis;
+            result =  parMetis.refine( copyGraph, copyCoords, copyWeights, result, settings, copyMetrics );
+            
         }
         if( not std::is_same<ValueType,real_t>() ){
-            PRINT0("*** ERROR: Requested local refinement with parmetis. Parmetis is found but compiled with a different type for ValueType. Local refinement will not take place. Either compile geographer and parmetis so that real_t=ValueType or choose some other local refinement algorithm.\nAborting...");
-            std::exit(-1);
+            throw std::runtime_error("*** ERROR: Requested local refinement with parmetis. Parmetis is found but compiled with a different type for ValueType. Local refinement will not take place. Either compile geographer and parmetis so that real_t=ValueType or choose some other local refinement algorithm.\nAborting...");
         }
 #else
-        PRINT0("*** ERROR: requested local refinement using parmetis (settings.localRefAlgo) but parmetis was not installed. Either install parmetis or pick another local refinement method.\nAborting...");
-        //TODO: is this the best way to abort?
-        std::exit(-1);
+        throw std::runtime_error("*** ERROR: requested local refinement using parmetis (settings.localRefAlgo) but parmetis was not installed. Either install parmetis or pick another local refinement method.\nAborting...");
 #endif
     } else if( settings.localRefAlgo==Tool::geographer){
     	SCAI_REGION("ParcoRepart.doLocalRefinement.multiLevelStep")
@@ -588,8 +592,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
         std::chrono::duration<double> LRtime = std::chrono::steady_clock::now() - start;
         metrics.MM["timeLocalRef"] = comm->max( LRtime.count() );
     }else{
-        PRINT0("Provided algorithm for local refinement is "<< to_string(settings.localRefAlgo) << " but is not currently supported. Pick geographer or parMetisRefine. \nAborting...");
-        std::exit(-1);
+        throw std::runtime_error("Provided algorithm for local refinement is "+ to_string(settings.localRefAlgo) + " but is not currently supported. Pick geographer or parMetisRefine. \nAborting...");
     }
 			
 }//doLocalRefinement

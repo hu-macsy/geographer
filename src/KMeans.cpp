@@ -1305,7 +1305,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
             SCAI_ASSERT_LE_ERROR(samples[iter], localN, "invalid number of samples");
             lastIndex = localIndices.begin() + samples[iter];
             std::sort(localIndices.begin(), lastIndex);// sorting not really necessary, but increases locality
-            ValueType ratio = ValueType(comm->sum(samples[iter])) / globalN;
+            [[maybe_unused]] ValueType ratio = ValueType(comm->sum(samples[iter])) / globalN;
             assert(ratio <= 1);
 
         } else {

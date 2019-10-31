@@ -4,9 +4,8 @@
 namespace ITI {
 
 template <typename IndexType, typename ValueType>
-class parmetisWrapper{ 
-
-friend class Wrappers<IndexType,ValueType>;
+class parmetisWrapper : public Wrappers<IndexType,ValueType> { 
+public:
 
 /** @brief Class for external partitioning parmetis tool.
 */
@@ -18,7 +17,7 @@ friend class Wrappers<IndexType,ValueType>;
 
     Returns the new, refined partition;
     */
-    static scai::lama::DenseVector<IndexType> refine(
+    scai::lama::DenseVector<IndexType> refine(
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
@@ -27,9 +26,6 @@ friend class Wrappers<IndexType,ValueType>;
         Metrics<ValueType> &metrics
     );
 
-protected:
-
-    //metis wrapper
 
     /** Returns a partition with one of the metis methods
      *
@@ -45,25 +41,27 @@ protected:
      *
      * @return A DenseVector of size N with the partition calcualted: 0<= return[i] < k with the block that point i belongs to
      */
-    static scai::lama::DenseVector<IndexType> partition (
+    virtual scai::lama::DenseVector<IndexType> partition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-        bool nodeWeightsFlag,
-        int parMetisGeom,
-        struct Settings &settings,
+        const bool nodeWeightsFlag,
+        const Tool tool,
+        //int parMetisGeom,
+        const struct Settings &settings,
         Metrics<ValueType> &metrics);
 
 //
-//TODO: parMetis assumes that vertices are stores in a consecutive manner. This is not true for a
+//TODO: parMetis assumes that vertices are stored in a consecutive manner. This is not true for a
 //      general distribution. Must reindex vertices for parMetis repartition
 //
-    static scai::lama::DenseVector<IndexType> repartition (
+    virtual scai::lama::DenseVector<IndexType> repartition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-        bool nodeWeightsFlag,
-        struct Settings &settings,
+        const bool nodeWeightsFlag,
+        const Tool tool,
+        const struct Settings &settings,
         Metrics<ValueType> &metrics);
 }; //class parmetisWrapper
 }//namespace ITI

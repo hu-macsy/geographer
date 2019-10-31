@@ -7,28 +7,46 @@ namespace ITI {
 */
 
 template <typename IndexType, typename ValueType>
-class zoltanWrapper {
+class zoltanWrapper : public Wrappers<IndexType, ValueType> {
 
-friend class Wrappers<IndexType,ValueType>;
-	
 public:
 
-    static scai::lama::DenseVector<IndexType> partition (
-        const scai::lama::CSRSparseMatrix<ValueType> &graph,
-        const std::vector<scai::lama::DenseVector<ValueType>> &coords,
-        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-        bool nodeWeightsFlag,
-        std::string algo,
-        struct Settings &settings,
-        Metrics<ValueType> &metrics);
+    /** Partitions a graph using some algorithm from zoltan. 
+        \sa Wrappers::partition()
+    */
 
-    static scai::lama::DenseVector<IndexType> repartition (
+    virtual scai::lama::DenseVector<IndexType> partition (
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const std::vector<scai::lama::DenseVector<ValueType>> &coords,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        const bool nodeWeightsFlag,
+        const Tool tool,        
+        const struct Settings &settings,
+        Metrics<ValueType> &metrics);
+    
+    /** @brief Version for tools that do not need the graph as input.
+        Partitions a graph using some algorithm from zoltan. 
+        \sa Wrappers::partition()
+    */
+    scai::lama::DenseVector<IndexType> partition (
         const std::vector<scai::lama::DenseVector<ValueType>> &coords,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
         bool nodeWeightsFlag,
         std::string algo,
         struct Settings &settings,
+        Metrics<ValueType> &metrics);    
+
+    /** Repartitions a graph using some algorithm from zoltan. 
+        \sa Wrappers::repartition()
+    */    
+
+    virtual scai::lama::DenseVector<IndexType> repartition (
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const std::vector<scai::lama::DenseVector<ValueType>> &coords,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        const bool nodeWeightsFlag,
+        const Tool tool,
+        const struct Settings &settings,
         Metrics<ValueType> &metrics);
 
 private:
@@ -36,11 +54,12 @@ private:
     static scai::lama::DenseVector<IndexType> zoltanCore (
         const std::vector<scai::lama::DenseVector<ValueType>> &coords,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-        bool nodeWeightsFlag,
-        std::string algo,
-        bool repart,
-        struct Settings &settings,
+        const bool nodeWeightsFlag,
+        const std::string algo,
+        const bool repart,
+        const struct Settings &settings,
         Metrics<ValueType> &metrics);
 
+    static std::string tool2String( ITI::Tool tool);
     };//class zoltanWrapper
 } /* namespace ITI */

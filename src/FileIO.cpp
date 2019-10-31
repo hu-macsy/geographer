@@ -314,10 +314,6 @@ void FileIO<IndexType, ValueType>::writeCoordsDistributed(const std::vector<Dens
     if(f.fail())
         throw std::runtime_error("File "+ thisPEFilename+ " failed.");
 
-    IndexType dimension= coords.size();
-
-    assert(coords.size() == dimension );
-
     IndexType localN = distPtr->getLocalSize();
 
     scai::hmemo::ReadAccess<ValueType> coordAccess0( coords[0].getLocalValues() );

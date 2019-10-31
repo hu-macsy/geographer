@@ -110,7 +110,7 @@ public:
         std::vector<std::vector<ValueType>>& coords) {
         IndexType numTrees = treePtrVector.size();
         //  both vectors must have the same size = forestSize
-        IndexType forestSize = treePtrVector[numTrees-1]->getID()+1;
+        [[maybe_unused]] IndexType forestSize = treePtrVector[numTrees-1]->getID()+1;
         //PRINT("graphNgbrsCells.size()= " << graphNgbrsCells.size() << ", forest size= " << forestSize);
         assert( forestSize == graphNgbrsCells.size() );
 

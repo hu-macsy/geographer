@@ -34,7 +34,7 @@ Options populateOptions() {
     //repartitioning
     ("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
     //multi-level and local refinement
-    ("initialPartition", "Choose initial partitioning method between space-filling curves (geoSFC), balanced k-means (geoKmeans) or the hierarchical version (geoHierKM) and MultiJagged (geoMS). If parmetis or zoltan are installed, you can also choose to partition with them using for example, parMetisGraph or zoltanMJ. For more information, see src/Settings.h file.", value<Tool>())
+    ("initialPartition", "Choose initial partitioning method between space-filling curves (geoSFC), balanced k-means (geoKmeans) or the hierarchical version (geoHierKM) and MultiJagged (geoMS). If parmetis or zoltan are installed, you can also choose to partition with them using for example, parMetisGraph or zoltanMJ. For more information, see src/Settings.h file.", value<std::string>())
     ("noRefinement", "skip local refinement steps")
     ("multiLevelRounds", "Tuning Parameter: How many multi-level rounds with coarsening to perform", value<IndexType>()->default_value(std::to_string(settings.multiLevelRounds)))
     ("minBorderNodes", "Tuning parameter: Minimum number of border nodes used in each refinement step", value<IndexType>())
@@ -77,7 +77,7 @@ Options populateOptions() {
     ("autoSettings", "Set some settings automatically to some values possibly overwriting some user passed parameters. ", value<bool>() )
     //used for the competitors main
     ("outDir", "write result partition into folder", value<std::string>())
-    ("tools", "choose which supported tools to use. See in Settings::Tools for the supported tools and how to call them.", value<std::string>() )
+    ("tools", "choose which supported tools to use. For multiple tool use comma to separate without spaces. See in Settings::Tools for the supported tools and how to call them.", value<std::string>() )
     //mesh generation
     ("generate", "generate uniform mesh as input graph")
     ("numX", "Number of points in x dimension of generated graph", value<IndexType>())
@@ -216,7 +216,8 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         settings.blockSizesFile = vm["blockSizesFile"].as<std::string>();
     }
     if (vm.count("initialPartition")) {
-        settings.initialPartition = vm["initialPartition"].as<Tool>();
+        std::string s = vm["initialPartition"].as<std::string>();
+        settings.initialPartition = to_tool(s);
     }
     if (vm.count("multiLevelRounds")) {
         settings.multiLevelRounds = vm["multiLevelRounds"].as<IndexType>();
@@ -233,6 +234,8 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("localRefAlgo")) {
         settings.localRefAlgo = vm["localRefAlgo"].as<Tool>();
     }
+    //TODO: cxxopts supports parsing of multiple arguments and storing them as vectors
+    //  use that and not our own parsing
     if (vm.count("cutsPerDim")) {
         std::stringstream ss( vm["cutsPerDim"].as<std::string>() );
         std::string item;
@@ -347,11 +350,11 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
 
     //used (mainly) from allCompetitors to define which tools to use
     if (vm.count("tools")) {  
-        std::stringstream ss( vm["tools"].as<std::string>() );
+        std::stringstream ss( vm["tools"].as<std::string>() );       
         std::string item;
         std::vector<std::string> tools;
 
-        while (!std::getline(ss, item, ' ').fail()) {
+        while (!std::getline(ss, item, ',').fail()) {
             tools.push_back( item );
         }
 
