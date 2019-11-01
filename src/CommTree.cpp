@@ -90,6 +90,15 @@ CommTree<IndexType, ValueType>::CommTree( const std::vector<IndexType> &levels, 
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
+void CommTree<IndexType, ValueType>::createFromLevels( const std::vector<IndexType> &levels, const IndexType numWeights ) {
+
+    CommTree tmpTree( levels, numWeights );
+
+    *this = tmpTree;
+}
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
 IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vector<commNode> leaves) {
 
     hierarchyLevels = leaves.front().hierarchy.size()+1; //+1 is for the root
@@ -184,7 +193,7 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
 template <typename IndexType, typename ValueType>
 void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights ) {
 
-    if( areWeightsAdapted ) {
+    if( areWeightsAdaptedV ) {
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
         if( comm->getRank()==0 )
             std::cout<< " Tree node weights are already adapted, skipping adaptWeights " << std::endl;
@@ -192,7 +201,6 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
         //we need to access leaves like that because getLeaves is const
         std::vector<commNode> hierLevel = this->tree.back();
 
-        const IndexType numBlocks = hierLevel.size();
         const IndexType numWeights = this->getNumWeights();
         SCAI_ASSERT_EQ_ERROR( numWeights, nodeWeights.size(), "Given weights vector size and tree number of weights do not agree" );
 
@@ -222,11 +230,11 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
             }
         }
 
-        //clear tree and rebuild. This will correctly construct the intemediate levels
+        //clear tree and rebuild. This will correctly construct the intermediate levels
         tree.clear();
-        IndexType size = createTreeFromLeaves( hierLevel );
+        [[maybe_unused]] IndexType size = createTreeFromLeaves( hierLevel );
 
-        areWeightsAdapted = true;
+        areWeightsAdaptedV = true;
     }
 }//adaptWeights
 
@@ -243,9 +251,6 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
     unsigned int levelBelowsize = levelBelow.size();
     std::vector<bool> seen(levelBelowsize, false);
     //PRINT("level below has size " << levelBelowsize );
-
-    //will be used later to normalize the speed
-    ValueType maxRelatSpeed = 0;
 
     std::vector<commNode> aboveLevel;
 
@@ -432,7 +437,7 @@ std::vector<ValueType> CommTree<IndexType,ValueType>::computeImbalance(
     const IndexType numLeaves = leaves.size();
     SCAI_ASSERT_EQ_ERROR( numLeaves, k, "Number of blocks of the partition and number of leaves of the tree do not agree" );
 
-    if( not areWeightsAdapted ) {
+    if( not areWeightsAdaptedV ) {
         std::cout<<"Warning, tree weights are not adapted according to the input graph node weights. Will adapt first and then calculate imbalances." << std::endl;
         //this line can change the tree. Without it the function can be const
         this->adaptWeights( nodeWeights );

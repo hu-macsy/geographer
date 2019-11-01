@@ -128,7 +128,7 @@ inline std::ostream& operator<<(std::ostream& out, Format method) {
 - zoltanMJ Partition a point set (no graph is needed) using the Multijagged algorithm of zoltan2.
 - zoltanMJ Partition a point set (no graph is needed) using the space filling curves algorithm of zoltan2.
 */
-enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, none};
+enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, parMetisRefine, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, parhipFastMesh, parhipUltraFastMesh, parhipEcoMesh, myAlgo, none, unknown};
 
 
 std::istream& operator>>(std::istream& in, ITI::Tool& tool);
@@ -139,7 +139,7 @@ std::string to_string(const ITI::Tool& t);
 
 std::string to_string(const ITI::Format& f);
 
-ITI::Tool toTool(const std::string& s);
+ITI::Tool to_tool(const std::string& s);
 
 
 /** @brief A structure that holds several options for partitioning, input, output, metrics e.t.c.
@@ -165,7 +165,6 @@ struct Settings {
     IndexType dimensions= 2;	///< the dimension of the point set
     std::string fileName = "-";	///< the name of the input file to read the graph from
     std::string outFile = "-";	///< name of the file to store metrics (if desired)
-    bool storePartition = false;
     std::string outDir = "-"; 	//this is used by the competitors main
     std::string PEGraphFile = "-"; //TODO: this should not be in settings
     std::string blockSizesFile = "-"; //TODO: this should not be in settings
@@ -183,7 +182,7 @@ struct Settings {
     //@{
     IndexType numX = 32;
     IndexType numY = 32;
-    IndexType numZ = 32;
+    IndexType numZ = 1;
     //@}
 
     /** @name Tuning parameters for local refinement
@@ -197,6 +196,7 @@ struct Settings {
     bool useGeometricTieBreaking = false;	///< if distance from center should be used for tie braking
     bool gainOverBalance = false;
     bool skipNoGainColors = false;			///< if we should skip some rounds if there is no gain
+    ITI::Tool localRefAlgo = ITI::Tool::geographer; ///< with which algorithm to do local refinement
     //@}
 
     /** @name Space filling curve parameters
@@ -251,6 +251,7 @@ struct Settings {
     bool writeDebugCoordinates = false;		///< store coordinates and block id
     bool writePEgraph = false;				///< store the processor graph
     bool storeInfo = false;					///< store metrics info
+    bool storePartition = false;            ///< store metrics info
     IndexType repeatTimes = 1;				///< for benchmarking, how many times is the partition repeated
     IndexType thisRound=-1; //TODO: what is this? This has nothing to do with the settings.
 
@@ -263,6 +264,9 @@ struct Settings {
     /** @name Various parameters
     */
     //@{
+
+    /// use some default settings; will overwrite other arguments given in the command line
+    bool setAutoSettings;
     ///this is used by the competitors main to set the tools we are gonna use
     std::vector<std::string> tools;
 
@@ -272,6 +276,8 @@ struct Settings {
     /// variable to check if the settings given are valid or not
     bool isValid = true;
     //@}
+	
+	int myAlgoParam = 0;
 
     //
     // print settings
@@ -284,8 +290,7 @@ struct Settings {
 
         out<< "Git commit: " << version << " and machine: "<< machine << std::endl;
 
-        IndexType numPoints = numX* numY* numZ;
-        out<< "Setting: number of points= " << numPoints<< ", dimensions= "<< dimensions << ", filename: " << fileName << std::endl;
+        out<< "Setting: dimensions= "<< dimensions << ", filename: " << fileName << std::endl;
         if( outFile!="-" ) {
             out<< "outFile: " << outFile << std::endl;
         }
@@ -326,6 +331,13 @@ struct Settings {
         } else {
             out<< "initial partition undefined" << std::endl;
         }
+        out << "local refinement algo: ";
+        if( noRefinement ){
+            out << "none" << std::endl;
+        }else{
+            out << localRefAlgo << std::endl;
+        }
+
         out << "epsilon= "<< epsilon << std::endl;
         out << "numBlocks= " << numBlocks << std::endl;
     }
@@ -337,7 +349,11 @@ struct Settings {
         }
     }
 
+    template <typename ValueType>
+    Settings setDefault( const scai::lama::CSRSparseMatrix<ValueType>& graph );
+
 }; //struct Settings
+
 
 /** @cond INTERNAL
 */

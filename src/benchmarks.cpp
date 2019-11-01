@@ -38,7 +38,7 @@ TEST_F( benchmarkTest, benchMapping ) {
     const IndexType k = settings.numBlocks;
 
     //
-    // 1 - read graph, coordiantes and create unit nodeweights
+    // 1 - read graph, coordinates and create unit nodeweights
     //
 
     scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );

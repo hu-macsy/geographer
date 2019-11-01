@@ -35,12 +35,12 @@ public:
 
     //MM, metrics map
     std::map<std::string,ValueType> MM = {
-        {"inputTime",-1.0},
-        {"timeMigrationAlgo",-1.0}, {"timeFirstDistribution",-1.0}, {"timeLRorRedist",-1.0}, 
-        {"timeFinalPartition",-1.0}, {"timeSecondDistribution",-1.0}, {"timeInitialPart",-1.0},
-        {"timeMapping", -1.0}, {"reportTime",-1.0},
+        {"timeMigrationAlgo",-1.0}, {"timeFirstDistribution",-1.0}, {"timeTotal",-1.0}, {"reportTime",-1.0},
+        {"inputTime",-1.0}, {"timeFinalPartition",-1.0}, {"timeSecondDistribution",-1.0}, {"timePreliminary",-1.0}, {"timeLocalRef",-1.0}, {"timeKmeans", -1.0},
         {"preliminaryCut",-1.0}, {"preliminaryImbalance",-1.0}, {"finalCut",-1.0}, {"finalImbalance",-1.0}, {"maxBlockGraphDegree",-1.0},
+        {"preliminaryMaxCommVol",-1.0},{"preliminaryTotalCommVol",-1.0},
         {"totalBlockGraphEdges",-1.0}, {"maxCommVolume",-1.0}, {"totalCommVolume",-1.0}, {"maxBoundaryNodes",-1.0}, {"totalBoundaryNodes",-1.0},
+        {"SpMVtime",-1.0}, {"commTime",-1.0}, 
         {"maxBorderNodesPercent",-1.0}, {"avgBorderNodesPercent",-1.0},
         {"maxBlockDiameter",-1.0}, {"harmMeanDiam",-1.0}, {"numDisconBlocks",-1.0},
         {"maxRedistVol",-1.0}, {"totRedistVol",-1.0},	 //redistribution metrics
@@ -70,6 +70,12 @@ public:
         this->MM = m.MM;
         return *this;
     }
+
+    /**Wrapper function to call metrics depending on setting.metricsDetail
+
+    */
+
+    void getMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings);
 
 
     /** @brief Get all possible metrics.
@@ -154,6 +160,14 @@ public:
         const scai::lama::DenseVector<IndexType> partition,
         const scai::lama::CSRSparseMatrix<ValueType> PEGraph );
 
+    /** Given a distributed matrix (aka graph) it operates a multiplication with a vector for the
+        given number of repetitions and returns the average running time. The matrix is not const
+        because inside we set: matrix.setCommunicationKind( scai::lama::SyncKind::ASYNC_COMM );
+    */
+    ValueType getSPMVtime(
+    scai::lama::CSRSparseMatrix<ValueType> matrix,
+    const IndexType repeatTimes);
+
     //@{
     /** @name Print metrics
 
@@ -176,9 +190,7 @@ public:
 
 //TODO: add default constructor and remove Settings
 template<typename ValueType>
-inline Metrics<ValueType> aggregateVectorMetrics( const std::vector<Metrics<ValueType>>& metricsVec ) {
-
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+inline Metrics<ValueType> aggregateVectorMetrics( const std::vector<Metrics<ValueType>>& metricsVec, const scai::dmemo::CommunicatorPtr comm ) {
 
     IndexType numRuns = metricsVec.size();
 

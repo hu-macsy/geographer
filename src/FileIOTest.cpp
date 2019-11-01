@@ -271,8 +271,9 @@ TYPED_TEST(FileIOTest, testReadCoordsOcean) {
 
     std::string coordFile = FileIOTest<ValueType>::graphPath + "node2d_core2.out";
     const IndexType n = 126858;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-    std::vector<DenseVector<ValueType> > coords = FileIO<IndexType, ValueType>::readCoordsOcean(coordFile, 2);
+    std::vector<DenseVector<ValueType> > coords = FileIO<IndexType, ValueType>::readCoordsOcean(coordFile, 2, comm);
     EXPECT_EQ(n, coords[0].size());
 
     for (IndexType d = 0; d < 2; d++) {
@@ -288,7 +289,7 @@ TYPED_TEST(FileIOTest, testReadCoordsOcean) {
 TYPED_TEST(FileIOTest, testReadQuadTree) {
     using ValueType = TypeParam;
 
-    std::string filename = FileIOTest<ValueType>::graphPath + "cells.dat";
+    std::string filename = FileIOTest<ValueType>::graphPath + "cells_small.dat";
 
     scai::lama::CSRSparseMatrix<ValueType> matrix = FileIO<IndexType, ValueType>::readQuadTree(filename);
 
@@ -303,12 +304,12 @@ TYPED_TEST(FileIOTest, testReadQuadTree) {
 TYPED_TEST(FileIOTest, testReadBinaryEdgeList) {
     using ValueType = TypeParam;
 
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     std::string filename = FileIOTest<ValueType>::graphPath + "delaunay-3D-12.edgelist";
 
-    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(filename, ITI::Format::BINARYEDGELIST);
+    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(filename, comm, ITI::Format::BINARYEDGELIST);
 
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-    scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 
     const IndexType n = graph.getNumRows();
     //const IndexType localN = dist->getLocalSize();
@@ -353,9 +354,8 @@ TYPED_TEST(FileIOTest, testReadGraphBinary) {
     //std::string file = "Grid8x8.bgf";   // Grid8x8: n= 64, m=224
     std::string filename= FileIOTest<ValueType>::graphPath + file;
 
-    scai::lama::CSRSparseMatrix<ValueType> graph;
-
-    graph =  FileIO<IndexType, ValueType>::readGraphBinary(filename);
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::lama::CSRSparseMatrix<ValueType> graph =  FileIO<IndexType, ValueType>::readGraphBinary(filename, comm);
 
     //assertions
 
@@ -401,19 +401,19 @@ TYPED_TEST(FileIOTest, testReadMatrixMarketFormat) {
     
     ITI::Format ff = ITI::Format::MATRIXMARKET;
 
-    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
     std::tie( N, dimensions) = FileIO<IndexType, ValueType>::getMatrixMarketCoordsInfos( coordFile );
     PRINT0(" number of points= " << N << ", dimensions= " << dimensions);
 
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions, ff);
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( coordFile, N, dimensions, comm, ff);
 
-    std::chrono::duration<double> readTime =  std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> readTime =  std::chrono::steady_clock::now() - startTime;
     PRINT0("Read " << coords.size() << " coordinates in time " << readTime.count() );
 
-    startTime = std::chrono::system_clock::now();
-    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( graphFile, ff);
-    readTime =  std::chrono::system_clock::now() - startTime;
+    startTime = std::chrono::steady_clock::now();
+    scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( graphFile, comm, ff);
+    readTime =  std::chrono::steady_clock::now() - startTime;
 
     PRINT0("Read  graph in time " << readTime.count() );
 
@@ -471,7 +471,7 @@ TYPED_TEST(FileIOTest, testWriteCoordsParallel) {
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     scai::dmemo::DistributionPtr blockDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
 
-    std::vector<DenseVector<ValueType>> coordsOrig = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coordsOrig = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions, comm);
     EXPECT_TRUE(coordsOrig[0].getDistributionPtr()->isEqual(*blockDist));
 
     //
@@ -481,7 +481,7 @@ TYPED_TEST(FileIOTest, testWriteCoordsParallel) {
     FileIO<IndexType, ValueType>::writeCoordsParallel( coordsOrig, outFilename);
 
     //now read the coords
-    std::vector<DenseVector<ValueType>> coordsBinary =  FileIO<IndexType, ValueType>::readCoordsBinary( outFilename, N, dimensions);
+    std::vector<DenseVector<ValueType>> coordsBinary =  FileIO<IndexType, ValueType>::readCoordsBinary( outFilename, N, dimensions, comm);
 
 
     for( int d=0; d<dimensions; d++) {
@@ -513,8 +513,8 @@ TYPED_TEST(FileIOTest, testReadGraphAndCoordsBinary) {
     //
     // check that graphs are identical
     //
-    scai::lama::CSRSparseMatrix<ValueType> graphBin =  FileIO<IndexType, ValueType>::readGraphBinary(fileBin);
-    scai::lama::CSRSparseMatrix<ValueType> graphMetis =  FileIO<IndexType, ValueType>::readGraph(fileMetis);
+    scai::lama::CSRSparseMatrix<ValueType> graphBin = FileIO<IndexType, ValueType>::readGraphBinary(fileBin, comm);
+    scai::lama::CSRSparseMatrix<ValueType> graphMetis = FileIO<IndexType, ValueType>::readGraph(fileMetis);
 
     if( graphBin.getNumRows()< 500) {
         PRINT0("Checking matrix symmetry...");
@@ -555,8 +555,8 @@ TYPED_TEST(FileIOTest, testReadGraphAndCoordsBinary) {
     IndexType dimensions = 2;
     IndexType N = graphBin.getNumRows();
 
-    std::vector<DenseVector<ValueType>> coordsBinary =  FileIO<IndexType, ValueType>::readCoordsBinary( coordFileBin, N, dimensions);
-    std::vector<DenseVector<ValueType>> coordsMetis =  FileIO<IndexType, ValueType>::readCoords( coordFileMetis, N, dimensions);
+    std::vector<DenseVector<ValueType>> coordsBinary =  FileIO<IndexType, ValueType>::readCoordsBinary( coordFileBin, N, dimensions, comm);
+    std::vector<DenseVector<ValueType>> coordsMetis =  FileIO<IndexType, ValueType>::readCoords( coordFileMetis, N, dimensions, comm);
 
     SCAI_ASSERT_EQ_ERROR( coordsBinary.size(), coordsMetis.size(), "Wrong dimension");
 
@@ -666,7 +666,7 @@ TYPED_TEST (FileIOTest, testReadEdgeListDistributed) {
 
         std::string file = FileIOTest<ValueType>::graphPath + "tmp4/out";
 
-        scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file );
+        scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file, comm );
 
         ASSERT_TRUE( graph.isConsistent());
         EXPECT_TRUE( graph.checkSymmetry() );

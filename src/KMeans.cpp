@@ -39,9 +39,8 @@ Settings settings) {
     const IndexType localN = coordinates[0].getLocalValues().size();
     const IndexType globalN = coordinates[0].size();
     const IndexType dimensions = settings.dimensions;
-    const IndexType k = settings.numBlocks;
     // global communicator
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
 
     // the input is already partitioned into numOldBlocks number of blocks
     // for every old block we must find a number of new centers/blocks
@@ -968,7 +967,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeRepartition(
     Metrics<ValueType>& metrics) {
 
     const IndexType localN = coordinates[0].getLocalValues().size();
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
     const IndexType p = comm->getSize();
     SCAI_ASSERT_EQ_ERROR(p, settings.numBlocks, "Deriving the previous partition from the distribution cannot work for p != k");
     const IndexType numNodeWeights = nodeWeights.size();
@@ -1024,7 +1023,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeRepartition(
     const Settings settings) {
 
     const IndexType localN = previous.getLocalValues().size();
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
     std::vector<std::vector<ValueType> > initialCenters;
 
     if (settings.numBlocks == comm->getSize()
@@ -1130,7 +1129,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     SCAI_ASSERT_EQ_ERROR(centers[0][0].size(), dim, "Center dimensions mismatch");
     SCAI_ASSERT_EQ_ERROR(centers1DVector[0].size(), dim, "Center dimensions mismatch");
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
 
     const IndexType p = comm->getSize();
 
@@ -1306,7 +1305,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
             SCAI_ASSERT_LE_ERROR(samples[iter], localN, "invalid number of samples");
             lastIndex = localIndices.begin() + samples[iter];
             std::sort(localIndices.begin(), lastIndex);// sorting not really necessary, but increases locality
-            ValueType ratio = ValueType(comm->sum(samples[iter])) / globalN;
+            [[maybe_unused]] ValueType ratio = ValueType(comm->sum(samples[iter])) / globalN;
             assert(ratio <= 1);
 
         } else {
@@ -1330,7 +1329,13 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
             const ValueType ratio = totalSampledWeightSum / nodeWeightSum[i];
             adjustedBlockSizes[i].resize(targetBlockWeights[i].size());
 
-            SCAI_ASSERT_LE_ERROR(totalSampledWeightSum, nodeWeightSum[i]+ 1e-8, "Error in sampled weight sum.");
+            //TODO: merge to one assertion; or not...
+            if( std::is_same<ValueType,float>::value ){
+                //SCAI_ASSERT_LE_ERROR(totalSampledWeightSum, nodeWeightSum[i]*(1+1e-4), "Error in sampled weight sum.");
+            }else{  //double
+                SCAI_ASSERT_LE_ERROR(totalSampledWeightSum, nodeWeightSum[i]*(1+1e-8), "Error in sampled weight sum.");
+            }
+
 
             for (IndexType j = 0; j < targetBlockWeights[i].size(); j++) {
                 adjustedBlockSizes[i][j] = ValueType(targetBlockWeights[i][j]) * ratio;
@@ -1520,6 +1525,8 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     ValueType time = comm->max(KMeansTime.count());
 
     PRINT0("total KMeans time: " << time << " , number of iterations: " << iter);
+    //special time for the core kmeans
+    metrics.MM["timeKmeans"] = time;
 
     return result;
 }// computePartition
@@ -1583,7 +1590,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierarchicalPartition
     SCAI_ASSERT_EQ_ERROR(settings.numBlocks, commTree.getNumLeaves(), "The number of leaves and number of blocks must agree");
 
     // get global communicator
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
 
     if (settings.erodeInfluence) {
         if (comm->getRank()==0) {
@@ -1594,7 +1601,6 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierarchicalPartition
 
     const IndexType numNodeWeights = nodeWeights.size();
     const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
-    const IndexType localN = dist->getLocalSize();
 
     // redistribute points based on their hilbert curve index
     // warning: this functions redistributes the coordinates and the node weights.
@@ -1760,7 +1766,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierPlusRepart(
 
     std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors(-1);
 
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
     PRINT0("Finished hierarchical partition");
 
     // refine using a repartition step

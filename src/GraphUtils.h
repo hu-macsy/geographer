@@ -32,9 +32,18 @@ public:
      *
      * @param[in,out] the graph
      *
-     * @return A block-distributed vector containing the old indices.
+     * @return A block-distributed vector containing the old local indices
+     of this PE
      */
-    static scai::lama::DenseVector<IndexType> reindex(scai::lama::CSRSparseMatrix<ValueType> &graph);
+    static scai::dmemo::DistributionPtr genBlockRedist(scai::lama::CSRSparseMatrix<ValueType> &graph);
+
+    /** @brief Attempt to locally renumber the matrix and convert it to
+    a general block distribution without actually redistributing
+    @attention  deprecated version,
+    */
+
+    //TODO: deprecated version, fix and use or remove
+    static scai::dmemo::DistributionPtr reindex(scai::lama::CSRSparseMatrix<ValueType> &graph);
 
     /**
      * @brief Perform a BFS on the local subgraph.
@@ -274,7 +283,7 @@ public:
      * @param[in] edgeList The local list of edges for this PE; edgeList[i].first is one vertex of the edge and .second the other.
      * @return The distributed adjacency matrix.
      */
-    static scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>>& edgeList );
+    static scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>>& edgeList, const scai::dmemo::CommunicatorPtr comm );
 
 
     /** Given a CSR sparse matrix, it calculates its edge list representations.

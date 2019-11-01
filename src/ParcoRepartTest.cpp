@@ -219,13 +219,13 @@ TYPED_TEST(ParcoRepartTest, testMetisWrapper) {
     Metrics<ValueType> metrics2(settings);
 
     //scai::lama::DenseVector<IndexType> partition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
-    std::vector<IndexType> localPartition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, dimensions, xyzLocal, settings, metrics1 );
+    std::vector<IndexType> localPartition = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( vtxDist, xadj, adjncy, localMatrix.getJA().size(), vwgt, xyzLocal, comm, settings, metrics1 );
 
     scai::lama::DenseVector<IndexType> partition( graph.getRowDistributionPtr(), scai::hmemo::HArray<IndexType>(  localPartition.size(), localPartition.data()) );
 
     metrics1.getAllMetrics(graph, partition, nodeWeights, settings);
 
-    scai::lama::DenseVector<IndexType> partition2 = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( graph, coords, nodeWeights, settings, metrics2);
+    scai::lama::DenseVector<IndexType> partition2 = ITI::ParcoRepart<IndexType,ValueType>::partitionGraph( graph, coords, nodeWeights, comm, settings, metrics2);
     partition2.redistribute( graph.getRowDistributionPtr() );
 
     metrics2.getAllMetrics(graph, partition2, nodeWeights, settings);
@@ -929,8 +929,7 @@ TYPED_TEST (ParcoRepartTest, testGetLocalWeightedGraphColoring_2D) {
 
 //WARNING: disabled test because the setRawData() seems to not work properly
 
-TYPED_TEST (ParcoRepartTest, 
-    DISABLED_testGetLocalCommunicationWithColoring_2D) {
+TYPED_TEST (ParcoRepartTest, testGetLocalCommunicationWithColoring_2D) {
     using ValueType = TypeParam;
 
     std::string file = ParcoRepartTest<ValueType>::graphPath + "Grid16x16";
@@ -989,6 +988,7 @@ TYPED_TEST (ParcoRepartTest,
         scai::lama::CSRSparseMatrix<ValueType> blockGraph;
         blockGraph.setRawDenseData( 6, 6, adjArray);
         SCAI_ASSERT( blockGraph.checkSymmetry(), true );
+        /*
         PRINT0(">> "<< blockGraph.getLocalStorage().getValues().size());
         PRINT0(">> "<< blockGraph.getLocalStorage().getIA().size());
         PRINT0(">> "<< blockGraph.getLocalStorage().getJA().size());
@@ -996,18 +996,19 @@ TYPED_TEST (ParcoRepartTest,
             for(int j=0; j<6; j++)
                 PRINT0(i<<", " << j << " = " << blockGraph.getValue(i,j));
         }
+        */
         // get the communication pairs
         std::vector<DenseVector<IndexType>> commScheme = ParcoRepart<IndexType, ValueType>::getCommunicationPairs_local( blockGraph,settings );
 
         // print the pairs
-
+        /*    
         for(IndexType i=0; i<commScheme.size(); i++) {
             for(IndexType j=0; j<commScheme[i].size(); j++) {
                 PRINT( "round :"<< i<< " , PEs talking: "<< j << " with "<< commScheme[i].getValue(j));
             }
             std::cout << std::endl;
         }
-
+        */
     }
 
 
@@ -1124,14 +1125,14 @@ TYPED_TEST(ParcoRepartTest, testRedistributeFromPartition) {
     ASSERT_EQ(1, nodeWeights.size());
 
     // get partition
-    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, nodeWeights, settings, metrics);
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, nodeWeights, comm, settings, metrics);
     ASSERT_EQ(globalN, partition.size());
 
     bool useRedistributor = false;
 
-    std::chrono::time_point<std::chrono::system_clock> beforeRedistribution =  std::chrono::system_clock::now();
-    scai::dmemo::DistributionPtr retDist = aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights[0], settings, useRedistributor);
-    std::chrono::duration<double> redistTime = std::chrono::system_clock::now() - beforeRedistribution;
+    std::chrono::time_point<std::chrono::steady_clock> beforeRedistribution =  std::chrono::steady_clock::now();
+    scai::dmemo::DistributionPtr retDist = aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, useRedistributor);
+    std::chrono::duration<double> redistTime = std::chrono::steady_clock::now() - beforeRedistribution;
     ValueType maxTime = comm->max( redistTime.count() );
     if( comm->getRank()==0)
         std::cout << "Time to redistribute (useRedistributor= " << useRedistributor <<"): " << maxTime << std::endl;
@@ -1142,9 +1143,9 @@ TYPED_TEST(ParcoRepartTest, testRedistributeFromPartition) {
 
 
     useRedistributor = !useRedistributor;
-    beforeRedistribution =  std::chrono::system_clock::now();
-    scai::dmemo::DistributionPtr retDist2 = aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights[0], settings, useRedistributor);
-    redistTime = std::chrono::system_clock::now() - beforeRedistribution;
+    beforeRedistribution =  std::chrono::steady_clock::now();
+    scai::dmemo::DistributionPtr retDist2 = aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, useRedistributor);
+    redistTime = std::chrono::steady_clock::now() - beforeRedistribution;
     maxTime = comm->max( redistTime.count() );
     if( comm->getRank()==0)
         std::cout << "Time to redistribute (useRedistributor= " << useRedistributor <<"): " << maxTime << std::endl;

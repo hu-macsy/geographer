@@ -31,7 +31,7 @@ TYPED_TEST(KMeansTest, testFindInitialCentersSFC) {
     const IndexType dimensions = 2;
     const IndexType k = 8;
 
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile);
     const IndexType n = graph.getNumRows();
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
@@ -81,8 +81,10 @@ TYPED_TEST(KMeansTest, testFindInitialCentersSFC) {
     for (IndexType i=0; i<k; i++) {
         ValueType coordSum = std::accumulate(centers[i].begin(), centers[i].end(), 0.0);
         ValueType totalSum = comm->sum(coordSum);
-        //WARNING: fails with p=5 for ValueType float
+        //WARNING: fails with p=5 or 11, for ValueType float
         EXPECT_LT(std::abs(p*coordSum - totalSum), 1e-5);
+        //basically, that coordSum is equal on all PEs
+        EXPECT_EQ( comm->max(coordSum), comm->min(coordSum) );
     }
 }
 //------------------------------------------- -----------------------

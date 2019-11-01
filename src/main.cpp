@@ -26,6 +26,7 @@
 #include "Metrics.h"
 #include "GraphUtils.h"
 #include "parseArgs.h"
+#include "mainHeader.h"
 
 /**
  *  Examples of use:
@@ -86,22 +87,14 @@ int main(int argc, char** argv) {
     }
 
     IndexType N = -1; 		// total number of points
+    std::string machine = settings.machine; //machine name
+    
+    // timing information
+    //
 
-    std::string machine = settings.machine;
-    /* timing information
-     */
-
-    std::chrono::time_point<std::chrono::system_clock> startTime = std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
     if (comm->getRank() == 0) {
-        std::string inputstring;
-        if (vm.count("graphFile")) {
-            inputstring = vm["graphFile"].as<std::string>();
-        } else if (vm.count("quadTreeFile")) {
-            inputstring = vm["quadTreeFile"].as<std::string>();
-        } else {
-            inputstring = "generate";
-        }
 
         std::cout<< "commit:"<< version<< " main file: "<< __FILE__ << " machine:" << machine << " p:"<< comm->getSize();
 
@@ -123,206 +116,15 @@ int main(int argc, char** argv) {
     std::vector<scai::lama::DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
     std::vector<scai::lama::DenseVector<ValueType>> nodeWeights;		//the weights for each node
 
+    N = readInput<ValueType>( vm, settings, comm, graph, coordinates, nodeWeights );
 
-    if (vm.count("graphFile")) {
-        std::string graphFile = vm["graphFile"].as<std::string>();
-        settings.fileName = graphFile;
-        std::string coordFile;
-        if (vm.count("coordFile")) {
-            coordFile = vm["coordFile"].as<std::string>();
-        } else {
-            coordFile = graphFile + ".xyz";
-        }
-
-        std::string coordString;
-        if (settings.useDiffusionCoordinates) {
-            coordString = "and generating coordinates with diffusive distances.";
-        } else {
-            coordString = "and \"" + coordFile + "\" for coordinates";
-        }
-
-        if (comm->getRank() == 0)
-        {
-            std::cout<< "Reading from file \""<< graphFile << "\" for the graph " << coordString << std::endl;
-        }
-
-        //
-        // read the adjacency matrix and the coordinates from a file
-        //
-
-        if (vm.count("fileFormat")) {
-            if (settings.fileFormat == ITI::Format::TEEC) {
-                IndexType n = vm["numX"].as<IndexType>();
-                scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(n, comm));
-                scai::dmemo::DistributionPtr noDist( new scai::dmemo::NoDistribution(n));
-                graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>(dist, noDist);
-                ITI::FileIO<IndexType, ValueType>::readCoordsTEEC(graphFile, n, settings.dimensions, nodeWeights);
-                if (settings.verbose) {
-                    ValueType minWeight = nodeWeights[0].min();
-                    ValueType maxWeight = nodeWeights[0].max();
-                    if (comm->getRank() == 0) std::cout << "Min node weight:" << minWeight << ", max weight: " << maxWeight << std::endl;
-                }
-                coordFile = graphFile;
-            } else {
-                graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights, settings.fileFormat );
-            }
-        } else {
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights );
-        }
-        N = graph.getNumRows();
-        scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
-        scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
-        assert(graph.getColDistribution().isEqual(*noDistPtr));
-
-        IndexType numReadNodeWeights = nodeWeights.size();
-        if (numReadNodeWeights == 0) {
-            nodeWeights.resize(1);
-            nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
-        }
-
-        if (settings.numNodeWeights > 0) {
-            if (settings.numNodeWeights < nodeWeights.size()) {
-                nodeWeights.resize(settings.numNodeWeights);
-                if (comm->getRank() == 0) {
-                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, thus discarding "
-                              << numReadNodeWeights - settings.numNodeWeights << std::endl;
-                }
-            } else if (settings.numNodeWeights > nodeWeights.size()) {
-                nodeWeights.resize(settings.numNodeWeights);
-                for (IndexType i = numReadNodeWeights; i < settings.numNodeWeights; i++) {
-                    nodeWeights[i] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
-                }
-                if (comm->getRank() == 0) {
-                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, padding with "
-                              << settings.numNodeWeights - numReadNodeWeights << " uniform weights. " << std::endl;
-                }
-            }
-        }
-
-        // for 2D we do not know the size of every dimension
-        settings.numX = N;
-        settings.numY = 1;
-        settings.numZ = 1;
-
-        std::chrono::duration<double> readGraphTime = std::chrono::system_clock::now() - startTime;
-        ValueType timeToReadGraph = ValueType ( comm->max(readGraphTime.count()) );
-
-        comm->synchronize();
-        if (comm->getRank() == 0) {
-            std::cout<< "Read " << N << " points in " << timeToReadGraph << " ms." << std::endl;
-        }
-
-        if (settings.useDiffusionCoordinates) {
-            scai::lama::CSRSparseMatrix<ValueType> L = ITI::GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
-
-            std::vector<IndexType> nodeIndices(N);
-            std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
-
-            ITI::GraphUtils<IndexType, ValueType>::FisherYatesShuffle(nodeIndices.begin(), nodeIndices.end(), settings.dimensions);
-
-            if (comm->getRank() == 0) {
-                std::cout << "Chose diffusion sources";
-                for (IndexType i = 0; i < settings.dimensions; i++) {
-                    std::cout << " " << nodeIndices[i];
-                }
-                std::cout << "." << std::endl;
-            }
-
-            coordinates.resize(settings.dimensions);
-
-            for (IndexType i = 0; i < settings.dimensions; i++) {
-                coordinates[i] = ITI::Diffusion<IndexType, ValueType>::potentialsFromSource(L, nodeWeights[0], nodeIndices[i]);
-            }
-
-        } else {
-            coordinates = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.coordFormat);
-        }
-
-        std::chrono::duration<double> readCoordsTime = std::chrono::system_clock::now() - startTime;
-        ValueType timeToReadCoords = ValueType ( comm->max(readCoordsTime.count()) ) -timeToReadGraph ;
-
-        comm->synchronize();
-        if (comm->getRank() == 0) {
-            std::cout << "Read coordinates in "<< timeToReadCoords << " ms." << std::endl;
-        }
-
-    } else if(vm.count("generate")) {
-        if (settings.dimensions == 2) {
-            settings.numZ = 1;
-        }
-
-        N = settings.numX * settings.numY * settings.numZ;
-
-        std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
-        maxCoord[0] = settings.numX;
-        maxCoord[1] = settings.numY;
-        if(settings.dimensions==3) {
-            maxCoord[2] = settings.numZ;
-        }
-
-        std::vector<IndexType> numPoints(3); // number of points in each dimension, used only for 3D
-
-        for (IndexType i = 0; i < settings.dimensions; i++) {
-            numPoints[i] = maxCoord[i];
-        }
-
-        if( comm->getRank()== 0) {
-            std::cout<< "Generating for dim= "<< settings.dimensions << " and numPoints= "<< settings.numX << ", " << settings.numY << ", "<< settings.numZ << ", in total "<< N << " number of points" << std::endl;
-            std::cout<< "\t\t and maxCoord= "; //<< maxCoord[0] << ", "<< maxCoord[1] << ", " << maxCoord[2]<< std::endl;
-            for (IndexType i = 0; i < settings.dimensions; i++) {
-                std::cout << maxCoord[i] << ", ";
-            }
-            std::cout << std::endl;
-        }
-
-        scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-        scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
-        graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( rowDistPtr, noDistPtr );
-
-        scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-        for(IndexType i=0; i<settings.dimensions; i++) {
-            coordinates[i].allocate(coordDist);
-            coordinates[i] = static_cast<ValueType>( 0 );
-        }
-
-        // create the adjacency matrix and the coordinates
-        ITI::MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist( graph, coordinates, maxCoord, numPoints, settings.dimensions );
-
-        IndexType nodes= graph.getNumRows();
-        IndexType edges= graph.getNumValues()/2;
-        if(comm->getRank()==0) {
-            std::cout<< "Generated random 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
-        }
-
-        nodeWeights.resize(1);
-        nodeWeights[0] = scai::lama::fill<scai::lama::DenseVector<ValueType>>(graph.getRowDistributionPtr(), 1);
-
-    } else if (vm.count("quadTreeFile")) {
-        //if (comm->getRank() == 0) {
-        graph = ITI::FileIO<IndexType, ValueType>::readQuadTree(vm["quadTreeFile"].as<std::string>(), coordinates);
-        N = graph.getNumRows();
-        //}
-
-        //broadcast graph size from root to initialize distributions
-        //IndexType NTransport[1] = {static_cast<IndexType>(graph.getNumRows())};
-        //comm->bcast( NTransport, 1, 0 );
-        //N = NTransport[0];
-
-        scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-        scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
-        graph.redistribute(rowDistPtr, noDistPtr);
-        for (IndexType i = 0; i < settings.dimensions; i++) {
-            coordinates[i].redistribute(rowDistPtr);
-        }
-
-        nodeWeights.resize(1);
-        nodeWeights[0] = scai::lama::fill<scai::lama::DenseVector<ValueType>>(graph.getRowDistributionPtr(), 1);
-
-    } else {
-        std::cout << "Call with --graphFile <input>" << std::endl;
-        return 126;
+    if( settings.setAutoSettings ){
+        settings = settings.setDefault( graph );
+        if( !settings.isValid )
+               return -1;
     }
 
+    //---------------------------------------------------------------
     //
     // read the communication graph or the block sizes if provided
     //
@@ -360,18 +162,14 @@ int main(int argc, char** argv) {
         }
 
         commTree.createFlatHeterogeneous( blockSizes );
+    }else if( settings.hierLevels.size()!=0 ){
+        const IndexType numWeights = nodeWeights.size();
+        commTree.createFromLevels(settings.hierLevels, numWeights );
     } else {
         commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
     }
 
     commTree.adaptWeights( nodeWeights );
-
-    //---------------------------------------------------------------------
-    //
-    //  read block sizes from a file if it is passed as an argument
-    //
-
-    //std::vector<std::vector<ValueType> > blockSizes;
 
 
     //---------------------------------------------------------------
@@ -400,7 +198,7 @@ int main(int argc, char** argv) {
     //
 
     comm->synchronize();
-    std::chrono::duration<double> inputTime = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> inputTime = std::chrono::steady_clock::now() - startTime;
 
     assert(N > 0);
 
@@ -467,13 +265,13 @@ int main(int argc, char** argv) {
         //metricsVec.push_back( Metrics( comm->getSize()) );
         metricsVec.push_back( Metrics<ValueType>( settings ) );
 
-        std::chrono::time_point<std::chrono::system_clock> beforePartTime =  std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> beforePartTime =  std::chrono::steady_clock::now();
 
-        partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, commTree, settings, metricsVec[r] );
+        partition = ITI::ParcoRepart<IndexType, ValueType>::partitionGraph( graph, coordinates, nodeWeights, previous, commTree, comm, settings, metricsVec[r] );
         assert( partition.size() == N);
         assert( coordinates[0].size() == N);
 
-        std::chrono::duration<double> partitionTime =  std::chrono::system_clock::now() - beforePartTime;
+        std::chrono::duration<double> partitionTime =  std::chrono::steady_clock::now() - beforePartTime;
 
         //WARNING: with the noRefinement flag the partition is not distributed
         if (!comm->all(partition.getDistribution().isEqual(graph.getRowDistribution()))) {
@@ -487,19 +285,14 @@ int main(int argc, char** argv) {
         // Get metrics
         //
 
-        std::chrono::time_point<std::chrono::system_clock> beforeReport = std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> beforeReport = std::chrono::steady_clock::now();
 
-        if( settings.metricsDetail=="all" ) {
-            metricsVec[r].getAllMetrics( graph, partition, nodeWeights, settings );
-        }
-        if( settings.metricsDetail=="easy" ) {
-            metricsVec[r].getEasyMetrics( graph, partition, nodeWeights, settings );
-        }
+        metricsVec[r].getMetrics(graph, partition, nodeWeights, settings );
 
         metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
-        metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));
+        //metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));
 
-        std::chrono::duration<double> reportTime =  std::chrono::system_clock::now() - beforeReport;
+        std::chrono::duration<double> reportTime =  std::chrono::steady_clock::now() - beforeReport;
 
         //---------------------------------------------
         //
@@ -531,6 +324,8 @@ int main(int argc, char** argv) {
             if( comm->getRank()==0 ) {
                 std::ofstream outF( fileName, std::ios::out);
                 if(outF.is_open()) {
+					outF << "Calling command:" << std::endl;
+					outF<< callingCommand << std::endl << std::endl;
                     settings.print( outF, comm);
                     outF << "\nMetrics" << std::endl;
                     metricsVec[r].print( outF );
@@ -541,7 +336,7 @@ int main(int argc, char** argv) {
         comm->synchronize();
     }// repeat loop
 
-    std::chrono::duration<double> totalTime =  std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<double> totalTime =  std::chrono::steady_clock::now() - startTime;
     ValueType totalT = ValueType ( comm->max(totalTime.count() ));
 
     //
@@ -549,7 +344,7 @@ int main(int argc, char** argv) {
     //
 
     //aggregate metrics in one struct
-    const Metrics<ValueType> aggrMetrics = aggregateVectorMetrics( metricsVec );
+    const Metrics<ValueType> aggrMetrics = aggregateVectorMetrics( metricsVec, comm );
 
     if (repeatTimes > 1) {
         if (comm->getRank() == 0) {
@@ -598,12 +393,12 @@ int main(int argc, char** argv) {
     }
 
 
-    if( settings.outFile!="-" and settings.storePartition) {
-        std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
+    if( settings.outFile!="-" and settings.storePartition ) {
+        std::chrono::time_point<std::chrono::steady_clock> beforePartWrite = std::chrono::steady_clock::now();
         std::string partOutFile = settings.outFile+".part";
         ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
 
-        std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
+        std::chrono::duration<double> writePartTime =  std::chrono::steady_clock::now() - beforePartWrite;
         if( comm->getRank()==0 ) {
             std::cout << " and last partition of the series in file " << partOutFile << std::endl;
             std::cout<< " Time needed to write .part file: " << writePartTime.count() <<  std::endl;

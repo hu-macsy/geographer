@@ -267,6 +267,16 @@ public:
         return hierarchyLevels;
     }
 
+    bool areWeightsAdapted(){
+        return areWeightsAdaptedV;
+    }
+
+
+    /** Creates a homogeneous tree with levels.size() number of levels
+    and each node in level i has levels[i] children. \sa CommTree()
+    */
+    void createFromLevels( const std::vector<IndexType> &levels, const IndexType numWeights );
+
     /** Takes a vector of leaves and creates the tree. The hierarchy vector in every node is used
     to construct the level above until we reach the root.
 
@@ -438,7 +448,7 @@ private:
     IndexType numNodes;					///< all the nodes of the tree
     IndexType numLeaves;				///< the leafs of the tree
     IndexType numWeights;				///< how many weights each node has
-    bool areWeightsAdapted = false;		///< if relative weights are adapted, \sa adaptWeights
+    bool areWeightsAdaptedV = false;		///< if relative weights are adapted, \sa adaptWeights
 /// if isProportional[i] is true, then weight i is proportional and if false, weight i is absolute; isProportional.size()=numWeights
     std::vector<bool> isProportional;
 

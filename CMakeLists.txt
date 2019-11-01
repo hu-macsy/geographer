@@ -19,6 +19,23 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif(NOT CMAKE_BUILD_TYPE)
 
+if(NOT CODE_COVERAGE)
+    set(CODE_COVERAGE FALSE)
+endif()
+
+### add code coverage
+if(CMAKE_COMPILER_IS_GNUCXX AND CODE_COVERAGE)
+    set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/CmakeModules)
+    include(CodeCoverage)
+    APPEND_COVERAGE_COMPILER_FLAGS()
+    #setup_target_for_coverage(${PROJECT_NAME}_coverage ${PROJECT_TEST_NAME} coverage)
+    setup_target_for_coverage_gcovr_html( 
+        NAME ${PROJECT_NAME}_coverage 
+        EXECUTABLE GeographerTest -j 4
+        DEPANDENCIES GeographerTest)
+    #setup_target_for_coverage(${PROJECT_NAME}_coverage GeographerTest coverage)
+endif()
+
 option(USE_NETWORKIT "Use NETWORKIT package." OFF)
 if(USE_NETWORKIT)
   if (NOT DEFINED NETWORKIT_DIR)
@@ -87,8 +104,7 @@ endif (USE_NETWORKIT)
 ### get git commit ###
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
 add_definitions("-DBUILD_COMMIT=${GIT_COMMIT}")
-
-add_definitions("-Wall -Wno-sign-compare -Wno-unused")
+add_definitions("-Wall -Wno-sign-compare")
 
 ### define install directories ###
 set(BIN_DEST "bin")

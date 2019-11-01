@@ -17,7 +17,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
     SCAI_REGION( "MultiLevel.multiLevelStep" );
     scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
-    const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
+    [[maybe_unused]] const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
 
     if (coordinates.size() != settings.dimensions) {
         throw std::runtime_error("Dimensions do not agree: vector.size()= " + std::to_string(coordinates.size())  + " != settings.dimensions= " + std::to_string(settings.dimensions) );
@@ -54,7 +54,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         SCAI_REGION_START( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
         CSRSparseMatrix<ValueType> coarseGraph;
         DenseVector<IndexType> fineToCoarseMap;
-        std::chrono::time_point<std::chrono::system_clock> beforeCoarse =  std::chrono::system_clock::now();
+        std::chrono::time_point<std::chrono::steady_clock> beforeCoarse =  std::chrono::steady_clock::now();
 
         if (comm->getRank() == 0) {
             std::cout << "Beginning coarsening, still " << settings.multiLevelRounds << " levels to go." << std::endl;
@@ -85,7 +85,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
         assert(coarseWeights.sum() == nodeWeights.sum());
 
-        std::chrono::duration<double> coarseningTime =  std::chrono::system_clock::now() - beforeCoarse;
+        std::chrono::duration<double> coarseningTime =  std::chrono::steady_clock::now() - beforeCoarse;
         ValueType timeForCoarse = ValueType ( comm->max(coarseningTime.count() ));
         if (comm->getRank() == 0) std::cout << "Time for coarsening:" << timeForCoarse << std::endl;
 
@@ -102,7 +102,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         {
             SCAI_REGION( "MultiLevel.multiLevelStep.uncoarsen" )
             // uncoarsening/refinement
-            std::chrono::time_point<std::chrono::system_clock> beforeUnCoarse =  std::chrono::system_clock::now();
+            std::chrono::time_point<std::chrono::steady_clock> beforeUnCoarse =  std::chrono::steady_clock::now();
             DenseVector<IndexType> fineTargets = getFineTargets(coarseOrigin, fineToCoarseMap);
             auto redistributor = scai::dmemo::redistributePlanByNewOwners( fineTargets.getLocalValues(), fineTargets.getDistributionPtr());
             scai::dmemo::DistributionPtr projectedFineDist = redistributor.getTargetDistributionPtr();
@@ -123,7 +123,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
             origin.redistribute(redistributor);
 
-            std::chrono::duration<double> uncoarseningTime =  std::chrono::system_clock::now() - beforeUnCoarse;
+            std::chrono::duration<double> uncoarseningTime =  std::chrono::steady_clock::now() - beforeUnCoarse;
             ValueType time = ValueType ( comm->max(uncoarseningTime.count() ));
             if (comm->getRank() == 0) std::cout << "Time for uncoarsening:" << time << std::endl;
         }
@@ -135,30 +135,29 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         scai::lama::CSRSparseMatrix<ValueType> processGraph = GraphUtils<IndexType, ValueType>::getPEGraph(input);
 
         //TODO: remove from final version?
-        /*
+        
         // write the PE graph for further experiments
         if(settings.writePEgraph) { //write PE graph for further experiments
             //TODO: this works only for 12 rounds
             PRINT0( "thisRound= " << settings.thisRound << " , multiLevelRounds= " << settings.multiLevelRounds);
             if( settings.thisRound==0) {
-                std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
+                std::chrono::time_point<std::chrono::steady_clock> before =  std::chrono::steady_clock::now();
                 std::string filename = settings.fileName+ "_k"+ std::to_string(settings.numBlocks)+ ".PEgraph";
                 if( not FileIO<IndexType,ValueType>::fileExists(filename) ) {
                     FileIO<IndexType,ValueType>::writeGraph(processGraph, filename, 1);
                 }
-                std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - before;
+                std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - before;
                 PRINT0("time to write PE graph: :" << elapTime.count() );
             }
         }
-        */
-        
-        std::chrono::time_point<std::chrono::system_clock> before =  std::chrono::system_clock::now();
+
+        std::chrono::time_point<std::chrono::steady_clock> before =  std::chrono::steady_clock::now();
 
         std::vector<DenseVector<IndexType>> communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph, settings);
 
         std::vector<IndexType> nodesWithNonLocalNeighbors = GraphUtils<IndexType, ValueType>::getNodesWithNonLocalNeighbors(input);
 
-        std::chrono::duration<double> elapTime = std::chrono::system_clock::now() - before;
+        std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - before;
         ValueType maxTime = comm->max( elapTime.count() );
         ValueType minTime = comm->min( elapTime.count() );
         if (settings.verbose) PRINT0("getCommPairs and border nodes: time " << minTime << " -- " << maxTime );
@@ -174,14 +173,14 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         ValueType gain = 0;
         while (numRefinementRounds == 0 || gain >= settings.minGainForNextRound) {
 
-            std::chrono::time_point<std::chrono::system_clock> beforeFMStep =  std::chrono::system_clock::now();
+            std::chrono::time_point<std::chrono::steady_clock> beforeFMStep =  std::chrono::steady_clock::now();
 
             // TODO: if getting the graph is fast, maybe doing it in every step might help
             // get graph before every step
             processGraph = GraphUtils<IndexType, ValueType>::getPEGraph(input);
             communicationScheme = ParcoRepart<IndexType,ValueType>::getCommunicationPairs_local(processGraph, settings);
             nodesWithNonLocalNeighbors = GraphUtils<IndexType, ValueType>::getNodesWithNonLocalNeighbors(input);
-            elapTime = std::chrono::system_clock::now() - beforeFMStep;
+            elapTime = std::chrono::steady_clock::now() - beforeFMStep;
             maxTime = comm->max( elapTime.count() );
             minTime = comm->min( elapTime.count() );
 
@@ -207,7 +206,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
                 }
             }
 
-            std::chrono::duration<double> elapTimeFMStep = std::chrono::system_clock::now() - beforeFMStep;
+            std::chrono::duration<double> elapTimeFMStep = std::chrono::steady_clock::now() - beforeFMStep;
             ValueType FMStepTime = comm->max( elapTimeFMStep.count() );
 
             if (numRefinementRounds > 0) {
@@ -234,7 +233,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
             }
 
         }
-        std::chrono::duration<double> elapTime2 = std::chrono::system_clock::now() - before;
+        std::chrono::duration<double> elapTime2 = std::chrono::steady_clock::now() - before;
         ValueType refineTime = comm->max( elapTime2.count() );
         PRINT0("local refinement time: " << refineTime );
     }
@@ -286,9 +285,8 @@ DenseVector<IndexType> MultiLevel<IndexType, ValueType>::getFineTargets(const De
 template<typename IndexType, typename ValueType>
 void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType> &nodeWeights,  const HaloExchangePlan& halo, const std::vector<DenseVector<ValueType>>& coordinates, CSRSparseMatrix<ValueType>& coarseGraph, DenseVector<IndexType>& fineToCoarse, Settings settings, IndexType iterations) {
     SCAI_REGION("MultiLevel.coarsen");
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::CommunicatorPtr comm = adjM.getRowDistributionPtr()->getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-
 
     // localN= number of local nodes
     IndexType localN= adjM.getLocalNumRows();
@@ -533,8 +531,6 @@ void MultiLevel<IndexType, ValueType>::coarsen(const CSRSparseMatrix<ValueType>&
     assert(wIndices.size() == newLocalN);
     wIndices.release();
 
-    const IndexType localEdgeCount = newJA.size();
-
     const auto newDist = scai::dmemo::generalDistributionUnchecked(newGlobalN, myGlobalIndices, comm);
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(newGlobalN));
 
@@ -665,7 +661,7 @@ DenseVector<ValueType> MultiLevel<IndexType, ValueType>::sumToCoarse(const Dense
     scai::dmemo::DistributionPtr fineDist = fineToCoarse.getDistributionPtr();
     const IndexType fineLocalN = fineDist->getLocalSize();
     scai::dmemo::DistributionPtr coarseDist = projectToCoarse(fineToCoarse);
-    IndexType coarseLocalN = coarseDist->getLocalSize();
+    [[maybe_unused]] const IndexType coarseLocalN = coarseDist->getLocalSize();
     assert(inputDist->getLocalSize() == fineLocalN);
 
     DenseVector<ValueType> result(coarseDist, 0);
@@ -689,8 +685,8 @@ template<typename IndexType, typename ValueType>
 std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::maxLocalMatching(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const DenseVector<ValueType>& nodeWeights, const std::vector<DenseVector<ValueType>>& coordinates, bool nnCoarsening) {
     SCAI_REGION("MultiLevel.maxLocalMatching");
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = distPtr->getCommunicatorPtr();
 
     // get local data of the adjacency matrix
     const CSRStorage<ValueType>& localStorage = adjM.getLocalStorage();
@@ -707,9 +703,6 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
     // ia must have size localN+1
     assert(ia.size()-1 == localN );
     SCAI_ASSERT_EQ_ERROR( rLocalNodeWeights.size(), localN, "Size mismatch" );
-
-    //mainly for debugging reasons
-    IndexType totalNbrs= 0;
 
     // the vector<vector> to return
     // matching[0][i]-matching[1][i] are the endpoints of an edge that is matched
@@ -753,7 +746,7 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
         }
     }
 
-    assert(ia[ia.size()-1] >= totalNbrs);
+    assert(ia[ia.size()-1] >= 0);
 
     return matching;
 }

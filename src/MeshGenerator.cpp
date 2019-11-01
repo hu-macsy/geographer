@@ -246,9 +246,9 @@ void MeshGenerator<IndexType, ValueType>::createStructured2D3DMesh_dist(CSRSpars
         throw std::runtime_error("Needs three point counts, one for each dimension");
     }
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
-
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+    
     if( !dist->isEqual( coords[0].getDistribution() ) ) {
         std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and coordinates dist: "<< coords[0].getDistribution() << std::endl;
         throw std::runtime_error( "Distributions: should (?) be equal.");
@@ -439,8 +439,8 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
         throw std::runtime_error("Needs three point counts, one for each dimension");
     }
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 
     if( !dist->isEqual( coords[0].getDistribution() ) ) {
         std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and coordinates dist: "<< coords[0].getDistribution() << std::endl;
