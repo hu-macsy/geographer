@@ -405,7 +405,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         std::vector<DenseVector<ValueType>> coordinateCopy = coordinates;
         std::vector<DenseVector<ValueType>> nodeWeightCopy = nodeWeights;
         if (comm->getSize() > 1 && (settings.dimensions == 2 || settings.dimensions == 3)) {
-            SCAI_REGION("ParcoRepart.initialPartition.prepareForKMeans")
+//SCAI_REGION("ParcoRepart.initialPartition.prepareForKMeans")
 
             if (!settings.repartition || comm->getSize() != settings.numBlocks) {
 
