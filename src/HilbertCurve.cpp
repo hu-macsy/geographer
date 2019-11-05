@@ -381,6 +381,7 @@ std::vector<double> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector 
         scai::hmemo::ReadAccess<ValueType> coordAccess1( coordinates[1].getLocalValues() );
 
         const unsigned long divisor = size_t(1) << size_t(2*int(recursionDepth));
+        const double dDivisor = double(divisor);
 
         for (IndexType i = 0; i < localN; i++) {
             scaledPoint[0] = (coordAccess0[i]-minCoords[0])/dim0Extent;
@@ -419,7 +420,7 @@ std::vector<double> HilbertCurve<IndexType, ValueType>::getHilbertIndex2DVector 
                 //std::cout<< subSquare<<std::endl;
                 integerIndex = (integerIndex << 2) | subSquare;
             }
-            hilbertIndices[i] = double(integerIndex) / double(divisor);
+            hilbertIndices[i] = integerIndex / dDivisor;
         }
     }
 
