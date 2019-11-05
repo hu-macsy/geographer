@@ -32,10 +32,12 @@ FIND_PACKAGE( Zoltan2 PATHS "/home/hpc/pr87si/di36qin/Code/Trilinos/build/packag
 ### find metis and parmetis
 find_library( PARMETIS_LIB NAMES libparmetis.so libparmetis.a HINTS "${PARMETIS_BASE}/lib" )
 
-if( PARMETIS_LIB AND NOT DEFINED METIS_INCLUDE)
-    message(WARNING "PARMETIS_BASE was specified but not METIS_INCLUDE. Use -DMETIS_INCLUDE=<path_to_directory_that_contains_metis.h>. Setting path to parmetis/metis/include")
+if(PARMETIS_LIB AND NOT DEFINED METIS_INCLUDE)
     set( METIS_INCLUDE "${PARMETIS_BASE}/../../../metis/include")
+    message(WARNING "PARMETIS_BASE was specified but not METIS_INCLUDE. Use -DMETIS_INCLUDE=<path_to_directory_that_contains_metis.h>. Setting path to ${METIS_INCLUDE}")   
 endif()
+
+
 
 ### find parhip ###
 find_library( PARHIP_LIB libparhip.a "${PARHIP_BASE}" NO_DEFAULT_PATH)
@@ -78,13 +80,14 @@ if(Zoltan2_FOUND OR PARMETIS_LIB OR PARHIP_LIB )
         set(PARMETIS_WRAP_H parmetisWrapper.h)
         set(PARMETIS_INCLUDES ${METIS_INCLUDE} "${PARMETIS_BASE}/include")
 
-        if( NOT DEFINED METIS_BASE )
-            message("\t\tNot given a path to metis, will use path: ${PARMETIS_BASE}/../libmetis. To give a custom path provide variable METIS_BASE")
-            set(METIS_LIB_DIR "${PARMETIS_BASE}/../libmetis")
-        else()
-            set(METIS_LIB_DIR "${METIS_BASE}/lib")
+        #find metis library
+        if(NOT DEFINED METIS_LIB_DIR)
+            message( WARNING "variable METIS_LIB_DIR was not set. Set this variable to point to the directory that libmetis exists. Will attempt to find it...")
         endif()
-        find_library( METIS_LIB libmetis.a ${METIS_LIB_DIR}  NO_DEFAULT_PATH)
+    
+        find_library(METIS_LIB NAMES libmetis.so libmetis.a HINTS "${METIS_LIB_DIR}" "${METIS_LIB_DIR}/lib" "${METIS_LIB_DIR}/libmetis" "${METIS_INCLUDE}/../lib" "${METIS_INCLUDE}/../libmetis")
+        message("\tFound metis lib in " ${METIS_LIB})
+        
         set(PARMETIS_LIBS ${PARMETIS_LIB} ${METIS_LIB} )
     else()
         message(WARNING "parmetis was not found")        
