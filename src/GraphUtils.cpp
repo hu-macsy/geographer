@@ -1256,7 +1256,7 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
         //sort map lexicographically by vertex ids
         struct lexEdgeSort {
             //bool operator()(const std::pair<edge,ValueType> u, const std::pair<edge,ValueType> v){
-            const bool operator()(const edge u, const edge v) {
+            bool operator() (const edge u, const edge v) const {
                 //sort edges based on the first node of the edge or the second if the first is the same
                 if (u.first == v.first)
                     return u.second < v.second;
