@@ -1641,7 +1641,6 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
 
     PRINT0("assembled local indices");
 
-    const auto genDist = scai::dmemo::generalDistributionUnchecked(globalN, localIndices, comm);//this could be a GenBlockDistribution, right?
 
     //-------------------------------------------------------------------
     //
@@ -1680,7 +1679,8 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
             scai::hmemo::HArray<IndexType>(ja.size(), ja.data()),
             scai::hmemo::HArray<ValueType>(values.size(), values.data()));//no longer allowed. TODO: change
 
-    const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
+    //const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
+    const auto genDist = scai::dmemo::generalDistributionUnchecked(globalN, localIndices, comm);//this could be a GenBlockDistribution, right?
 
     PRINT0("assembled CSR storage");
 
