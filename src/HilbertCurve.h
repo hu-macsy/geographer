@@ -26,8 +26,6 @@
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 #include <scai/tracing.hpp>
 
-#include <JanusSort.hpp>
-
 #include "Settings.h"
 #include "Metrics.h"
 
@@ -229,11 +227,12 @@ private:
 
 };
 
-
+/*
 template<typename T>
 MPI_Datatype getMPIType();
 
 template<typename T1, typename T2>
 MPI_Datatype getMPITypePair();
+*/
 
 }//namespace ITI

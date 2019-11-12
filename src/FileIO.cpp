@@ -1137,6 +1137,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 //-------------------------------------------------------------------------------------------------
 
 //TODO: handle case where number of files != numPEs
+//TODO: edge weights
 
 template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListDistributed(const std::string prefix, const scai::dmemo::CommunicatorPtr comm) {

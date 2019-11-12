@@ -412,7 +412,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
                 if (settings.initialMigration != ITI::Tool::geoSFC) {
                     throw std::logic_error("KMeans depends on pre-sorting with space filling curves.");
                 }
-
+PRINT(comm->getRank());
                 HilbertCurve<IndexType,ValueType>::redistribute(coordinateCopy, nodeWeightCopy, settings, metrics);
             }
         }
