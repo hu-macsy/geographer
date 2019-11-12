@@ -50,26 +50,28 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
 
     const scai::dmemo::CommunicatorPtr comm = adjM.getRowDistributionPtr()->getCommunicatorPtr();
 
-    IndexType root =0;
-    scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
+    const IndexType root =0;
+    const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
 
-    IndexType globalN = distPtr->getGlobalSize();
+    const IndexType globalN = distPtr->getGlobalSize();
 
     // Create a noDistribution and redistribute adjM. This way adjM is replicated in every PE
     // TODO: use gather (or something) to gather in root PE and print there, not replicate everywhere
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
     // in order to keep input array unchanged, create new tmp array by coping
-    // adjM.redistribute( noDist , noDist);
-
     CSRSparseMatrix<ValueType> tmpAdjM( adjM );
-    tmpAdjM.redistribute( noDist, noDist);
+    tmpAdjM.replicate();
 
     if(comm->getRank()==root) {
-        SCAI_REGION("FileIO.writeGraph.newVersion.writeInFile");
+        SCAI_REGION("FileIO.writeGraph.writeInFile");
         std::ofstream fNew;
         std::string newFile = filename;
         fNew.open(newFile);
+
+        if(not fNew.is_open()){
+            throw std::runtime_error("File "+ newFile+ " could not be opened");
+        }
 
         const scai::lama::CSRStorage<ValueType>& localAdjM = tmpAdjM.getLocalStorage();
         const scai::hmemo::ReadAccess<IndexType> rGlobalIA( localAdjM.getIA() );
@@ -97,6 +99,7 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
             }
             fNew << std::endl;
         }
+ 
         fNew.close();
     }
 }
@@ -1142,8 +1145,6 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListDistributed(const std::string prefix, const scai::dmemo::CommunicatorPtr comm) {
     SCAI_REGION( "FileIO.readEdgeListDistributed" );
 
-    //typedef unsigned long long int ULLI;
-
     const IndexType thisPE = comm->getRank();
     PRINT0("About to read a distributed edge list");
 
@@ -1168,17 +1169,19 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
     while (std::getline(file, line)) {
         std::stringstream ss( line );
 
+        //comments
+        if(ss.str()[0]=='#' or ss.str()[0]=='%'){
+            continue;
+        }
+
         IndexType v1, v2;
         ss >> v1;
         ss >> v2;
 
         edgeList.push_back( std::make_pair( v1, v2) );
-
     }
 
-    scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils<IndexType, ValueType>::edgeList2CSR( edgeList, comm );
-
-    return graph;
+    return  GraphUtils<IndexType, ValueType>::edgeList2CSR( edgeList, comm );
 
 }
 //-------------------------------------------------------------------------------------------------

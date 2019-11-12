@@ -10,3 +10,17 @@ target_link_libraries(analyze ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARI
 add_executable(heatMap ${FILES_CORE} graphToHeatmap.cpp)
 target_include_directories(heatMap PUBLIC ${CXXOPTS_DIR})
 target_link_libraries(heatMap ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+
+add_executable(coords2binary ${FILES_CORE} coords2binary.cpp)
+target_include_directories(coords2binary PUBLIC "../src/")
+target_link_libraries(coords2binary ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+
+add_executable(distEdgeList2CSR ${FILES_CORE} distEdgeList2CSR.cpp)
+target_include_directories(distEdgeList2CSR PUBLIC "../src/")
+target_link_libraries(distEdgeList2CSR ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+
+set(TOOLS_DIR "../tools")
+install(TARGETS analyze DESTINATION ${TOOLS_DIR})
+install(TARGETS heatMap DESTINATION ${TOOLS_DIR})
+install(TARGETS coords2binary DESTINATION ${TOOLS_DIR})
+install(TARGETS distEdgeList2CSR DESTINATION ${TOOLS_DIR})

@@ -336,8 +336,8 @@ TYPED_TEST (GraphUtilsTest,testEdgeList2CSR) {
     const IndexType thisPE = comm->getRank();
     const IndexType numPEs = comm->getSize();
 
-    const IndexType localM = 10;
-    const IndexType N = numPEs * 4;
+    const IndexType localM = 40+2*thisPE;
+    const IndexType N = numPEs * 7;
     std::vector< std::pair<IndexType, IndexType>> localEdgeList( localM );
 
     srand( std::time(NULL)*thisPE );

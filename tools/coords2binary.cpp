@@ -8,15 +8,18 @@
 #include "FileIO.h"
 
 typedef double ValueType;
-typedef int IndexType;
+typedef long int IndexType;
 
 
 int main(int argc, char** argv) {
-    std::cout << "program converts a coordinates file into a binary file. "  << std::endl;
-    std::cout << "usage: ./a.out dimensions numberOfPoints inputFile outputFile , eg: ./a.out 2 100 coords.xyz coords.bcf" << std::endl;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     IndexType thisPE = comm->getRank();
+
+    if(thisPE==0){
+        std::cout << "program converts a coordinates file into a binary file. "  << std::endl;
+        std::cout << "usage: ./a.out dimensions numberOfPoints inputFile outputFile , eg: ./a.out 2 100 coords.xyz coords.bcf" << std::endl;
+    }
 
     if( argc!=5 ) {
         if( thisPE==0 ) {
@@ -37,7 +40,7 @@ int main(int argc, char** argv) {
     std::string inFilename = argv[3];
     std::string outFilename = argv[4];
 
-    std::vector<DenseVector<ValueType>> coordsOrig = ITI::FileIO<IndexType, ValueType>::readCoords( inFilename, globalN, dimensions);
+    std::vector<scai::lama::DenseVector<ValueType>> coordsOrig = ITI::FileIO<IndexType, ValueType>::readCoords( inFilename, globalN, dimensions);
 
     ITI::FileIO<IndexType, ValueType>::writeCoordsParallel( coordsOrig, outFilename);
 
