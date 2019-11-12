@@ -1258,7 +1258,7 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
         //sort map lexicographically by vertex ids
         struct lexEdgeSort {
             //bool operator()(const std::pair<edge,ValueType> u, const std::pair<edge,ValueType> v){
-            bool operator()(const edge u, const edge v) {
+            bool operator() (const edge u, const edge v) const {
                 //sort edges based on the first node of the edge or the second if the first is the same
                 if (u.first == v.first)
                     return u.second < v.second;
@@ -1643,7 +1643,6 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
 
     PRINT0("assembled local indices");
 
-    const auto genDist = scai::dmemo::generalDistributionUnchecked(globalN, localIndices, comm);//this could be a GenBlockDistribution, right?
 
     //-------------------------------------------------------------------
     //
@@ -1682,7 +1681,8 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
             scai::hmemo::HArray<IndexType>(ja.size(), ja.data()),
             scai::hmemo::HArray<ValueType>(values.size(), values.data()));//no longer allowed. TODO: change
 
-    const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
+    //const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
+    const auto genDist = scai::dmemo::generalDistributionUnchecked(globalN, localIndices, comm);//this could be a GenBlockDistribution, right?
 
     PRINT0("assembled CSR storage");
 
