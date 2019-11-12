@@ -1136,7 +1136,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     //
     // copy/convert node weights
     //
-
+PRINT0("core");
     std::vector<ValueType> nodeWeightSum(nodeWeights.size());
     std::vector<std::vector<ValueType>> convertedNodeWeights(nodeWeights.size());
 
@@ -1183,10 +1183,12 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
         for (IndexType d = 0; d < dim; d++) {
             scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
             convertedCoords[d] = std::vector<ValueType>(rAccess.get(), rAccess.get()+localN);
+if( localN==0 ){
+    PRINT(d << ", PE " << comm->getRank() << " has no local points. min= " << minCoords[d] << " convertedCoords[d].size()= " <<convertedCoords[d].size() );
+}
 
             minCoords[d] = *std::min_element(convertedCoords[d].begin(), convertedCoords[d].end());
             maxCoords[d] = *std::max_element(convertedCoords[d].begin(), convertedCoords[d].end());
-
             assert(convertedCoords[d].size() == localN);
         }
     }

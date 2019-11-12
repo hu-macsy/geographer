@@ -4,6 +4,9 @@
  *  Created on: 15.11.2016
  *      Author: tzovas
  */
+#include <scai/dmemo/mpi/MPICommunicator.hpp>
+
+#include <JanusSort.hpp>
 
 #include "HilbertCurve.h"
 
@@ -779,7 +782,7 @@ template<typename IndexType, typename ValueType>
 void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<ValueType> >& coordinates, std::vector<DenseVector<ValueType>>& nodeWeights, Settings settings, Metrics<ValueType>& metrics) {
     SCAI_REGION_START("HilbertCurve.redistribute.sfc")
     scai::dmemo::DistributionPtr inputDist = coordinates[0].getDistributionPtr();
-    scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
+    const scai::dmemo::CommunicatorPtr comm = inputDist->getCommunicatorPtr();
     const IndexType localN = inputDist->getLocalSize();
     const IndexType globalN = inputDist->getGlobalSize();
 
@@ -796,7 +799,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     }
 
     std::chrono::duration<double> migrationCalculation, migrationTime;
-
+PRINT(comm->getRank());
     std::vector<double> hilbertIndices = HilbertCurve<IndexType, ValueType>::getHilbertIndexVector(coordinates, settings.sfcResolution, settings.dimensions);
     SCAI_REGION_END("HilbertCurve.redistribute.sfc")
     SCAI_REGION_START("HilbertCurve.redistribute.sort")
@@ -815,9 +818,17 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
         }
     }
 
-    MPI_Comm mpi_comm = MPI_COMM_WORLD; //TODO: cast the communicator ptr to a MPI communicator and get getMPIComm()?
-    JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
+PRINT(comm->getRank()<< ": " << localN );  
+    //MPI_Comm mpi_comm = MPI_COMM_WORLD; //TODO: cast the communicator ptr to a MPI communicator and get getMPIComm()?
+    //const scai::dmemo::MPICommunicator* mpi_comm = dynamic_cast<scai::dmemo::MPICommunicator*>(comm); //->getCommunicatorPtr(scai::dmemo::CommunicatorType::MPI);
+
+    //scai::dmemo::CommunicatorPtr comm2 = inputDist->getCommunicatorPtr();    
+    std::shared_ptr<const scai::dmemo::MPICommunicator> mpi_comm = std::dynamic_pointer_cast<const scai::dmemo::MPICommunicator>(comm);
+
+    //MPI_Comm mpi_comm = commMPI.getMPIComm();
+    JanusSort::sort(mpi_comm->getMPIComm(), localPairs, MPI_DOUBLE_INT);
     //JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>() );
+PRINT(comm->getRank() << ": " << localPairs.size() );    
     
     migrationCalculation = std::chrono::steady_clock::now() - beforeInitPart;
     metrics.MM["timeMigrationAlgo"] = migrationCalculation.count();
@@ -867,7 +878,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     // allocate recvPlan - either with allocateTranspose, or directly
     scai::dmemo::CommunicationPlan recvPlan = comm->transpose( sendPlan );
     const IndexType newLocalN = recvPlan.totalQuantity();
-
+PRINT(comm->getRank() << ": new localN= " << newLocalN);
     //in some rare cases it can happen that some PE(s) do not get
     //any new local points; TODO: debug/investigate
 
@@ -928,6 +939,7 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
                 }
             }
         }
+   
         // same for node weights
         for (IndexType w = 0; w < numNodeWeights; w++) {
             if (nodesUnweighted) {
@@ -1030,7 +1042,7 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
 //template function to get a MPI datatype. These are on purpose outside
 // the class because we cannot specialize them without specializing
 // the whole class. Maybe doing so it not a problem...
-
+/*
 template<>
 MPI_Datatype getMPIType<float>(){
  return MPI_FLOAT;
@@ -1051,7 +1063,7 @@ MPI_Datatype getMPITypePair<float,IndexType>(){
     std::cout << __FILE__ << ", MPI_FLOAT_INT" << std::endl;
     return MPI_FLOAT_INT;
 }
-
+*/
 //-------------------------------------------------------------------------------------------------
 
 template class HilbertCurve<IndexType, double>;
