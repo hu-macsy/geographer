@@ -817,23 +817,19 @@ PRINT(comm->getRank());
             localPairs[i].index = rIndices[i];
         }
     }
-PRINT(comm->sum(localN));
-PRINT(comm->getRank());
+
+PRINT(comm->getRank()<< ": " << localN );  
     //MPI_Comm mpi_comm = MPI_COMM_WORLD; //TODO: cast the communicator ptr to a MPI communicator and get getMPIComm()?
     //const scai::dmemo::MPICommunicator* mpi_comm = dynamic_cast<scai::dmemo::MPICommunicator*>(comm); //->getCommunicatorPtr(scai::dmemo::CommunicatorType::MPI);
 
-//scai::dmemo::CommunicatorPtr comm2 = inputDist->getCommunicatorPtr();    
-std::shared_ptr<const scai::dmemo::MPICommunicator> mpi_comm = std::dynamic_pointer_cast<const scai::dmemo::MPICommunicator>(comm);
+    //scai::dmemo::CommunicatorPtr comm2 = inputDist->getCommunicatorPtr();    
+    std::shared_ptr<const scai::dmemo::MPICommunicator> mpi_comm = std::dynamic_pointer_cast<const scai::dmemo::MPICommunicator>(comm);
 
-PRINT0(comm->getNodeRank() );
-PRINT0(comm->getNodeSize() );
-PRINT0(comm->getType() );
-PRINT0(*mpi_comm);
-SCAI_ASSERT_EQ_ERROR( comm->sum(comm->getRank()),comm->getSize()*(comm->getSize()-1)/2, "Not all PEs are here" );
     //MPI_Comm mpi_comm = commMPI.getMPIComm();
     JanusSort::sort(mpi_comm->getMPIComm(), localPairs, MPI_DOUBLE_INT);
     //JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>() );
-PRINT(comm->getRank());    
+PRINT(comm->getRank() << ": " << localPairs.size() );    
+    
     migrationCalculation = std::chrono::steady_clock::now() - beforeInitPart;
     metrics.MM["timeMigrationAlgo"] = migrationCalculation.count();
     std::chrono::time_point < std::chrono::steady_clock > beforeMigration = std::chrono::steady_clock::now();
@@ -882,7 +878,7 @@ PRINT(comm->getRank());
     // allocate recvPlan - either with allocateTranspose, or directly
     scai::dmemo::CommunicationPlan recvPlan = comm->transpose( sendPlan );
     const IndexType newLocalN = recvPlan.totalQuantity();
-
+PRINT(comm->getRank() << ": new localN= " << newLocalN);
     //in some rare cases it can happen that some PE(s) do not get
     //any new local points; TODO: debug/investigate
 
