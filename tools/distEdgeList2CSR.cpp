@@ -7,11 +7,11 @@
 
 #include "FileIO.h"
 
-typedef double ValueType;
-typedef long int IndexType;
-
 
 int main(int argc, char** argv) {
+	
+	using namespace ITI;
+	typedef double ValueType;   //use double
     
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     IndexType thisPE = comm->getRank();

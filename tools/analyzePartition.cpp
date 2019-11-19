@@ -17,10 +17,10 @@ using ITI::version;
 using ITI::Metrics;
 using scai::lama::DenseVector;
 
-using ValueType = double; //hardcode to double
-
 
 int main(int argc, char** argv) {
+	typedef double ValueType;   //use double
+	
     using namespace cxxopts;
     cxxopts::Options options("analyze", "Analyzing existing partitions");
 
