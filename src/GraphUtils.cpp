@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include <chrono>
 
+#include <scai/dmemo/mpi/MPICommunicator.hpp>
 #include <scai/hmemo/ReadAccess.hpp>
 #include <scai/hmemo/WriteAccess.hpp>
 #include <scai/dmemo/HaloExchangePlan.hpp>
@@ -1483,6 +1484,13 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     //
     std::chrono::time_point<std::chrono::steady_clock> beforeSort =  std::chrono::steady_clock::now();
     MPI_Comm mpi_comm = MPI_COMM_WORLD;
+
+    // as MPI communicator might have been splitted, take the one used by comm
+    if ( comm->getType() == scai::dmemo::CommunicatorType::MPI ){
+        const auto& mpiComm = static_cast<const scai::dmemo::MPICommunicator&>( *comm );
+        mpi_comm = mpiComm.getMPIComm();
+    }
+
     JanusSort::sort(mpi_comm, localPairs, MPI_2INT);
 
     std::chrono::duration<double> sortTmpTime = std::chrono::steady_clock::now() - beforeSort;

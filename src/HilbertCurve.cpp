@@ -7,6 +7,8 @@
 
 #include "HilbertCurve.h"
 
+#include <scai/dmemo/mpi/MPICommunicator.hpp>
+
 
 namespace ITI {
 
@@ -746,6 +748,13 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
 
         //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
         MPI_Comm mpi_comm = MPI_COMM_WORLD;
+
+        // as MPI communicator might have been splitted, take the one used by comm
+        if ( comm->getType() == scai::dmemo::CommunicatorType::MPI ){
+            const auto& mpiComm = static_cast<const scai::dmemo::MPICommunicator&>( *comm );
+            mpi_comm = mpiComm.getMPIComm();
+        }
+
         JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
         //JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>());
 
@@ -816,6 +825,13 @@ void HilbertCurve<IndexType, ValueType>::redistribute(std::vector<DenseVector<Va
     }
 
     MPI_Comm mpi_comm = MPI_COMM_WORLD; //TODO: cast the communicator ptr to a MPI communicator and get getMPIComm()?
+
+    // as MPI communicator might have been splitted, take the one used by comm
+    if ( comm->getType() == scai::dmemo::CommunicatorType::MPI ){
+        const auto& mpiComm = static_cast<const scai::dmemo::MPICommunicator&>( *comm );
+        mpi_comm = mpiComm.getMPIComm();
+    }
+
     JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
     //JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>() );
     
