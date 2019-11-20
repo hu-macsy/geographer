@@ -50,8 +50,9 @@ public:
         CSRSparseMatrix<ValueType> &input,
         std::vector<DenseVector<ValueType>> &coordinates,
         std::vector<DenseVector<ValueType>> &nodeWeights,
-        struct Settings settings,
-        struct Metrics& metrics);
+        const scai::dmemo::CommunicatorPtr comm,
+        Settings settings,
+        Metrics<ValueType>& metrics);
 
     /** Version to partition a point set, without using the graph.
      * \overload
@@ -59,8 +60,8 @@ public:
     static DenseVector<IndexType> partitionGraph(
         std::vector<DenseVector<ValueType>> &coordinates,
         std::vector<DenseVector<ValueType>> &nodeWeights,
-        struct Settings settings,
-        struct Metrics& metrics);
+        Settings settings,
+        Metrics<ValueType>& metrics);
 
     /**
      * Wrapper without metrics.
@@ -69,8 +70,8 @@ public:
     static DenseVector<IndexType> partitionGraph(
         std::vector<DenseVector<ValueType>> &coordinates,
         std::vector<DenseVector<ValueType>> &nodeWeights,
-        struct Settings settings) {
-        Metrics metrics(settings);
+        Settings settings) {
+        Metrics<ValueType> metrics(settings);
         return partitionGraph( coordinates, nodeWeights, settings, metrics );
     }
 
@@ -94,29 +95,31 @@ public:
         std::vector<DenseVector<ValueType>> &nodeWeights,
         DenseVector<IndexType>& previous,
         CommTree<IndexType,ValueType> commTree,
-        struct Settings settings,
-        struct Metrics& metrics);
+        const scai::dmemo::CommunicatorPtr comm,
+        Settings settings,
+        Metrics<ValueType>& metrics);
 
     /**
      * Wrapper without node weights.
      * \overload
      */
-    static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings, struct Metrics& metrics);
+    static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings, Metrics<ValueType>& metrics);
 
     /**
      * Wrapper without node weights and no metrics
      * \overload
      */
-    static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, struct Settings settings);
+    static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
 
     /**
      * Wrapper without metrics.
      * \overload
      */
 
-    static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights, struct Settings settings) {
-        Metrics metrics(settings);
-        return partitionGraph( input, coordinates, nodeWeights, settings, metrics);
+    static DenseVector<IndexType> partitionGraph(CSRSparseMatrix<ValueType> &input, std::vector<DenseVector<ValueType>> &coordinates, std::vector<DenseVector<ValueType>> &nodeWeights, Settings settings) {
+        const scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
+        Metrics<ValueType> metrics(settings);
+        return partitionGraph( input, coordinates, nodeWeights, comm, settings, metrics);
     }
 
     /**
@@ -133,7 +136,7 @@ public:
         std::vector<DenseVector<ValueType>> &nodeWeights,
         std::vector<std::vector<ValueType>> &blockSizes,
         Settings settings,
-        struct Metrics& metrics);
+        Metrics<ValueType>& metrics);
 
 
     /**
@@ -153,10 +156,11 @@ public:
 
     * vwgt, size=localN, array for the node weights
 
-    * ndims, the dimensions of the coordinates
-
     * xyz, size=ndims*locaN, the coordinates for every vertex. For vertex/point i, its coordinates are
     		in xyz[ndims*i], xyz[ndims*i+1], ... , xyz[ndims*i+ndims]
+    * ndims is the dimensions of the coordinates are given via settings.dimensions
+
+    \warning One a single node weight is supported. Edge weights not supported.
 
     \sa <a href="glaros.dtc.umn.edu/gkhome/fetch/sw/metis/manual.pdf">metis manual</a>.
 
@@ -164,8 +168,9 @@ public:
     */
     static std::vector<IndexType> partitionGraph(
         IndexType *vtxDist, IndexType *xadj, IndexType *adjncy, IndexType localM,
-        IndexType *vwgt, IndexType ndims, ValueType *xyz,
-        Settings  settings, Metrics& metrics);
+        IndexType *vwgt, ValueType *xyz,
+        const scai::dmemo::CommunicatorPtr comm,
+        Settings settings, Metrics<ValueType>& metrics);
 
     /**
      * Get an initial partition using the morton curve and measuring density per square.
@@ -205,14 +210,14 @@ private:
     using the coordinates of the graph.
     */
     static DenseVector<IndexType> initialPartition(
-        CSRSparseMatrix<ValueType> &input,
-        std::vector<DenseVector<ValueType>> &coordinates,
-        std::vector<DenseVector<ValueType>> &nodeWeights,
+        const CSRSparseMatrix<ValueType> &input,
+        const std::vector<DenseVector<ValueType>> &coordinates,
+        const std::vector<DenseVector<ValueType>> &nodeWeights,
         DenseVector<IndexType>& previous,
         CommTree<IndexType,ValueType> commTree,
         scai::dmemo::CommunicatorPtr comm,
-        struct Settings settings,
-        struct Metrics& metrics); 
+        Settings settings,
+        Metrics<ValueType>& metrics); 
 	
 	/** Wrapper function to do local refinement on a partitioned graph. 
 	 */
@@ -223,7 +228,7 @@ private:
 		std::vector<DenseVector<ValueType>> &nodeWeights,
 		scai::dmemo::CommunicatorPtr comm,
 		Settings settings,
-		struct Metrics& metrics);
+		Metrics<ValueType>& metrics);
 	
 };
 } //namespace ITI

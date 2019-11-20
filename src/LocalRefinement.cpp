@@ -23,7 +23,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     const std::vector<DenseVector<IndexType>>& communicationScheme,
     Settings settings) {
 
-    std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
 
     SCAI_REGION( "LocalRefinement.distributedFMStep" )
     const IndexType globalN = input.getRowDistributionPtr()->getGlobalSize();
@@ -83,9 +83,9 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
         }
     }
 
-    std::chrono::duration<double> beforeLoop = std::chrono::system_clock::now() - startTime;
-    ValueType t1 = comm->max(beforeLoop.count());
+    std::chrono::duration<double> beforeLoop = std::chrono::steady_clock::now() - startTime;
     if(settings.verbose) {
+        //ValueType t1 = comm->max(beforeLoop.count());
         //PRINT0("time elapsed before main loop: " << t1 );
         PRINT0("number of rounds/loops: " << communicationScheme.size() );
     }
@@ -128,7 +128,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
                     throw std::runtime_error("Block ID "+std::to_string(partAccess[j])+" found on process "+std::to_string(localBlockID)+".");
                 }
             }
-            for (IndexType node : nodesWithNonLocalNeighbors) {
+            for ([[maybe_unused]] IndexType node : nodesWithNonLocalNeighbors) {
                 assert(inputDist->isLocal(node));
             }
         }
@@ -224,7 +224,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
              * Build Halo to cover border region of other PE.
              * This uses a special halo builder method that doesn't require communication, since the required and provided indices are already known.
              */
-            IndexType numValues = input.getLocalStorage().getValues().size();
+            [[maybe_unused]] const IndexType numValues = input.getLocalStorage().getValues().size();
             {
                 scai::hmemo::HArrayRef<IndexType> arrRequiredIndexes( requiredHaloIndices );
                 scai::hmemo::HArrayRef<IndexType> arrProvidedIndexes( interfaceNodes );
@@ -232,7 +232,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
             }
 
             //all required halo indices are in the halo
-            for (IndexType node : requiredHaloIndices) {
+            for ([[maybe_unused]] IndexType node : requiredHaloIndices) {
                 assert(graphHalo.global2Halo(node) != scai::invalidIndex);
             }
 
@@ -529,7 +529,6 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
     }
 
     const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
-    const IndexType globalN = inputDist->getGlobalSize();
     scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
 
     //the size of this border region
@@ -789,6 +788,8 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
     /*
      * apply partition modifications in reverse until best is recovered
      */
+    [[maybe_unused]] const IndexType globalN = inputDist->getGlobalSize();
+
     for (int i = testedNodes-1; i > maxIndex; i--) {
         assert(transfers[i] < globalN);
         IndexType veryLocalID = transfers[i];
@@ -1148,7 +1149,6 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
     }
 
     scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
-    scai::hmemo::ReadAccess<IndexType> partAccess(localData);
 
     const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
@@ -1321,6 +1321,8 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distancesFrom
 
 //---------------------------------------------------------------------------------------
 
-template class LocalRefinement<IndexType, ValueType>;
+
+template class LocalRefinement<IndexType, double>;
+template class LocalRefinement<IndexType, float>;
 
 } // namespace ITI

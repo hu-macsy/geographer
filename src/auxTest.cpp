@@ -16,8 +16,8 @@
 #include <cstdlib>
 #include <numeric>
 #include <chrono>
+#include <vector>
 
-#include "MeshGenerator.h"
 #include "FileIO.h"
 #include "MultiLevel.h"
 #include "ParcoRepart.h"
@@ -34,18 +34,25 @@ using namespace scai;
 
 namespace ITI {
 
-class auxTest : public ::testing::TestWithParam<int> {
+template<typename T>
+class auxTest : public ::testing::Test {
 protected:
     // the directory of all the meshes used
     // projectRoot is defined in config.h.in
     std::string graphPath = projectRoot+"/meshes/";
 };
 
-TEST_F (auxTest, testInitialPartitions) {
+using testTypes = ::testing::Types<double,float>;
+TYPED_TEST_SUITE(auxTest, testTypes);
 
+//-----------------------------------------------
+
+TYPED_TEST (auxTest, testInitialPartitions) {
+    using ValueType = TypeParam;
+    
     //std::string fileName = "trace-00008.graph";
     std::string fileName = "Grid64x64";
-    std::string file = graphPath + fileName;
+    std::string file = auxTest<ValueType>::graphPath + fileName;
     std::ifstream f(file);
     IndexType dimensions= 2;
     IndexType N, edges;
@@ -61,15 +68,14 @@ TEST_F (auxTest, testInitialPartitions) {
     std::string command = "mkdir -p " + destPath;
     const int dir_err = system( command.c_str() );
     if (-1 == dir_err){
-        std::cout << "Error creating directory " << destPath << std::endl;
-        std::exit(1);
+        throw std::runtime_error("Error creating directory " + destPath );
     }
     scai::dmemo::DistributionPtr dist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
     scai::dmemo::DistributionPtr noDistPointer(new scai::dmemo::NoDistribution(N));
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file, comm);
     graph.redistribute(dist, noDistPointer);
 
-    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions, comm);
     EXPECT_TRUE(coordinates[0].getDistributionPtr()->isEqual(*dist));
 
     EXPECT_EQ( graph.getNumColumns(), graph.getNumRows());
@@ -135,7 +141,7 @@ TEST_F (auxTest, testInitialPartitions) {
     }
     uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
     scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
-    Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
     ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, halo, settings, metrics);
     if(dimensions==2) {
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"finalWithPixel");
@@ -167,8 +173,7 @@ TEST_F (auxTest, testInitialPartitions) {
     // get a hilbertPartition
     scai::lama::DenseVector<IndexType> hilbertPartition = ParcoRepart<IndexType, ValueType>::partitionGraph(coordinates, nodeWeights, settings, metrics);
 
-    //newDist = scai::dmemo::DistributionPtr( new scai::dmemo::GeneralDistribution ( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() ) );
-    /*scai::dmemo::DistributionPtr*/ newDist = scai::dmemo::generalDistributionByNewOwners( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() );
+    newDist = scai::dmemo::generalDistributionByNewOwners( hilbertPartition.getDistribution(), hilbertPartition.getLocalValues() );
     hilbertPartition.redistribute(newDist);
     graph.redistribute(newDist, noDistPointer);
     for (IndexType d = 0; d < dimensions; d++) {
@@ -208,8 +213,9 @@ TEST_F (auxTest, testInitialPartitions) {
 }
 //-----------------------------------------------------------------
 
-TEST_F (auxTest, testPixelDistance) {
+TYPED_TEST (auxTest, testPixelDistance) {
 
+    using ValueType = TypeParam;
     typedef aux<IndexType,ValueType> aux;
 
     IndexType sideLen = 100;
@@ -244,7 +250,10 @@ TEST_F (auxTest, testPixelDistance) {
 }
 //-----------------------------------------------------------------
 
-TEST_F(auxTest, testIndex2_3DPoint) {
+TYPED_TEST(auxTest, testIndex2_3DPoint) {
+
+    using ValueType = TypeParam;
+
     std::vector<IndexType> numPoints(3);
 
     srand(time(NULL));
@@ -265,7 +274,10 @@ TEST_F(auxTest, testIndex2_3DPoint) {
 }
 //-----------------------------------------------------------------
 
-TEST_F(auxTest, testIndex2_2DPoint) {
+TYPED_TEST(auxTest, testIndex2_2DPoint) {
+    
+    using ValueType = TypeParam;
+
     std::vector<IndexType> numPoints= {9, 11};
 
     srand(time(NULL));
@@ -345,9 +357,13 @@ TEST_F(auxTest, testBenchIndexReordering){
 //-----------------------------------------------------------------
 
 
-TEST_P(auxTest, testRedistributeFromPartition) {
-    std::string fileName = "bubbles-00010.graph";
-    std::string file = graphPath + fileName;
+TYPED_TEST(auxTest, testRedistributeFromPartition) {
+
+    using ValueType = TypeParam;
+
+    //std::string fileName = "bubbles-00010.graph";
+    std::string fileName = "Grid8x8";
+    std::string file = auxTest<ValueType>::graphPath + fileName;
 
     const IndexType dimensions= 2;
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -355,22 +371,22 @@ TEST_P(auxTest, testRedistributeFromPartition) {
     const IndexType k = comm->getSize();
     //
 
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file, comm);
     const IndexType N = graph.getNumRows();
-    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions, comm);
 
     const scai::dmemo::DistributionPtr inputDist  = graph.getRowDistributionPtr();
     const IndexType localN = inputDist->getLocalSize();
 
-    DenseVector<ValueType> nodeWeights( inputDist, 1 ); //unit weights
-
+    //unit weights
+    std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, DenseVector<ValueType>(inputDist, 1));
     EXPECT_TRUE( coordinates[0].getDistributionPtr()->isEqual( *inputDist ) );
 
     srand( comm->getRank() ); //so not all PEs claim the same IDs
     //create a random partition
     DenseVector<IndexType> partition(inputDist, 0);
     for (IndexType i = 0; i < localN; i++) {
-        //IndexType blockId = ( (rand() % k) % (comm->getRank()+1) )%k; //hevily imbalanced partition
+        //IndexType blockId = ( (rand() % k) % (comm->getRank()+1) )%k; //heavily imbalanced partition
         IndexType blockId = (rand() % k);
         partition.getLocalValues()[i] = blockId;
     }
@@ -378,84 +394,105 @@ TEST_P(auxTest, testRedistributeFromPartition) {
     Settings settings;
     settings.numBlocks = comm->getSize();
 
-    const bool useRedistributor = GetParam();
-    const bool renumberPEs = not GetParam();
+    for( bool useRedistributor: std::vector<bool>({false, true}) ){
+        for( bool renumberPEs: std::vector<bool>({true, false}) ){
 
-    //get some metrics of the current partition to verify that it does not change after renumbering
-    std::pair<std::vector<IndexType>,std::vector<IndexType>> borderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
-    ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( graph, partition );
-    ValueType imbalance = GraphUtils<IndexType,ValueType>::computeImbalance( partition, settings.numBlocks );
-    PRINT0( "imbalance: " << imbalance );
+            PRINT0("useRedistributor: " << useRedistributor << ", renumberPEs: "<< renumberPEs);
+            
+            CSRSparseMatrix<ValueType> copyGraph = graph;
+            DenseVector<IndexType> copyPartition = partition;
+            std::vector<DenseVector<ValueType>> copyCoordinates = coordinates;
+            std::vector<DenseVector<ValueType>> copyWeights = nodeWeights;
 
-    //redistribute
+            //graph.redistribute( inputDist );
 
-    scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition(
-                partition,
-                graph,
-                coordinates,
-                nodeWeights,
+            //get some metrics of the current partition to verify that it does not change after renumbering
+            std::pair<std::vector<IndexType>,std::vector<IndexType>> borderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( copyGraph, copyPartition, settings);
+            ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( copyGraph, copyPartition );
+            ValueType imbalance = GraphUtils<IndexType,ValueType>::computeImbalance( copyPartition, settings.numBlocks );
+            PRINT0( "imbalance: " << imbalance );
+
+            //redistribute
+
+            scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition(
+                copyPartition,
+                copyGraph,
+                copyCoordinates,
+                copyWeights,
                 settings,
                 useRedistributor,
                 renumberPEs);
 
-    //checks
+            //checks
+            EXPECT_TRUE( graph.isConsistent() );
 
-    const scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
-    EXPECT_TRUE( nodeWeights.getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*newDist), "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*newDist), "Distribution mismatch" );
-    SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*distFromPart), "Distribution mismatch" );
+            SCAI_ASSERT_DEBUG( copyPartition.isConsistent(), copyPartition << ": is invalid vector after redistribution" );
+            SCAI_ASSERT_DEBUG( copyCoordinates[0].isConsistent(), copyCoordinates[0] << ": is invalid vector after redistribution" );
+            SCAI_ASSERT_DEBUG( copyWeights[0].isConsistent(), copyWeights[0] << ": is invalid vector after redistribution" );
+            EXPECT_TRUE( copyGraph.checkSymmetry() );
+            SCAI_ASSERT_DEBUG( copyGraph.isConsistent(), copyGraph << ": is invalid matrix after redistribution" )
+            
+            const scai::dmemo::DistributionPtr newDist = copyGraph.getRowDistributionPtr();
+            EXPECT_TRUE( copyWeights[0].getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
+            SCAI_ASSERT_ERROR( copyCoordinates[0].getDistribution().isEqual(*newDist), "Distribution mismatch" );
+            SCAI_ASSERT_ERROR( copyPartition.getDistribution().isEqual(*newDist), "Distribution mismatch" );
+            SCAI_ASSERT_ERROR( copyPartition.getDistribution().isEqual(*distFromPart), "Distribution mismatch" );
 
-    const IndexType newLocalN = newDist->getLocalSize();
-    //PRINT( comm->getRank() <<": " << newLocalN );
+            const IndexType newLocalN = newDist->getLocalSize();
+            //PRINT( comm->getRank() <<": " << newLocalN );
 
-    //the border nodes, inner nodes, cut and imbalance shoulb be the same
-    std::pair<std::vector<IndexType>,std::vector<IndexType>> newborderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
+            //the border nodes, inner nodes, cut and imbalance should be the same
+            std::pair<std::vector<IndexType>,std::vector<IndexType>> newborderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( copyGraph, copyPartition, settings);
 
-    std::sort( borderAndInnerNodes.first.begin(), borderAndInnerNodes.first.end(), std::greater<IndexType>() ) ;
-    std::sort( newborderAndInnerNodes.first.begin(), newborderAndInnerNodes.first.end(), std::greater<IndexType>() );
-    EXPECT_EQ( borderAndInnerNodes.first, borderAndInnerNodes.first );
+            std::sort( borderAndInnerNodes.first.begin(), borderAndInnerNodes.first.end(), std::greater<IndexType>() ) ;
+            std::sort( newborderAndInnerNodes.first.begin(), newborderAndInnerNodes.first.end(), std::greater<IndexType>() );
+            EXPECT_EQ( borderAndInnerNodes.first, borderAndInnerNodes.first );
 
-    std::sort( borderAndInnerNodes.second.begin(), borderAndInnerNodes.second.end() ) ;
-    std::sort( newborderAndInnerNodes.second.begin(), newborderAndInnerNodes.second.end() );
-    EXPECT_EQ( borderAndInnerNodes.second, borderAndInnerNodes.second );
+            std::sort( borderAndInnerNodes.second.begin(), borderAndInnerNodes.second.end() ) ;
+            std::sort( newborderAndInnerNodes.second.begin(), newborderAndInnerNodes.second.end() );
+            EXPECT_EQ( borderAndInnerNodes.second, borderAndInnerNodes.second );
 
-    ValueType newCut = GraphUtils<IndexType,ValueType>::computeCut( graph, partition );
-    EXPECT_EQ( cut, newCut );
+            ValueType newCut = GraphUtils<IndexType,ValueType>::computeCut( copyGraph, copyPartition );
+            EXPECT_EQ( cut, newCut );
 
-    ValueType newImbalance = GraphUtils<IndexType,ValueType>::computeImbalance( partition, settings.numBlocks );
-    EXPECT_EQ( imbalance, newImbalance );
+            ValueType newImbalance = GraphUtils<IndexType,ValueType>::computeImbalance( copyPartition, settings.numBlocks );
+            EXPECT_EQ( imbalance, newImbalance );
 
-    EXPECT_EQ( comm->sum(newLocalN), N);
+            EXPECT_EQ( comm->sum(newLocalN), N);
 
-    for (IndexType i = 0; i < newLocalN; i++) {
-        SCAI_ASSERT_EQ_ERROR( partition.getLocalValues()[i], comm->getRank(), "error for i= " << i <<" and localN= "<< newLocalN );
-        //PRINT(comm->getRank() << " : " << i << "- " << partition.getLocalValues()[i] );
+            for (IndexType i = 0; i < newLocalN; i++) {
+                SCAI_ASSERT_EQ_ERROR( copyPartition.getLocalValues()[i], comm->getRank(), "error for i= " << i <<" and localN= "<< newLocalN );
+                //PRINT(comm->getRank() << " : " << i << "- " << partition.getLocalValues()[i] );
+            }
+
+            //TODO: move to separate test?
+            //benchmarking
+
+            comm->synchronize();
+
+            scai::dmemo::RedistributePlan redistPlan = scai::dmemo::redistributePlanByNewDistribution( distFromPart, inputDist );
+            const IndexType sourceSz = redistPlan.getExchangeSourceSize();
+            const IndexType targetSz = redistPlan.getExchangeTargetSize();
+
+            IndexType globalSourceSz = comm->sum( sourceSz );
+            IndexType globalTargetSz = comm->sum( targetSz );
+
+            PRINT0( "renumbering: " <<renumberPEs  << ", globalSourceSz= " << globalSourceSz << ", globalTargetSz= " << globalTargetSz);
+            //PRINT(*comm << " : " << sourceSz << " __ " << targetSz );
+
+            comm->synchronize();
+        }
     }
-
-    //TODO: move to separate test?
-    //benchmarking
-
-    comm->synchronize();
-
-    scai::dmemo::RedistributePlan redistPlan = scai::dmemo::redistributePlanByNewDistribution( distFromPart, inputDist );
-    const IndexType sourceSz = redistPlan.getExchangeSourceSize();
-    const IndexType targetSz = redistPlan.getExchangeTargetSize();
-
-    IndexType globalSourceSz = comm->sum( sourceSz );
-    IndexType globalTargetSz = comm->sum( targetSz );
-
-    PRINT0( "renumbering: " <<renumberPEs  << ", globalSourceSz= " << globalSourceSz << ", globalTargetSz= " << globalTargetSz);
-    //PRINT(*comm << " : " << sourceSz << " __ " << targetSz );
-
-    comm->synchronize();
 
 }
 
 
-TEST_P(auxTest, benchmarkRedistributeFromPartition) {
+TYPED_TEST(auxTest, benchmarkRedistributeFromPartition) {
+
+    using ValueType = TypeParam;
+
     std::string fileName = "353off.graph";
-    std::string file = graphPath + fileName;
+    std::string file = auxTest<ValueType>::graphPath + fileName;
 
     const IndexType dimensions= 2;
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -463,15 +500,16 @@ TEST_P(auxTest, benchmarkRedistributeFromPartition) {
     const IndexType k = comm->getSize();
     //
 
-    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file, comm);
     const IndexType N = graph.getNumRows();
-    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions);
+    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions, comm);
 
     const scai::dmemo::DistributionPtr inputDist  = graph.getRowDistributionPtr();
     const IndexType localN = inputDist->getLocalSize();
     PRINT( comm->getRank() << ": localN= " << localN);
 
-    DenseVector<ValueType> nodeWeights( inputDist, 1 ); //unit weights
+    //unit weights
+    std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, DenseVector<ValueType>(graph.getRowDistributionPtr(), 1));
 
     EXPECT_TRUE( coordinates[0].getDistributionPtr()->isEqual( *inputDist ) );
 
@@ -487,62 +525,172 @@ TEST_P(auxTest, benchmarkRedistributeFromPartition) {
 
     scai::dmemo::DistributionPtr intermediateDist = initPartition.getDistributionPtr();
 
-    const bool useRedistributor = GetParam();
 
+    for( bool useRedistributor: std::vector<bool>({true, false}) ){
+        for( bool renumberPEs: std::vector<bool>({false, true}) ){
 
-    for( bool renumberPEs: vector<bool>({false, true}) ) {
+            DenseVector<IndexType> partition = initPartition;
 
-        DenseVector<IndexType> partition = initPartition;
+            std::chrono::time_point<std::chrono::steady_clock> start= std::chrono::steady_clock::now();
+            //redistribute
+            scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition(
+                        partition,
+                        graph,
+                        coordinates,
+                        nodeWeights,
+                        settings,
+                        useRedistributor,
+                        renumberPEs);
 
-        std::chrono::time_point<std::chrono::steady_clock> start= std::chrono::steady_clock::now();
-        //redistribute
-        scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition(
-                    partition,
-                    graph,
-                    coordinates,
-                    nodeWeights,
-                    settings,
-                    useRedistributor,
-                    renumberPEs);
+            std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - start;
+            ValueType time = elapTime.count();
+            ValueType globTime = comm->max( time );
+            PRINT0("max elapsed time with redistributor: " << useRedistributor << " and renumber: " << renumberPEs << " is " << globTime );
 
-        std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - start;
-        ValueType time = elapTime.count();
-        ValueType globTime = comm->max( time );
-        PRINT0("max elapsed time with redistributor: " << useRedistributor << " and renumber: " << renumberPEs << " is " << globTime );
+            //checks
 
-        //checks
+            const scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
+            EXPECT_TRUE( nodeWeights[0].getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
+            SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*newDist), "Distribution mismatch" );
+            SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*newDist), "Distribution mismatch" );
+            SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*distFromPart), "Distribution mismatch" );
 
-        const scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
-        EXPECT_TRUE( nodeWeights.getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
-        SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*newDist), "Distribution mismatch" );
-        SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*newDist), "Distribution mismatch" );
-        SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*distFromPart), "Distribution mismatch" );
+            //the border nodes, inner nodes, cut and imbalance shoulb be the same
+            std::pair<std::vector<IndexType>,std::vector<IndexType>> newborderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
 
-        const IndexType newLocalN = newDist->getLocalSize();
-        //PRINT( comm->getRank() <<": new localN= " << newLocalN << " , newLocalN-localN = " << newLocalN-localN );
+            comm->synchronize();
+            //(targetDistribution, sourceDistribution)
+            scai::dmemo::RedistributePlan redistPlan = scai::dmemo::redistributePlanByNewDistribution( distFromPart, intermediateDist );
+            const IndexType sourceSz = redistPlan.getExchangeSourceSize();
+            const IndexType targetSz = redistPlan.getExchangeTargetSize();
 
-        //the border nodes, inner nodes, cut and imbalance shoulb be the same
-        std::pair<std::vector<IndexType>,std::vector<IndexType>> newborderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
+            IndexType globalSourceSz = comm->sum( sourceSz );
+            IndexType globalTargetSz = comm->sum( targetSz );
 
-        comm->synchronize();
-        //(targetDistribution, sourceDistribution)
-        scai::dmemo::RedistributePlan redistPlan = scai::dmemo::redistributePlanByNewDistribution( distFromPart, intermediateDist );
-        const IndexType sourceSz = redistPlan.getExchangeSourceSize();
-        const IndexType targetSz = redistPlan.getExchangeTargetSize();
+            PRINT0( "renumbering: " <<renumberPEs  << ", globalSourceSz= " << globalSourceSz << ", globalTargetSz= " << globalTargetSz);
+            //PRINT(*comm << " : " << sourceSz << " -- " << targetSz << " = " << sourceSz-targetSz);
 
-        IndexType globalSourceSz = comm->sum( sourceSz );
-        IndexType globalTargetSz = comm->sum( targetSz );
-
-        PRINT0( "renumbering: " <<renumberPEs  << ", globalSourceSz= " << globalSourceSz << ", globalTargetSz= " << globalTargetSz);
-        //PRINT(*comm << " : " << sourceSz << " -- " << targetSz << " = " << sourceSz-targetSz);
-
-        comm->synchronize();
-
+            comm->synchronize();
+        }
     }
 
 }
 
-INSTANTIATE_TEST_CASE_P(InstantiationName,
+TYPED_TEST (auxTest, testMetisInterface) {
+    using ValueType = TypeParam;
+    
+    std::string fileName = "trace-00008.graph";
+    //std::string fileName = "Grid64x64";
+    std::string file = auxTest<ValueType>::graphPath + fileName;
+    std::ifstream f(file);
+
+    //read input 
+
+    const IndexType dimensions= 2;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    // for now local refinement requires k = P
+    const IndexType k = comm->getSize();
+    //
+
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file, comm );
+    const IndexType N = graph.getNumRows();
+    std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(file + ".xyz"), N, dimensions, comm);
+
+    const scai::dmemo::DistributionPtr inputDist  = graph.getRowDistributionPtr();
+    const IndexType localN = inputDist->getLocalSize();
+    //PRINT( comm->getRank() << ": localN= " << localN);
+
+    const IndexType numWeightsBefore = 3;
+    //unit weights
+    std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(numWeightsBefore, DenseVector<ValueType>(graph.getRowDistributionPtr(), 4.5213));
+
+    Settings settings;
+    settings.dimensions = dimensions;
+    settings.numBlocks = k;
+
+
+    //convert to metis interface
+
+    // vtxDist is an array of size numPEs and is replicated in every processor
+    std::vector<IndexType> vtxDist;
+
+    std::vector<IndexType> xadj;
+    std::vector<IndexType> adjncy;
+    // vwgt , adjwgt stores the weigths of vertices.
+    std::vector<ValueType> vwgt;
+
+    // tpwgts: array that is used to specify the fraction of
+    // vertex weight that should be distributed to each sub-domain for each balance constraint.
+    // Here we want equal sizes, so every value is 1/nparts; size = ncons*nparts 
+    std::vector<ValueType> tpwgts;
+
+    // the xyz array for coordinates of size dim*localN contains the local coords
+    std::vector<ValueType> xyzLocal;
+    // ubvec: array of size ncon to specify imbalance for every vertex weigth.
+    // 1 is perfect balance and nparts perfect imbalance. Here 1 for now
+    std::vector<ValueType> ubvec;
+
+    //local number of edges; number of node weights; flag about edge and vertex weights 
+    IndexType numWeights=0, wgtFlag=0;
+
+    // options: array of integers for passing arguments.
+    std::vector<IndexType> options;
+
+    IndexType localN2 = aux<IndexType,ValueType>::toMetisInterface(
+    graph, coordinates, nodeWeights, settings, vtxDist, xadj, adjncy,
+    vwgt, tpwgts, wgtFlag, numWeights, ubvec, xyzLocal, options );
+
+    //checks
+
+    const IndexType numPEs = comm->getSize();
+
+    EXPECT_EQ( vtxDist.size(), numPEs+1 );
+    EXPECT_EQ( localN, localN2 );
+    EXPECT_EQ( numWeights, numWeightsBefore );
+    EXPECT_EQ( xadj.size(), localN+1 );
+    EXPECT_EQ( adjncy.size(), graph.getLocalNumValues() );
+    EXPECT_EQ( vwgt.size(), numWeights*localN );
+    EXPECT_EQ( xyzLocal.size(), dimensions*localN );
+    EXPECT_EQ( std::accumulate( tpwgts.begin(), tpwgts.end(), 0.0), ValueType (numWeights) );
+
+    //check weights
+    for(int w=0; w<numWeights; w++ ){
+        ValueType wLocalSum = std::accumulate(vwgt.begin()+(w*localN), vwgt.begin()+(w+1)*localN, 0.0 );
+        if( std::is_same<ValueType,float>::value ){
+            EXPECT_NEAR( scai::utilskernel::HArrayUtils::sum(nodeWeights[w].getLocalValues()) , wLocalSum, 1 );
+            EXPECT_LE( std::abs( nodeWeights[w].sum()-comm->sum(wLocalSum)), nodeWeights[w].sum()*1e-4 );
+        }else{ //double
+            EXPECT_NEAR( scai::utilskernel::HArrayUtils::sum(nodeWeights[w].getLocalValues()) , wLocalSum, 1e-7 );
+            EXPECT_NEAR( nodeWeights[w].sum(), comm->sum(wLocalSum), 1e-7);
+        }
+    }
+
+    //check coordinate sum
+    for( int d=0; d<dimensions; d++){
+    
+        ValueType coordLocalSum = 0;
+        for( int i=0; i<localN; i++ ){
+            coordLocalSum += xyzLocal[ dimensions*i+d];
+        }
+
+        if( std::is_same<ValueType,float>::value ){
+            EXPECT_NEAR( scai::utilskernel::HArrayUtils::sum(coordinates[d].getLocalValues()) , coordLocalSum, 1 );
+            EXPECT_NEAR( coordinates[d].sum(), comm->sum(coordLocalSum), 1 );
+        }else{ //double
+            EXPECT_NEAR( scai::utilskernel::HArrayUtils::sum(coordinates[d].getLocalValues()) , coordLocalSum, 1e-7 );
+            EXPECT_NEAR( coordinates[d].sum(), comm->sum(coordLocalSum), 1e-7);
+        }        
+    }
+}
+
+
+//No way to combine typed and value test. See:
+// https://stackoverflow.com/questions/8507385/google-test-is-there-a-way-to-combine-a-test-which-is-both-type-parameterized-a
+//
+
+/*
+INSTANTIATE_TYPED_TEST_SUITE_P(InstantiationName,
                         auxTest,
                         testing::Values(true, false) );
+  */                      
 }

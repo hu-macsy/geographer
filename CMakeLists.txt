@@ -19,18 +19,46 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif(NOT CMAKE_BUILD_TYPE)
 
+if(NOT CODE_COVERAGE)
+    set(CODE_COVERAGE FALSE)
+endif()
+
+
+### add code coverage
+if(CMAKE_COMPILER_IS_GNUCXX AND CODE_COVERAGE)
+    set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/CmakeModules)
+    include(CodeCoverage)
+    APPEND_COVERAGE_COMPILER_FLAGS()
+    #setup_target_for_coverage(${PROJECT_NAME}_coverage ${PROJECT_TEST_NAME} coverage)
+    setup_target_for_coverage_gcovr_html( 
+        NAME ${PROJECT_NAME}_coverage 
+        EXECUTABLE GeographerTest -j 4
+        DEPANDENCIES GeographerTest)
+    #setup_target_for_coverage(${PROJECT_NAME}_coverage GeographerTest coverage)
+endif()
+
+
+#NetworKit
 option(USE_NETWORKIT "Use NETWORKIT package." OFF)
 if(USE_NETWORKIT)
   if (NOT DEFINED NETWORKIT_DIR)
      message( FATAL_ERROR "Install Directory of NETWORKIT not defined, specify with -DNETWORKIT_DIR" )
   endif (NOT DEFINED NETWORKIT_DIR)
   add_definitions(-DUSE_NETWORKIT)
-endif(USE_NETWORKIT)
+#endif(USE_NETWORKIT)
 
-set(NETWORKIT_INCLUDE "${NETWORKIT_DIR}/include/") 
-set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
+  set(NETWORKIT_INCLUDE "${NETWORKIT_DIR}/include/") 
+  set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
+# link_directories has to happen before target definitions
+#if (USE_NETWORKIT)
+  include_directories(${NETWORKIT_INCLUDE})
+  link_directories(${NETWORKIT_LIB})
+endif (USE_NETWORKIT)
 
+
+#cxxopts to parse input arguments
 set(CXXOPTS_DIR "${PROJECT_SOURCE_DIR}/external/cxxopts/include")
+
 
 ### find MPI ###
 find_package(MPI REQUIRED)
@@ -41,11 +69,13 @@ set(CMAKE_REQUIRED_LIBRARIES ${MPI_CXX_LIBRARIES})
 set(CMAKE_REQUIRED_INCLUDES ${MPI_CXX_INCLUDE_PATH})
 set(CMAKE_REQUIRED_FLAGS ${MPI_CXX_LINK_FLAGS})
 
+
 ### include GTest ###
 add_subdirectory("${PROJECT_SOURCE_DIR}/external/googletest" "googletest" EXCLUDE_FROM_ALL)
 set(GTEST_LIBRARIES gtest)
 enable_testing()
 set(GTEST_FOUND TRUE)
+
 
 ### find SCAI ###
 set ( SCAI_PATH_HINTS "${SCAI_DIR}" "${SCAI_HOME}" "$ENV{SCAI_HOME}" )
@@ -65,8 +95,8 @@ find_package( SCAI REQUIRED CONFIG
 
 include_directories(${SCAI_INCLUDE_DIRS})
 add_definitions(${SCAI_DEFINITIONS})
-#set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SCAI_CXX_FLAGS}" )
 link_directories(${SCAI_ROOT}/lib/)
+
 
 ### download KaDiS if not found. ###
 find_path(KaDiS_CMAKE CMakeLists.txt external/KaDiS NO_DEFAULT_PATH)
@@ -77,18 +107,11 @@ if((NOT KaDiS_CMAKE) OR (NOT EXISTS "${KaDiS_CMAKE}/CMakeLists.txt"))
                     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
-### add networkit include and link directory ###
-# link_directories has to happen before target definitions
-if (USE_NETWORKIT)
-  include_directories(${NETWORKIT_INCLUDE})
-  link_directories(${NETWORKIT_LIB})
-endif (USE_NETWORKIT)
 
 ### get git commit ###
 execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
 add_definitions("-DBUILD_COMMIT=${GIT_COMMIT}")
-
-add_definitions("-Wall -Wno-sign-compare -Wno-unused")
+add_definitions("-Wall -Wno-sign-compare")
 
 ### define install directories ###
 set(BIN_DEST "bin")
@@ -107,7 +130,6 @@ add_subdirectory(external/KaDiS EXCLUDE_FROM_ALL)
 set(RBC_LIBRARY rbcsorting)
 
 ### set value type ###
-set(Geographer_VALUE_TYPE "double" CACHE STRING "variable type used for values")
 configure_file("src/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/config.h" DESTINATION "${HEADER_DEST}")

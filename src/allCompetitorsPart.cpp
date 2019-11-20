@@ -27,11 +27,20 @@
 #include "MeshGenerator.h"
 #include "Wrappers.h"
 #include "parseArgs.h"
+#include "mainHeader.h"
 
+#if PARMETIS_FOUND
+#include "parmetisWrapper.h"
+#include <parmetis.h>
+#endif
 
-extern "C" {
-    void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);
-}
+#if ZOLTAN_FOUND
+#include "zoltanWrapper.h"
+#endif
+
+#if PARHIP_FOUND
+#include "parhipWrapper.h"
+#endif
 
 
 
@@ -40,8 +49,9 @@ extern "C" {
 int main(int argc, char** argv) {
 
     using namespace ITI;
+    typedef double ValueType;   //use double
 
-    std::chrono::time_point<std::chrono::system_clock> startTime =  std::chrono::system_clock::now();
+    std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     if (comm->getType() != scai::dmemo::CommunicatorType::MPI) {
@@ -65,10 +75,6 @@ int main(int argc, char** argv) {
     if( !settings.isValid )
         return -1;
 
-    const IndexType thisPE = comm->getRank();
-    IndexType N;
-
-
     if( comm->getRank() ==0 ) {
         std::cout <<"Starting file " << __FILE__ << std::endl;
 
@@ -86,127 +92,9 @@ int main(int argc, char** argv) {
     std::vector<DenseVector<ValueType>> coords(settings.dimensions);
     std::vector<DenseVector<ValueType>> nodeWeights;	//the weights for each node
 
-    std::string graphFile;
-
-    if (vm.count("graphFile")) {
-
-        graphFile = vm["graphFile"].as<std::string>();
-        std::string coordFile;
-        if (vm.count("coordFile")) {
-            coordFile = vm["coordFile"].as<std::string>();
-        } else {
-            coordFile = graphFile + ".xyz";
-        }
-
-        // read the graph
-        if (vm.count("fileFormat")) {
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights, settings.fileFormat );
-        } else {
-            graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights );
-        }
-
-        N = graph.getNumRows();
-
-        SCAI_ASSERT_EQUAL( graph.getNumColumns(),  graph.getNumRows(), "matrix not square");
-        SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
-
-        scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
-
-        // set the node weigths
-        IndexType numReadNodeWeights = nodeWeights.size();
-        if (numReadNodeWeights == 0) {
-            nodeWeights.resize(1);
-            nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
-        }
-
-        if (settings.numNodeWeights > 0) {
-            if (settings.numNodeWeights < nodeWeights.size()) {
-                nodeWeights.resize(settings.numNodeWeights);
-                if (comm->getRank() == 0) {
-                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, thus discarding "
-                              << numReadNodeWeights - settings.numNodeWeights << std::endl;
-                }
-            } else if (settings.numNodeWeights > nodeWeights.size()) {
-                nodeWeights.resize(settings.numNodeWeights);
-                for (IndexType i = numReadNodeWeights; i < settings.numNodeWeights; i++) {
-                    nodeWeights[i] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
-                }
-                if (comm->getRank() == 0) {
-                    std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, padding with "
-                              << settings.numNodeWeights - numReadNodeWeights << " uniform weights. " << std::endl;
-                }
-            }
-        }
-
-        //read the coordinates file
-        if (vm.count("coordFormat")) {
-            coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.coordFormat);
-        } else if (vm.count("fileFormat")) {
-            coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, settings.fileFormat);
-        } else {
-            coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions);
-        }
-        SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size(), coords[1].getLocalValues().size(), "coordinates not of same size" );
-
-    } else if(vm.count("generate")) {
-        if (settings.dimensions != 3) {
-            if(comm->getRank() == 0) {
-                std::cout << "Graph generation supported only fot 2 or 3 dimensions, not " << settings.dimensions << std::endl;
-                return 127;
-            }
-        }
-
-        N = settings.numX * settings.numY * settings.numZ;
-
-        std::vector<ValueType> maxCoord(settings.dimensions); // the max coordinate in every dimensions, used only for 3D
-
-        maxCoord[0] = settings.numX;
-        maxCoord[1] = settings.numY;
-        maxCoord[2] = settings.numZ;
-
-        std::vector<IndexType> numPoints(3); // number of points in each dimension, used only for 3D
-
-        for (IndexType i = 0; i < 3; i++) {
-            numPoints[i] = maxCoord[i];
-        }
-
-        if( comm->getRank()== 0) {
-            std::cout<< "Generating for dim= "<< settings.dimensions << " and numPoints= "<< settings.numX << ", " << settings.numY << ", "<< settings.numZ << ", in total "<< N << " number of points" << std::endl;
-            std::cout<< "\t\t and maxCoord= "<< maxCoord[0] << ", "<< maxCoord[1] << ", " << maxCoord[2]<< std::endl;
-        }
-
-        scai::dmemo::DistributionPtr rowDistPtr ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-        scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(N));
-        graph = scai::lama::zero<scai::lama::CSRSparseMatrix<ValueType>>( rowDistPtr, noDistPtr );
-
-        scai::dmemo::DistributionPtr coordDist ( scai::dmemo::Distribution::getDistributionPtr( "BLOCK", comm, N) );
-        for(IndexType i=0; i<settings.dimensions; i++) {
-            coords[i].allocate(coordDist);
-            coords[i] = static_cast<ValueType>( 0 );
-        }
-
-        // create the adjacency matrix and the coordinates
-        ITI::MeshGenerator<IndexType, ValueType>::createStructuredMesh_dist( graph, coords, maxCoord, numPoints, settings.dimensions);
-
-        IndexType nodes= graph.getNumRows();
-        IndexType edges= graph.getNumValues()/2;
-        if(comm->getRank()==0) {
-            std::cout<< "Generated structured 3D graph with "<< nodes<< " and "<< edges << " edges."<< std::endl;
-        }
-
-    } else {
-        std::cout << "Either an input file or generation parameters are needed. Call again with --graphFile, --quadTreeFile, or --generate" << std::endl;
-        return 126;
-    }
+    IndexType N = readInput<ValueType>( vm, settings, comm, graph, coords, nodeWeights );
 
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-
-    /*
-    //TODO: must compile with mpicc and module mpi.ibm/1.4 and NOT mpi.ibm/1.4_gcc
-    size_t total=-1,used=-1,free=-1,buffers=-1, cached=-1;
-    memusage(&total, &used, &free, &buffers, &cached);
-    printf("MEM: avail: %ld , used: %ld , free: %ld , buffers: %ld , file cache: %ld \n",total,used,free,buffers, cached);
-    */
 
     //---------------------------------------------------------------------------------
     //
@@ -215,58 +103,31 @@ int main(int argc, char** argv) {
 
     //WARNING: 1) removed parmetis sfc
     //WARNING: 2) parMetisGraph should be last because it often crashes
-    std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph };
+    std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph, ITI::Tool::parhipFastMesh, ITI::Tool::parhipUltraFastMesh, ITI::Tool::parhipEcoMesh  };
 
     //used for printing and creating filenames
     std::map<ITI::Tool, std::string> toolName = {
         {ITI::Tool::zoltanRCB,"zoltanRcb"}, {ITI::Tool::zoltanRIB,"zoltanRib"}, {ITI::Tool::zoltanMJ,"zoltanMJ"}, {ITI::Tool::zoltanSFC,"zoltanHsfc"},
-        {ITI::Tool::parMetisSFC,"parMetisSFC"}, {ITI::Tool::parMetisGeom,"parMetisGeom"}, {ITI::Tool::parMetisGraph,"parMetisGraph"}
+        {ITI::Tool::parMetisSFC,"parMetisSFC"}, {ITI::Tool::parMetisGeom,"parMetisGeom"}, {ITI::Tool::parMetisGraph,"parMetisGraph"},
+        {ITI::Tool::parhipFastMesh,"parhipFastMesh"}, {ITI::Tool::parhipUltraFastMesh,"parhipUltraFastMesh"}, {ITI::Tool::parhipEcoMesh,"parhipEcoMesh"}
     };
 
     std::vector<ITI::Tool> wantedTools;
     std::vector<std::string> tools = settings.tools; //not really needed
 
     //if no 'tools' parameter was gives, use all tools
-    if( tools.size()==0 )
-        tools.resize( 1, "all" );
-
-    if( tools[0] == "all") {
+    if( tools.size()==0 ){
         wantedTools = allTools;
     } else {
-        for( std::vector<std::string>::iterator tool=tools.begin(); tool!=tools.end(); tool++) {
-            ITI::Tool thisTool;
-            if( (*tool).substr(0,8)=="parMetis") {
-                if 		( *tool=="parMetisGraph") {
-                    thisTool = ITI::Tool::parMetisGraph;
-                }
-                else if ( *tool=="parMetisGeom") {
-                    thisTool = ITI::Tool::parMetisGeom;
-                }
-                else if	( *tool=="parMetisSfc") {
-                    thisTool = ITI::Tool::parMetisSFC;
-                }
-            } else if ( (*tool).substr(0,6)=="zoltan") {
-                std::string algo;
-                if		( *tool=="zoltanRcb") {
-                    thisTool = ITI::Tool::zoltanRCB;
-                }
-                else if ( *tool=="zoltanRib") {
-                    thisTool = ITI::Tool::zoltanRIB;
-                }
-                else if ( *tool=="zoltanMJ") {
-                    thisTool = ITI::Tool::zoltanMJ;
-                }
-                else if ( *tool=="zoltanHsfc") {
-                    thisTool = ITI::Tool::zoltanSFC;
-                }
-            } else {
-                std::cout<< "Tool "<< *tool <<" not supported.\nAborting..."<<std::endl;
-                return -1;
-            }
-            wantedTools.push_back( thisTool );
+        for( std::vector<std::string>::iterator tool=tools.begin(); tool!=tools.end(); tool++) {    
+            wantedTools.push_back( to_tool(*tool) );
         }
     }
 
+
+    std::string machine = settings.machine;
+    const IndexType thisPE = comm->getRank();
+    
 
     for( int t=0; t<wantedTools.size(); t++) {
 
@@ -276,26 +137,32 @@ int main(int argc, char** argv) {
         //
         scai::lama::DenseVector<IndexType> partition;
 
-        // the constuctor with metrics(comm->getSize()) is needed for ParcoRepart timing details
-        struct Metrics metrics( settings );
+        // the constructor with metrics(comm->getSize()) is needed for ParcoRepart timing details
+        Metrics<ValueType> metrics( settings );
         //metrics.numBlocks = settings.numBlocks;
 
-        // if usign unit weights, set flag for wrappers
+        // if using unit weights, set flag for wrappers
         bool nodeWeightsUse = true;
 
         // if graph is too big, repeat less times to avoid memory and time problems
         if( N>std::pow(2,29) ) {
             settings.repeatTimes = 2;
-        } else {
-            settings.repeatTimes = 5;
-        }
-        int parMetisGeom=0;
-
-        std::string outFile = "-";
-
+        } 
+        
+        //set outFile depending if we get outDir or outFile parameter
+        std::string outFile = settings.outFile;
+		
         if( vm.count("outDir") and vm.count("storeInfo") ) {
             //set the graphName in order to create the outFile name
-            std::string copyName = graphFile;
+            std::string copyName;
+            if( vm.count("graphFile") ){
+                copyName = vm["graphFile"].as<std::string>();
+            }else{     
+                copyName = "generate_"+vm["numX"].as<std::string>()+"_"+vm["numY"].as<std::string>();
+                //if( settings.dimensions==3 ){
+                //    copyName += "_"+vm["numZ"].as<std::string>();
+               // }
+            }
             std::reverse( copyName.begin(), copyName.end() );
             std::vector<std::string> strs = aux<IndexType,ValueType>::split( copyName, '/' );
             std::string graphName = aux<IndexType,ValueType>::split(strs.back(), '.')[0];
@@ -311,11 +178,35 @@ int main(int argc, char** argv) {
             PRINT0("\n\tWARNING: File " << outFile << " allready exists. Skipping partition with " << toolName[thisTool]);
             continue;
         }
-
+PRINT0(toolName[thisTool]);
         //get the partition
-        partition = ITI::Wrappers<IndexType,ValueType>::partition ( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
+        ITI::Wrappers<IndexType,ValueType>* partitioner;
+        if( toolName[thisTool].rfind("zoltan",0)==0 ){
+#if ZOLTAN_FOUND            
+            partitioner = new zoltanWrapper<IndexType,ValueType>;
+#else
+            throw std::runtime_error("Requested a zoltan tool but zoltan is not found. Pick another tool.\nAborting...");
+#endif            
+        }else if( toolName[thisTool].rfind("parMetis",0)==0 ){
+#if PARMETIS_FOUND            
+            partitioner = new parmetisWrapper<IndexType,ValueType>;
+#else
+            throw std::runtime_error("Requested a parmetis tool but parmetis is not found. Pick another tool.\nAborting...");
+#endif
+        }
+        else if(toolName[thisTool].rfind("parhip",0)==0 ){
+#if PARHIP_FOUND
+            partitioner = new parhipWrapper<IndexType,ValueType>;
+#else         
+            throw std::runtime_error("Requested a parhip tool but parhip is not found. Pick another tool.\nAborting...");
+#endif   
+        }else{
+            throw std::runtime_error("Provided tool: "+ toolName[thisTool] + " not supported.\nAborting..." );
+        }
 
-        PRINT0("time to get the partition: " <<  metrics.MM["timeFinalPartition"] );
+        partition = partitioner->partition( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
+
+        PRINT0("time to get the partition: " <<  metrics.MM["timeTotal"] );
 
         // partition has the the same distribution as the graph rows
         SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
@@ -334,8 +225,6 @@ int main(int argc, char** argv) {
         // Reporting output to std::cout
         //
 
-        std::string machine = settings.machine;
-
         if( thisPE==0 ) {
             if( vm.count("generate") ) {
                 std::cout << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon;
@@ -347,7 +236,7 @@ int main(int argc, char** argv) {
             std::cout << "\n >>>> " << toolName[thisTool];
             std::cout<<  "\033[0m" << std::endl;
 
-            //printMetricsShort( metrics, std::cout);
+            metrics.print( std::cout );
 
             // write in a file
             if( outFile!= "-" ) {
@@ -369,12 +258,12 @@ int main(int argc, char** argv) {
             }
         }
 
-        if( outFile!="-" ) {
-            std::chrono::time_point<std::chrono::system_clock> beforePartWrite = std::chrono::system_clock::now();
+        if( outFile!="-" and settings.storePartition ) {
+            std::chrono::time_point<std::chrono::steady_clock> beforePartWrite = std::chrono::steady_clock::now();
             std::string partOutFile = outFile+".part";
             ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
 
-            std::chrono::duration<double> writePartTime =  std::chrono::system_clock::now() - beforePartWrite;
+            std::chrono::duration<double> writePartTime =  std::chrono::steady_clock::now() - beforePartWrite;
             if( comm->getRank()==0 ) {
                 std::cout << " and last partition of the series in file " << partOutFile << std::endl;
                 std::cout<< " Time needed to write .partition file: " << writePartTime.count() <<  std::endl;
@@ -408,14 +297,16 @@ int main(int argc, char** argv) {
 
     } // for wantedTools.size()
 
-    std::chrono::duration<ValueType> totalTimeLocal = std::chrono::system_clock::now() - startTime;
+    std::chrono::duration<ValueType> totalTimeLocal = std::chrono::steady_clock::now() - startTime;
     ValueType totalTime = comm->max( totalTimeLocal.count() );
     if( thisPE==0 ) {
         std::cout<<"Exiting file " << __FILE__ << " , total time= " << totalTime <<  std::endl;
     }
 
-    //this is needed for supermuc
-    std::exit(0);
+    if (vm.count("callExit")) {
+        //this is needed for supermuc
+        std::exit(0);
+    }
 
     return 0;
 }

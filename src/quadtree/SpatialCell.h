@@ -19,7 +19,6 @@
 
 #include "Point.h"
 
-#include "config.h"
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
@@ -27,9 +26,9 @@ namespace ITI {
 
 /** Spatial cell class used by spatial tree to create a tree that stores point for faster search.
 */
+template <typename ValueType>
+class SpatialCell : public std::enable_shared_from_this<SpatialCell<ValueType>> {
 
-class SpatialCell : public std::enable_shared_from_this<SpatialCell> {
-    friend class QuadTreeTest;
 public:
     SpatialCell() = default;
     virtual ~SpatialCell() = default;
@@ -196,7 +195,7 @@ public:
         }
         else {
             assert(children.size() > 0);
-            bool foundResponsibleChild = false;
+            [[maybe_unused]] bool foundResponsibleChild = false;
             for (index i = 0; i < children.size(); i++) {
                 if (children[i]->responsible(coords)) {
                     foundResponsibleChild = true;
@@ -234,11 +233,11 @@ public:
     virtual count getElementsProbabilistically(const Point<ValueType> &query, std::function<ValueType(ValueType)> prob, std::vector<index> &result) {
         auto distancePair = distances(query);
         ValueType probUB = prob(distancePair.first);
-        ValueType probLB = prob(distancePair.second);
+        //ValueType probLB = prob(distancePair.second);
         if (probUB > 1) {
             throw std::runtime_error("f("+std::to_string(distancePair.first)+")="+std::to_string(probUB)+" is not a probability!");
         }
-        assert(probLB <= probUB);
+        assert(prob(distancePair.second) <= probUB);
         if (probUB > 0.5) probUB = 1;//if we are going to take every second element anyway, no use in calculating expensive jumps
         if (probUB == 0) return 0;
         //TODO: return whole if probLB == 1
@@ -568,11 +567,11 @@ public:
      *  in SpatialTree::getGraphFromForest(...).
      */
     //TODO: graphNgbrsCells, is initialised only in case of forest. If we have a tree is empty, right???
-    template<typename IndexType, typename ValueType>
+    template<typename IndexType>
     scai::lama::CSRSparseMatrix<ValueType> getSubTreeAsGraph(
-        std::vector< std::set<std::shared_ptr<const SpatialCell>>>& graphNgbrsCells,
+        std::vector< std::set<std::shared_ptr<const SpatialCell<ValueType>>>>& graphNgbrsCells,
         std::vector<std::vector<ValueType>>& coords,
-        std::queue<std::shared_ptr<const SpatialCell>> frontier = std::queue<std::shared_ptr<const SpatialCell>>()) const {
+        std::queue<std::shared_ptr<const SpatialCell<ValueType>>> frontier = std::queue<std::shared_ptr<const SpatialCell<ValueType>>>()) const {
         SCAI_REGION("SpatialCell.getSubTreeAsGraph");
         unsigned int treeSize= graphNgbrsCells.size();
 

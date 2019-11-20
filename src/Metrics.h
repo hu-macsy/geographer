@@ -13,7 +13,12 @@ namespace ITI {
 
 /** @brief A struct to hold and calculate several metrics for the partition.
 */
-struct Metrics {
+template <typename ValueType>
+class Metrics {
+public:
+    //hard code IndexType and ValueType; no need to be templates
+    //typedef long int IndexType;
+    //typedef double ValueType;
 
     // timing results
     //
@@ -30,10 +35,12 @@ struct Metrics {
 
     //MM, metrics map
     std::map<std::string,ValueType> MM = {
-        {"timeMigrationAlgo",-1.0}, {"timeFirstDistribution",-1.0}, {"timeTotal",-1.0}, {"timeSpMV",-1.0}, {"timeComm",-1.0}, {"reportTime",-1.0},
-        {"inputTime",-1.0}, {"timeFinalPartition",-1.0}, {"timeSecondDistribution",-1.0}, {"timePreliminary",-1.0},
+        {"timeMigrationAlgo",-1.0}, {"timeFirstDistribution",-1.0}, {"timeTotal",-1.0}, {"reportTime",-1.0},
+        {"inputTime",-1.0}, {"timeFinalPartition",-1.0}, {"timeSecondDistribution",-1.0}, {"timePreliminary",-1.0}, {"timeLocalRef",-1.0}, {"timeKmeans", -1.0},
         {"preliminaryCut",-1.0}, {"preliminaryImbalance",-1.0}, {"finalCut",-1.0}, {"finalImbalance",-1.0}, {"maxBlockGraphDegree",-1.0},
+        {"preliminaryMaxCommVol",-1.0},{"preliminaryTotalCommVol",-1.0},
         {"totalBlockGraphEdges",-1.0}, {"maxCommVolume",-1.0}, {"totalCommVolume",-1.0}, {"maxBoundaryNodes",-1.0}, {"totalBoundaryNodes",-1.0},
+        {"SpMVtime",-1.0}, {"commTime",-1.0}, 
         {"maxBorderNodesPercent",-1.0}, {"avgBorderNodesPercent",-1.0},
         {"maxBlockDiameter",-1.0}, {"harmMeanDiam",-1.0}, {"numDisconBlocks",-1.0},
         {"maxRedistVol",-1.0}, {"totRedistVol",-1.0},	 //redistribution metrics
@@ -62,6 +69,12 @@ struct Metrics {
         this->MM = m.MM;
         return *this;
     }
+
+    /**Wrapper function to call metrics depending on setting.metricsDetail
+
+    */
+
+    void getMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings);
 
 
     /** @brief Get all possible metrics.
@@ -146,6 +159,14 @@ struct Metrics {
         const scai::lama::DenseVector<IndexType> partition,
         const scai::lama::CSRSparseMatrix<ValueType> PEGraph );
 
+    /** Given a distributed matrix (aka graph) it operates a multiplication with a vector for the
+        given number of repetitions and returns the average running time. The matrix is not const
+        because inside we set: matrix.setCommunicationKind( scai::lama::SyncKind::ASYNC_COMM );
+    */
+    ValueType getSPMVtime(
+    scai::lama::CSRSparseMatrix<ValueType> matrix,
+    const IndexType repeatTimes);
+
     //@{
     /** @name Print metrics
 
@@ -167,19 +188,16 @@ struct Metrics {
 //-------------------------------------------------------------------------------------------------------------
 
 //TODO: add default constructor and remove Settings
-
-inline struct Metrics aggregateVectorMetrics( const std::vector<struct Metrics>& metricsVec ) {
-
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+template<typename ValueType>
+inline Metrics<ValueType> aggregateVectorMetrics( const std::vector<Metrics<ValueType>>& metricsVec, const scai::dmemo::CommunicatorPtr comm ) {
 
     IndexType numRuns = metricsVec.size();
 
-    Metrics aggregateMetrics( metricsVec[0] );
-    //aggregateMetrics  = metricsVec[0] ?
+    Metrics<ValueType> aggregateMetrics( metricsVec[0] );
 
     for(IndexType run=1; run<numRuns; run++) {
         //this is copied because the compiler complains about the const-ness if we use a reference
-        Metrics thisMetric = metricsVec[ run ];
+        Metrics<ValueType> thisMetric = metricsVec[ run ];
 		
 		for( auto metIt = aggregateMetrics.MM.begin(); metIt!=aggregateMetrics.MM.end(); metIt++){
 			std::string metString = metIt->first;

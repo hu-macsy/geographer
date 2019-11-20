@@ -13,12 +13,14 @@
 
 using ITI::Settings;
 using ITI::IndexType;
-using ITI::ValueType;
 using ITI::version;
 using ITI::Metrics;
 using scai::lama::DenseVector;
 
+
 int main(int argc, char** argv) {
+	typedef double ValueType;   //use double
+	
     using namespace cxxopts;
     cxxopts::Options options("analyze", "Analyzing existing partitions");
 
@@ -88,8 +90,9 @@ int main(int argc, char** argv) {
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     //std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
 
-    std::vector<DenseVector<ValueType> >  nodeWeights;
-    graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights, settings.fileFormat );
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    std::vector<DenseVector<ValueType>>  nodeWeights;
+    graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights, comm, settings.fileFormat );
 
     IndexType N = graph.getNumRows();
     scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
@@ -115,7 +118,6 @@ int main(int argc, char** argv) {
         throw std::runtime_error("Illegal minimum block ID in partition:" + std::to_string(part.min()));
     }
 
-    scai::dmemo::CommunicatorPtr comm = rowDistPtr->getCommunicatorPtr();
     if (settings.computeDiameter) {
         if (comm->getSize() != settings.numBlocks) {
             if (comm->getRank() == 0) {
@@ -128,7 +130,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    Metrics metrics(settings);
+    Metrics<ValueType> metrics(settings);
     metrics.getEasyMetrics( graph, part, nodeWeights, settings );
 
     if (comm->getRank() == 0) {

@@ -4,7 +4,7 @@ compiler: gcc
 
 matrix:
   include:
-    - name: GCC5, ValueType double
+    - name: GCC5
       os: linux
       addons:
         apt:
@@ -13,9 +13,9 @@ matrix:
           packages:
             - g++-5
       env:
-         - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5 && ValueType=double"
+         - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5"
 
-    - name: GCC6, ValueType double
+    - name: GCC6
       os: linux
       addons:
         apt:
@@ -24,9 +24,9 @@ matrix:
           packages:
             - g++-6
       env:
-        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6 && ValueType=double"
+        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
 
-    - name: GCC7, ValueType double
+    - name: GCC7
       os: linux
       addons:
         apt:
@@ -35,9 +35,9 @@ matrix:
           packages:
             - g++-7
       env:
-        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7 && ValueType=double"
+        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
 
-    - name: GCC8, ValueType double
+    - name: GCC8
       os: linux
       addons:
         apt:
@@ -46,9 +46,9 @@ matrix:
           packages:
             - g++-8
       env:
-        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8 && ValueType=double"
+        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8"
 
-    - name: GCC9, ValueType double
+    - name: GCC9
       os: linux
       addons:
         apt:
@@ -57,40 +57,22 @@ matrix:
           packages:
             - g++-9
       env:
-        - MATRIX_EVAL="CC=gcc-9 && CXX=g++-9 && ValueType=double" 
+        - MATRIX_EVAL="CC=gcc-9 && CXX=g++-9" 
 
-    - name: GCC5, ValueType float
+    - name: code_coverage
       os: linux
       addons:
         apt:
           sources:
             - ubuntu-toolchain-r-test
           packages:
-            - g++-5
+            - g++-8
+      before_install:
+        - pip install --user cpp-coveralls
       env:
-         - MATRIX_EVAL="CC=gcc-5 && CXX=g++-5 && ValueType=float"
-
-    - name: GCC6, ValueType float
-      os: linux
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-6
-      env:
-        - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6 && ValueType=float"
-
-    - name: GCC7, ValueType float
-      os: linux
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-7
-      env:
-        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7 && ValueType=float"
+        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8 -DCODE_COVERAGE=ON"   
+      after_success:
+        - coveralls --exclude lib --exclude tests --gcov-options '\-lp'         
 
 addons:
   apt:
@@ -105,5 +87,5 @@ install:
   - pushd lama && mkdir build && cd build && cmake -DADDITIONAL_WARNING_FLAGS="" ../scai && make -j4 && sudo make install && popd
 
 script:
-  - mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install -DGeographer_VALUE_TYPE=${ValueType} .. && make -j4 && sudo make install && cd ..
+  - mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install .. && make -j4 && sudo make install && cd ..
   - mpirun -np 4 install/bin/GeographerTest

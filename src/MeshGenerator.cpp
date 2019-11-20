@@ -246,9 +246,9 @@ void MeshGenerator<IndexType, ValueType>::createStructured2D3DMesh_dist(CSRSpars
         throw std::runtime_error("Needs three point counts, one for each dimension");
     }
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
-
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+    
     if( !dist->isEqual( coords[0].getDistribution() ) ) {
         std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and coordinates dist: "<< coords[0].getDistribution() << std::endl;
         throw std::runtime_error( "Distributions: should (?) be equal.");
@@ -439,8 +439,8 @@ void MeshGenerator<IndexType, ValueType>::createRandomStructured3DMesh_dist(CSRS
         throw std::runtime_error("Needs three point counts, one for each dimension");
     }
 
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
 
     if( !dist->isEqual( coords[0].getDistribution() ) ) {
         std::cout<< __FILE__<< "  "<< __LINE__<< ", matrix dist: " << *dist<< " and coordinates dist: "<< coords[0].getDistribution() << std::endl;
@@ -845,7 +845,7 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
     IndexType capacity = 1;
 
     // the quad tree
-    QuadTreeCartesianEuclid quad(minCoord, maxCoord, true, capacity);
+    QuadTreeCartesianEuclid<ValueType> quad(minCoord, maxCoord, true, capacity);
 
     // create points and add them in the tree
     std::random_device rd;
@@ -901,17 +901,17 @@ void MeshGenerator<IndexType, ValueType>::createQuadMesh( CSRSparseMatrix<ValueT
 //----------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-void MeshGenerator<IndexType, ValueType>::graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid &quad) {
+void MeshGenerator<IndexType, ValueType>::graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid<ValueType> &quad) {
 
     const IndexType treeSize = quad.countNodes();
     const IndexType dimension = quad.getDimensions();
 
     // the quad tree is created. extract it as a CSR matrix
     // graphNgbrsCells is just empty now
-    std::vector< std::set<std::shared_ptr<const SpatialCell>>> graphNgbrsCells( treeSize );
+    std::vector< std::set<std::shared_ptr<const SpatialCell<ValueType>>> > graphNgbrsCells( treeSize );
     std::vector<std::vector<ValueType>> coordsV( dimension );
 
-    adjM = quad.getTreeAsGraph<IndexType, ValueType>( graphNgbrsCells, coordsV );
+    adjM = quad.template getTreeAsGraph<IndexType>( graphNgbrsCells, coordsV );
     const IndexType n = adjM.getNumRows();
     assert(n == coordsV[0].size());
 
@@ -957,29 +957,12 @@ ValueType MeshGenerator<IndexType, ValueType>::dist3DSquared(std::tuple<IndexTyp
     ValueType distanceSquared = distX*distX+distY*distY+distZ*distZ;
     return distanceSquared;
 }
-//-------------------------------------------------------------------------------------------------
-template<typename IndexType, typename ValueType>
-template<typename T>
-ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<T> p1, const std::vector<T> p2) {
-    SCAI_REGION( "MeshGenerator.distSquared" )
 
-    const IndexType dimensions=p1.size();
-    SCAI_ASSERT_EQ_ERROR( p2.size(), dimensions, "The two points must have the same dimension" );
-
-    ValueType distanceSquared=0;
-
-    for( int d=0; d<dimensions; d++) {
-        ValueType distThisDim = p1[d]-p2[d];
-        distanceSquared += distThisDim*distThisDim;
-    }
-
-    return distanceSquared;
-}
 //-------------------------------------------------------------------------------------------------
 
-template class MeshGenerator<IndexType, ValueType>;
+template class MeshGenerator<IndexType, double>;
+template class MeshGenerator<IndexType, float>;
 
-template ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<IndexType> p1, const std::vector<IndexType> p2);
-template ValueType MeshGenerator<IndexType, ValueType>::distSquared( const std::vector<ValueType> p1, const std::vector<ValueType> p2);
+//template double MeshGenerator<long int, double>::distSquared( const std::vector<long int> p1, const std::vector<long int> p2);
 
 } //namespace ITI

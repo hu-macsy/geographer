@@ -14,7 +14,7 @@ Options populateOptions() {
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     Settings settings;
 
-    options.add_options()
+	options.add_options()
     ("help", "display options")
     ("version", "show version")
     //main arguments for daily use
@@ -24,8 +24,8 @@ Options populateOptions() {
     ("numBlocks", "Number of blocks, default is number of processes", value<IndexType>())
     ("epsilon", "Maximum imbalance. Each block has at most 1+epsilon as many nodes as the average.", value<double>()->default_value(std::to_string(settings.epsilon)))
     // other input specification
-    ("fileFormat", "Format of graph file, available are AUTO, METIS, ADCRIC and MatrixMarket format. See Readme.md for more details.", value<ITI::Format>())
-    ("coordFormat", "format of coordinate file: AUTO, METIS, ADCIRC and MATRIXMARKET", value<ITI::Format>())
+    ("fileFormat", "Format of graph file, available are AUTO, METIS, ADCRIC and MatrixMarket format. See Readme.md and src/Settings.h for more details.", value<ITI::Format>())
+    ("coordFormat", "format of coordinate file: AUTO, METIS, ADCIRC and MATRIXMARKET. See src/Settings.h for more details.", value<ITI::Format>())
     ("numNodeWeights", "Number of node weights to use. If the input graph contains more node weights, only the first ones are used.", value<IndexType>())
     ("seed", "random seed, default is current time", value<double>()->default_value(std::to_string(time(NULL))))
     //mapping
@@ -34,7 +34,7 @@ Options populateOptions() {
     //repartitioning
     ("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
     //multi-level and local refinement
-    ("initialPartition", "Choose initial partitioning method between space-filling curves ('SFC' or 0), pixel grid coarsening ('Pixel' or 1), spectral partition ('Spectral' or 2), k-means ('K-Means' or 3) and multisection ('MultiSection' or 4). SFC, Spectral and K-Means are most stable.", value<Tool>())
+    ("initialPartition", "Choose initial partitioning method between space-filling curves (geoSFC), balanced k-means (geoKmeans) or the hierarchical version (geoHierKM) and MultiJagged (geoMS). If parmetis or zoltan are installed, you can also choose to partition with them using for example, parMetisGraph or zoltanMJ. For more information, see src/Settings.h file.", value<std::string>())
     ("noRefinement", "skip local refinement steps")
     ("multiLevelRounds", "Tuning Parameter: How many multi-level rounds with coarsening to perform", value<IndexType>()->default_value(std::to_string(settings.multiLevelRounds)))
     ("minBorderNodes", "Tuning parameter: Minimum number of border nodes used in each refinement step", value<IndexType>())
@@ -45,34 +45,39 @@ Options populateOptions() {
     ("useGeometricTieBreaking", "Tuning Parameter: Use distances to block center for tie breaking", value<bool>())
     ("skipNoGainColors", "Tuning Parameter: Skip Colors that didn't result in a gain in the last global round", value<bool>())
     ("nnCoarsening", "When coarsening, pick the nearest neighbor based on the euclidean distance", value<bool>())
+    ("localRefAlgo", "With which algorithm to do local refinement.", value<Tool>() )
     //multisection
     ("bisect", "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached", value<bool>())
-    ("cutsPerDim", "If MultiSection is chosen, then provide d values that define the number of cuts per dimension.", value<std::string>())
+    ("cutsPerDim", "If MultiSection is chosen, then provide d values that define the number of cuts per dimension. You must provide as many numbers as the dimensions separated with commas. For example, --cutsPerDim=3,4,10 for 3 dimensions resulting in 3*4*10=120 blocks", value<std::string>())
     ("pixeledSideLen", "The resolution for the pixeled partition or the spectral", value<IndexType>())
     // K-Means
     ("minSamplingNodes", "Tuning parameter for K-Means", value<IndexType>())
-    ("influenceExponent", "Tuning parameter for K-Means, default is ", value<ValueType>()->default_value(std::to_string(settings.influenceExponent)))
-    ("influenceChangeCap", "Tuning parameter for K-Means", value<ValueType>())
+    ("influenceExponent", "Tuning parameter for K-Means, default is ", value<double>()->default_value(std::to_string(settings.influenceExponent)))
+    ("influenceChangeCap", "Tuning parameter for K-Means", value<double>())
     ("balanceIterations", "Tuning parameter for K-Means", value<IndexType>())
     ("maxKMeansIterations", "Tuning parameter for K-Means", value<IndexType>())
     ("tightenBounds", "Tuning parameter for K-Means")
     ("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
-    // using '/' to seperate the lines breaks the output message
-    ("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3 4 10, there are 3 levels. In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
+    // using '/' to separate the lines breaks the output message
+    ("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3,4,10 there are 3 levels. In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
     //output
     ("outFile", "write result partition into file", value<std::string>())
     //debug
     ("writeDebugCoordinates", "Write Coordinates of nodes in each block", value<bool>())
     ("verbose", "Increase output.")
+    ("debugMode", "Increase output and more expensive checks")
     ("storeInfo", "Store timing and other metrics in file.")
+    ("storePartition", "Store the partition file.")
     ("callExit", "Call std::exit after finishing partitioning, useful in case of lingering MPI data structures.")
     // evaluation
     ("repeatTimes", "How many times we repeat the partitioning process.", value<IndexType>())
     ("noComputeDiameter", "Compute diameter of resulting block files.")
     ("maxDiameterRounds", "abort diameter algorithm after that many BFS rounds", value<IndexType>())
     ("metricsDetail", "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV", value<std::string>())
+    ("autoSettings", "Set some settings automatically to some values possibly overwriting some user passed parameters. ", value<bool>() )
     //used for the competitors main
-    // ("outDir", "write result partition into file", value<std::string>())
+    ("outDir", "write result partition into folder", value<std::string>())
+    ("tools", "choose which supported tools to use. For multiple tool use comma to separate without spaces. See in Settings::Tools for the supported tools and how to call them.", value<std::string>() )
     //mesh generation
     ("generate", "generate uniform mesh as input graph")
     ("numX", "Number of points in x dimension of generated graph", value<IndexType>())
@@ -81,6 +86,7 @@ Options populateOptions() {
     // exotic test cases
     ("quadTreeFile", "read QuadTree from file", value<std::string>())
     ("useDiffusionCoordinates", "Use coordinates based from diffusive systems instead of loading from file", value<bool>())
+	//("myAlgoParam", "help message", value<int>())
     ;
 
     return options;
@@ -157,7 +163,9 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
 
     using std::vector;
     settings.verbose = vm.count("verbose");
+    settings.debugMode = vm.count("debugMode");
     settings.storeInfo = vm.count("storeInfo");
+    settings.storePartition = vm.count("storePartition");
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
     settings.noRefinement = vm.count("noRefinement");
@@ -169,6 +177,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.nnCoarsening = vm.count("nnCoarsening");
     settings.bisect = vm.count("bisect");
     settings.writeDebugCoordinates = vm.count("writeDebugCoordinates");
+    settings.setAutoSettings = vm.count("autoSettings");
 
     if (vm.count("fileFormat")) {
         settings.fileFormat = vm["fileFormat"].as<ITI::Format>();
@@ -207,7 +216,8 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         settings.blockSizesFile = vm["blockSizesFile"].as<std::string>();
     }
     if (vm.count("initialPartition")) {
-        settings.initialPartition = vm["initialPartition"].as<Tool>();
+        std::string s = vm["initialPartition"].as<std::string>();
+        settings.initialPartition = to_tool(s);
     }
     if (vm.count("multiLevelRounds")) {
         settings.multiLevelRounds = vm["multiLevelRounds"].as<IndexType>();
@@ -221,13 +231,18 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("minGainForNextGlobalRound")) {
         settings.minGainForNextRound = vm["minGainForNextGlobalRound"].as<IndexType>();
     }
+    if (vm.count("localRefAlgo")) {
+        settings.localRefAlgo = vm["localRefAlgo"].as<Tool>();
+    }
+    //TODO: cxxopts supports parsing of multiple arguments and storing them as vectors
+    //  use that and not our own parsing
     if (vm.count("cutsPerDim")) {
         std::stringstream ss( vm["cutsPerDim"].as<std::string>() );
         std::string item;
         std::vector<IndexType> cutsPerDim;
         IndexType product = 1;
 
-        while (!std::getline(ss, item, ' ').fail()) {
+        while (!std::getline(ss, item, ',').fail()) {
             IndexType cutsInDim = std::stoi(item);
             cutsPerDim.push_back(cutsInDim);
             product *= cutsInDim;
@@ -250,10 +265,10 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         settings.minSamplingNodes = vm["minSamplingNodes"].as<IndexType>();
     }
     if (vm.count("influenceExponent")) {
-        settings.influenceExponent = vm["influenceExponent"].as<ValueType>();
+        settings.influenceExponent = vm["influenceExponent"].as<double>();
     }
     if (vm.count("influenceChangeCap")) {
-        settings.influenceChangeCap = vm["influenceChangeCap"].as<ValueType>();
+        settings.influenceChangeCap = vm["influenceChangeCap"].as<double>();
     }
     if (vm.count("balanceIterations")) {
         settings.balanceIterations = vm["balanceIterations"].as<IndexType>();
@@ -261,20 +276,20 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("maxKMeansIterations")) {
         settings.maxKMeansIterations = vm["maxKMeansIterations"].as<IndexType>();
     }
-    if (vm.count("hierLevels")) {
+    if (vm.count("hierLevels")) {  
         std::stringstream ss( vm["hierLevels"].as<std::string>() );
         std::string item;
         std::vector<IndexType> hierLevels;
         IndexType product = 1;
 
-        while (!std::getline(ss, item, ' ').fail()) {
+        while (!std::getline(ss, item, ',').fail()) {
             IndexType blocksInLevel = std::stoi(item);
             hierLevels.push_back(blocksInLevel);
             product *= blocksInLevel;
-            std::cout << product << std::endl;
         }
 
         settings.hierLevels = hierLevels;
+
         if (!vm.count("numBlocks")) {
             settings.numBlocks = product;
         } else {
@@ -331,6 +346,19 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
             }
             settings.numBlocks = numBlocks;
         }
+    }
+
+    //used (mainly) from allCompetitors to define which tools to use
+    if (vm.count("tools")) {  
+        std::stringstream ss( vm["tools"].as<std::string>() );       
+        std::string item;
+        std::vector<std::string> tools;
+
+        while (!std::getline(ss, item, ',').fail()) {
+            tools.push_back( item );
+        }
+
+        settings.tools = tools;
     }
 
     return settings;

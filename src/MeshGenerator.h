@@ -28,11 +28,7 @@
 #include <tuple>
 #include <random>
 
-#include "quadtree/Point.h"
-#include "quadtree/SpatialTree.h"
-#include "quadtree/SpatialCell.h"
 #include "quadtree/QuadTreeCartesianEuclid.h"
-
 #include "AuxiliaryFunctions.h"
 #include "Settings.h"
 
@@ -46,8 +42,6 @@ using scai::lama::DenseVector;
 template <typename IndexType, typename ValueType>
 class MeshGenerator {
 public:
-
-
 
     /** Creates a uniform 3D mesh and writes it to a file (as a graph) using the METIS format.
 
@@ -100,7 +94,21 @@ public:
     /** General version for the squared distance that works for arbitrary dimensions.
     */
     template<typename T>
-    static ValueType distSquared( const std::vector<T> p1, const std::vector<T> p2);
+    static ValueType distSquared( const std::vector<T> p1, const std::vector<T> p2){
+        SCAI_REGION( "MeshGenerator.distSquared" )
+
+        const IndexType dimensions=p1.size();
+        SCAI_ASSERT_EQ_ERROR( p2.size(), dimensions, "The two points must have the same dimension" );
+
+        ValueType distanceSquared=0;
+
+        for( int d=0; d<dimensions; d++) {
+            ValueType distThisDim = p1[d]-p2[d];
+            distanceSquared += distThisDim*distThisDim;
+        }
+
+        return distanceSquared;
+    }
 
 private:
     /** Creates the adjacency matrix and the coordinate vector for a 3D mesh in a distributed way. The graph is already distributed
@@ -115,7 +123,7 @@ private:
 
     /**  Create a graph and coordinates from a quadtree.
     */
-    static void graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid &quad);
+    static void graphFromQuadtree(CSRSparseMatrix<ValueType> &adjM, std::vector<DenseVector<ValueType>> &coords, const QuadTreeCartesianEuclid<ValueType> &quad);
 
     /** Creates random points in the cube for the given dimension, points in [0,maxCoord]^dim.
      */

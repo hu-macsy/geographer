@@ -141,7 +141,7 @@ public:
     @param[in] adjM The graph,
     @param[in] partition The partition of the graph.
     */
-    static void print2DGrid(const scai::lama::CSRSparseMatrix<ValueType>& adjM, scai::lama::DenseVector<IndexType>& partition  ) {
+    static void print2DGrid(const scai::lama::CSRSparseMatrix<ValueType>& adjM, const scai::lama::DenseVector<IndexType>& partition  ) {
 
         IndexType N= adjM.getNumRows();
 
@@ -166,7 +166,7 @@ public:
                 bordViz[i][j]=border.getValue(i*numX+j);
             }
 
-        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        scai::dmemo::CommunicatorPtr comm = adjM.getRowDistributionPtr()->getCommunicatorPtr();
         comm->synchronize();
 
         if(comm->getRank()==0 ) {
@@ -327,10 +327,51 @@ public:
         DenseVector<IndexType>& partition,
         CSRSparseMatrix<ValueType>& graph,
         std::vector<DenseVector<ValueType>>& coordinates,
-        DenseVector<ValueType>& nodeWeights,
+        std::vector<DenseVector<ValueType>>& nodeWeights,
         Settings settings,
         bool useRedistributor = true,
         bool renumberPEs = true );
+
+
+    static void redistributeInput(
+        const scai::dmemo::DistributionPtr targetDistribution,
+        scai::lama::DenseVector<IndexType>& partition,
+        scai::lama::CSRSparseMatrix<ValueType>& graph,
+        std::vector<scai::lama::DenseVector<ValueType>>& coordinates,
+        std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights);
+
+
+    static void redistributeInput(
+        const scai::dmemo::RedistributePlan redistributor,
+        scai::lama::DenseVector<IndexType>& partition,
+        scai::lama::CSRSparseMatrix<ValueType>& graph,
+        std::vector<scai::lama::DenseVector<ValueType>>& coordinates,
+        std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights);
+
+
+    /** Function to convert lama data structures to raw pointers as used
+        by the metis and parmetis interface. All const arguments are the
+        input and the rest are output parameters. Returns the number of
+        local vertices/rows.
+
+        \warning Edge weights not supported.
+    **/
+    static IndexType toMetisInterface(
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const std::vector<scai::lama::DenseVector<ValueType>> &coords,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        const struct Settings &settings,
+        std::vector<IndexType>& vtxDist, 
+        std::vector<IndexType>& xadj,
+        std::vector<IndexType>& adjncy,
+        std::vector<ValueType>& vwgt,
+        std::vector<ValueType>& tpwgts,
+        IndexType &wgtFlag,
+        IndexType &numWeights,
+        std::vector<ValueType>& ubvec,
+        std::vector<ValueType>& xyzLocal,
+        std::vector<IndexType>& options);
+
 
     /**
      * Iterates over the local part of the adjacency matrix and counts local edges.
@@ -348,6 +389,16 @@ public:
 		const Settings settings);
 	
 	
+    /**@brief Check if distributions align and redistribute if not. Return if redistribution occurred.
+    */
+
+    static bool alignDistributions(
+        scai::lama::CSRSparseMatrix<ValueType>& graph,
+        std::vector<scai::lama::DenseVector<ValueType>>& coords,
+        std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights,
+        scai::lama::DenseVector<IndexType>& partition,
+        const Settings settings);
+
 	
 private:
 

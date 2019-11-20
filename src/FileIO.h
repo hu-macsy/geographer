@@ -12,7 +12,6 @@
 #include <scai/lama/DenseVector.hpp>
 #include <scai/lama/io/MatrixMarketIO.hpp>
 
-#include "quadtree/QuadTreeCartesianEuclid.h"
 #include "Settings.h"
 #include "GraphUtils.h"
 #include "CommTree.h"
@@ -135,7 +134,7 @@ public:
      * @param[in] fileFormat The type of file to read from.
      * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
      */
-    static CSRSparseMatrix<ValueType> readGraph(const std::string filename, Format = Format::METIS);
+    static CSRSparseMatrix<ValueType> readGraph(const std::string filename, const scai::dmemo::CommunicatorPtr comm, Format = Format::METIS);
 
     /** Reads a graph from filename in the given format and returns the adjacency matrix with the node weights. \sa ITI::Format
      * @param[in] filename The file to read from.
@@ -143,14 +142,20 @@ public:
      * @param[in] fileFormat The type of file to read from.
      * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
      */
-    static CSRSparseMatrix<ValueType> readGraph(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights, Format = Format::METIS);
+    static CSRSparseMatrix<ValueType> readGraph(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights, const scai::dmemo::CommunicatorPtr comm, Format = Format::METIS);
+
+    static CSRSparseMatrix<ValueType> readGraph(const std::string filename ){
+        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        Format formt = Format::METIS;
+        return readGraph( filename, comm, formt);
+    }
 
     /** Reads a graph in parallel that is stored in a binary file. Uses the same format as in ParHiP, the parallel version of KaHiP,
     see <a href="http://algo2.iti.kit.edu/schulz/software_releases/kahipv2.00.pdf">here</a> for mode details.
      * @param[in] filename The file to read from.
      * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
      */
-    static scai::lama::CSRSparseMatrix<ValueType> readGraphBinary(const std::string filename);
+    static scai::lama::CSRSparseMatrix<ValueType> readGraphBinary(const std::string filename, const scai::dmemo::CommunicatorPtr comm);
 
     /**Every PE reads its part of the file. The file contains all the edges of the graph: each line has two numbers indicating
      * the vertices of the edge.
@@ -164,7 +169,7 @@ public:
      * @param[in] filename The file to read from.
      * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
      */
-    static scai::lama::CSRSparseMatrix<ValueType> readEdgeList(const std::string filename, const bool binary = false);
+    static scai::lama::CSRSparseMatrix<ValueType> readEdgeList(const std::string filename, const scai::dmemo::CommunicatorPtr comm, const bool binary = false);
 
 
     /** Edge list format but now there are k files, one for each PE.
@@ -174,7 +179,7 @@ public:
      * @param[in] filename The prefix of the file to read from.
      * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
      * */
-    static scai::lama::CSRSparseMatrix<ValueType> readEdgeListDistributed(const std::string filename);
+    static scai::lama::CSRSparseMatrix<ValueType> readEdgeListDistributed(const std::string filename, const scai::dmemo::CommunicatorPtr comm);
 
     /** @brief Reads the coordinates from file "filename" and returns then in a vector of DenseVector.
      *
@@ -185,7 +190,12 @@ public:
      *
      * @return The coordinates. ret.size()=dimension, ret[i].size()=numberOfCoords
      */
-    static std::vector<DenseVector<ValueType>> readCoords ( const std::string filename, const IndexType numberOfCoords, const IndexType dimension, Format = Format::METIS);
+    static std::vector<DenseVector<ValueType>> readCoords ( const std::string filename, const IndexType numberOfCoords, const IndexType dimension, const scai::dmemo::CommunicatorPtr comm, Format = Format::METIS);
+
+    static std::vector<DenseVector<ValueType>> readCoords ( const std::string filename, const IndexType numberOfCoords, const IndexType dimension, Format format = Format::METIS){
+        const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        return readCoords( filename, numberOfCoords, dimension, comm, format);
+    }
 
     /** @brief  Read coordinates from a binary file. Coordinates are stored in a consecutive format,
 
@@ -197,12 +207,12 @@ public:
      *
      * @return The coordinates. ret.size()=dimension, ret[i].size()=numberOfCoords
     */
-    static std::vector<DenseVector<ValueType>> readCoordsBinary( const std::string filename, const IndexType numberOfCoords, const IndexType dimension);
+    static std::vector<DenseVector<ValueType>> readCoordsBinary( const std::string filename, const IndexType numberOfCoords, const IndexType dimension, const scai::dmemo::CommunicatorPtr comm);
 
 
     /** @brief  Read coordinates in Ocean format of Vadym Aizinger.
      */
-    static std::vector<DenseVector<ValueType>> readCoordsOcean ( const std::string filename, const IndexType dimension);
+    static std::vector<DenseVector<ValueType>> readCoordsOcean ( const std::string filename, const IndexType dimension, const scai::dmemo::CommunicatorPtr comm);
 
     /** @brief Read coordinates in TEEC format
      *
@@ -213,10 +223,8 @@ public:
      *
      * @return The coordinates
      */
-    static std::vector<DenseVector<ValueType>> readCoordsTEEC ( std::string filename, IndexType numberOfCoords, IndexType dimension, std::vector<DenseVector<ValueType>>& nodeWeights);
+    static std::vector<DenseVector<ValueType>> readCoordsTEEC ( std::string filename, IndexType numberOfCoords, IndexType dimension, std::vector<DenseVector<ValueType>>& nodeWeights, const scai::dmemo::CommunicatorPtr comm);
 
-
-    //static DenseVector<IndexType> readPartition(const std::string filename);
 
     /**
      * Reads a quadtree as specified in the format of Michael Selzer.
@@ -329,12 +337,12 @@ private:
     /**
      * Reads a graph in Matrix Market format
      */
-    static scai::lama::CSRSparseMatrix<ValueType> readGraphMatrixMarket(const std::string filename);
+    static scai::lama::CSRSparseMatrix<ValueType> readGraphMatrixMarket(const std::string filename, const scai::dmemo::CommunicatorPtr comm);
 
     /**
      * Reads the coordinates for the MatrixMarket file format.
      */
-    static std::vector<DenseVector<ValueType>> readCoordsMatrixMarket ( const std::string filename);
+    static std::vector<DenseVector<ValueType>> readCoordsMatrixMarket ( const std::string filename, const scai::dmemo::CommunicatorPtr comm);
 
     /**
      * Write a DenseVector in parallel in the filename. Each PE, one after another, write its own part.
