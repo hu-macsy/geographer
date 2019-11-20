@@ -26,8 +26,6 @@
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 #include <scai/tracing.hpp>
 
-#include <JanusSort.hpp>
-
 #include "Settings.h"
 #include "Metrics.h"
 
@@ -35,6 +33,27 @@
 namespace ITI {
 
 using scai::lama::DenseVector;
+
+
+/** @cond INTERNAL
+*/
+struct sort_pair {
+    double value;
+    int32_t index;
+    bool operator<(const sort_pair& rhs ) const {
+        return value < rhs.value || (value == rhs.value && index < rhs.index);
+    }
+    bool operator>(const sort_pair& rhs ) const {
+        return value > rhs.value || (value == rhs.value && index > rhs.index);
+    }
+    bool operator<=(const sort_pair& rhs ) const {
+        return !operator>(rhs);
+    }
+    bool operator>=(const sort_pair& rhs ) const {
+        return !operator<(rhs);
+    }
+};
+
 
 /** @brief Class providing functionality to calculate the hilbert index (and the inverse)
 of 2 or 3 dimensional points.
@@ -229,11 +248,13 @@ private:
 
 };
 
-
+/*
 template<typename T>
 MPI_Datatype getMPIType();
 
 template<typename T1, typename T2>
 MPI_Datatype getMPITypePair();
+*/
+
 
 }//namespace ITI

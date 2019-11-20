@@ -52,7 +52,7 @@ public:
      * is the number of edges. Then, row i has numbers e1, e2, e3, ... notating the edges:
      * (i, e1), (i, e2), (i, e3), ....
      *
-     * Not distributed.
+     * Not distributed. If the graph is indeed distributed, it will be replicated internally and then stored.
      *
      * @param[in] adjM The graph's adjacency matrix.
      * @param[in] filename The file's name to write to.
