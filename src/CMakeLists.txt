@@ -85,7 +85,7 @@ if(Zoltan2_FOUND OR PARMETIS_LIB OR PARHIP_LIB )
             message( WARNING "variable METIS_LIB_DIR was not set. Set this variable to point to the directory that libmetis exists. Will attempt to find it...")
         endif()
     
-        find_library(METIS_LIB NAMES libmetis.so libmetis.a HINTS "${METIS_LIB_DIR}" "${METIS_LIB_DIR}/lib" "${METIS_LIB_DIR}/libmetis" "${METIS_INCLUDE}/../lib" "${METIS_INCLUDE}/../libmetis")
+        find_library(METIS_LIB NAMES libmetis.so libmetis.a HINTS "/usr/local/lib" "/usr/lib" "${METIS_LIB_DIR}" "${METIS_LIB_DIR}/lib" "${METIS_LIB_DIR}/libmetis" "${METIS_INCLUDE}/../lib" "${METIS_INCLUDE}/../libmetis")
         message("\tFound metis lib in " ${METIS_LIB})
         
         set(PARMETIS_LIBS ${PARMETIS_LIB} ${METIS_LIB} )

@@ -1149,7 +1149,6 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
     }
 
     scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
-    scai::hmemo::ReadAccess<IndexType> partAccess(localData);
 
     const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
