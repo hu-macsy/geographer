@@ -22,6 +22,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     const IndexType globalN = coordinates[0].getDistributionPtr()->getGlobalSize();
     const IndexType localN = partition.getDistributionPtr()->getLocalSize();
 
+    SCAI_ASSERT_EQ_ERROR( partition.getDistribution(), graph.getRowDistribution(), "Distributions do not agree");
     SCAI_ASSERT_EQ_ERROR( graph.getNumRows(), globalN, "Mismatch in graph and coordinates size" );
     SCAI_ASSERT_EQ_ERROR( nodeWeights[0].getDistributionPtr()->getGlobalSize(), globalN, "Mismatch in nodeWeights vector" );
     SCAI_ASSERT_EQ_ERROR( partition.size(), globalN, "Mismatch in partition size");
@@ -208,15 +209,16 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 
     scai::dmemo::DistributionPtr distFromPartition;
 
-    if( useRedistributor ) {
-        PRINT0("***\tWarning: using a redistributor creates inconsistencies and is currently deprecated. Switching to no-redistributor version");
-        useRedistributor = false;
-    }
+//    if( useRedistributor ) {
+//        PRINT0("***\tWarning: using a redistributor creates inconsistencies and is currently deprecated. Switching to no-redistributor version");
+//        useRedistributor = false;
+//    }
 
     if( useRedistributor ) {
         scai::dmemo::RedistributePlan resultRedist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
         distFromPartition = resultRedist.getTargetDistributionPtr();
-
+        SCAI_ASSERT_EQ_ERROR( partition.getDistribution(), graph.getRowDistribution(), "Distributions do not agree");
+        
         scai::dmemo::RedistributePlan redistributor = scai::dmemo::redistributePlanByNewDistribution( distFromPartition, graph.getRowDistributionPtr());
     
         redistributeInput( redistributor, partition, graph, coordinates, nodeWeights);      
