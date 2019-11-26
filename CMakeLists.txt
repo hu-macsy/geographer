@@ -82,7 +82,7 @@ set ( SCAI_PATH_HINTS "${SCAI_DIR}" "${SCAI_HOME}" "$ENV{SCAI_HOME}" )
 
 if ( ${CMAKE_VERSION} VERSION_GREATER 3.11)
     ## use new policy to configure with SCAI_ROOT, suppress warning
-    cmake_policy( SET CMP0074 NEW )
+    cmake_policy( SET CMP0072 NEW )
 else ()
     ## simulate new policy by adding SCAI_ROOT to hints
     set ( SCAI_PATH_HINTS ${SCAI_PATH_HINTS} "${SCAI_ROOT}" "$ENV{SCAI_ROOT}" )

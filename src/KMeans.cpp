@@ -411,13 +411,13 @@ std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::findLocalCenter
 //TODO: how to treat multiple weights
 template<typename IndexType, typename ValueType>
 template<typename Iterator>
-std::vector<point<ValueType>> KMeans<IndexType,ValueType>::findCenters(
+std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::findCenters(
     const std::vector<DenseVector<ValueType>>& coordinates,
     const DenseVector<IndexType>& partition,
     const IndexType k,
     const Iterator firstIndex,
     const Iterator lastIndex,
-    const DenseVector<ValueType>& nodeWeights) {
+    const std::vector<DenseVector<ValueType>>& nodeWeights) {
     SCAI_REGION("KMeans.findCenters");
 
     const IndexType dim = coordinates.size();
@@ -426,53 +426,77 @@ std::vector<point<ValueType>> KMeans<IndexType,ValueType>::findCenters(
 
     // TODO: check that distributions align
 
-    std::vector<std::vector<ValueType> > result(dim);
-    std::vector<ValueType> weightSum(k, 0.0);
+    const IndexType numWeights= nodeWeights.size();
 
-    scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights.getLocalValues());
-    scai::hmemo::ReadAccess<IndexType> rPartition(partition.getLocalValues());
+    //calculate a center for each block, for each weight, size: numWeights*dim*k
+    std::vector<std::vector<std::vector<ValueType>>> allWeightsCenters( numWeights );
 
-    // compute weight sums
-    for (Iterator it = firstIndex; it != lastIndex; it++) {
-        const IndexType i = *it;
-        const IndexType part = rPartition[i];
-        const ValueType weight = rWeights[i];
-        weightSum[part] += weight;
-        // the lines above are equivalent to: weightSum[rPartition[*it]] += rWeights[*it];
-    }
+    for(unsigned int w=0; w<numWeights; w++){
+        std::vector<std::vector<ValueType>> result(dim, std::vector<ValueType>(k,0) );
+        std::vector<ValueType> weightSum(k, 0.0);
 
-    // find local centers
-    for (IndexType d = 0; d < dim; d++) {
-        result[d].resize(k,0);
-        scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
+        scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[w].getLocalValues());
+        scai::hmemo::ReadAccess<IndexType> rPartition(partition.getLocalValues());
 
+        // compute weight sums
         for (Iterator it = firstIndex; it != lastIndex; it++) {
             const IndexType i = *it;
             const IndexType part = rPartition[i];
-            result[d][part] += rCoords[i]*rWeights[i] / weightSum[part];// this is more expensive than summing first and dividing later, but avoids overflows
+            const ValueType weight = rWeights[i];
+            weightSum[part] += weight;
+            // the lines above are equivalent to: weightSum[rPartition[*it]] += rWeights[*it];
         }
-    }
 
-    // communicate local centers and weight sums
-    std::vector<ValueType> totalWeight(k, 0);
-    comm->sumImpl(totalWeight.data(), weightSum.data(), k, scai::common::TypeTraits<ValueType>::stype);
+        // find local centers
+        for (IndexType d = 0; d < dim; d++) {
+            scai::hmemo::ReadAccess<ValueType> rCoords(coordinates[d].getLocalValues());
 
-    // compute updated centers as weighted average
-    for (IndexType d = 0; d < dim; d++) {
-        for (IndexType j = 0; j < k; j++) {
-            ValueType weightRatio = (ValueType(weightSum[j]) / totalWeight[j]);
-
-            ValueType weightedCoord = weightSum[j] == 0 ? 0 : result[d][j] * weightRatio;
-            result[d][j] = weightedCoord;
-            assert(std::isfinite(result[d][j]));
-
-            // make empty clusters explicit
-            if (totalWeight[j] == 0) {
-                result[d][j] = NAN;
+            for (Iterator it = firstIndex; it != lastIndex; it++) {
+                const IndexType i = *it;
+                const IndexType part = rPartition[i];
+                // this is more expensive than summing first and dividing later, but avoids overflows
+                result[d][part] += rCoords[i]*rWeights[i] / weightSum[part];
             }
         }
 
-        comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
+        // communicate local centers and weight sums
+        std::vector<ValueType> totalWeight(k, 0);
+        comm->sumImpl(totalWeight.data(), weightSum.data(), k, scai::common::TypeTraits<ValueType>::stype);
+
+        // compute updated centers as weighted average
+        for (IndexType d = 0; d < dim; d++) {
+            for (IndexType j = 0; j < k; j++) {
+                ValueType weightRatio = (ValueType(weightSum[j]) / totalWeight[j]);
+
+                ValueType weightedCoord = weightSum[j] == 0 ? 0 : result[d][j] * weightRatio;
+                result[d][j] = weightedCoord;
+                assert(std::isfinite(result[d][j]));
+
+                // make empty clusters explicit
+                if (totalWeight[j] == 0) {
+                    result[d][j] = NAN;
+                }
+            }
+
+            comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
+        }
+
+        allWeightsCenters[w] = result;
+    }
+
+    //
+    //average the centers for each weight to create the final centers for each block
+    //
+
+    std::vector<std::vector<ValueType>> result(dim, std::vector<ValueType>(k,0) );
+
+    for(IndexType d = 0; d < dim; d++) {
+        for (IndexType j = 0; j < k; j++) {
+            for(unsigned int w=0; w<numWeights; w++){
+                //remember, allWeightsCenters size: numWeights*dim*k
+                result[d][j] += allWeightsCenters[w][d][k]/numWeights;
+            }
+        }
     }
 
     return result;
@@ -524,7 +548,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
     const scai::dmemo::DistributionPtr dist = previousAssignment.getDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
     const IndexType localN = dist->getLocalSize();
-    const IndexType currentLocalN = std::distance(firstIndex, lastIndex);
+    const IndexType currentLocalN = std::distance(firstIndex, lastIndex); //number of sampled points
 
     if (currentLocalN < 0) {
         throw std::runtime_error("currentLocalN: " + std::to_string(currentLocalN));
@@ -633,6 +657,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
         std::chrono::time_point<std::chrono::high_resolution_clock> balanceStart = std::chrono::high_resolution_clock::now();
         SCAI_REGION("KMeans.assignBlocks.balanceLoop");
 
+        //TODO: probably, only a few blocks are local; maybe change vector to a map?
         // the block weight for all new blocks
         std::vector<std::vector<ValueType>> blockWeights(numNodeWeights, std::vector<ValueType>(numNewBlocks, 0.0));
 
@@ -649,8 +674,10 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
             // for the sampled range
             for (Iterator it = firstIndex; it != lastIndex; it++) {
                 const IndexType i = *it;
+                //oldCluster: where it belonged in the previous iteration
                 const IndexType oldCluster = wAssignment[i];
-                const IndexType fatherBlock = rOldBlock[i];
+                //fatherBlock: meaningful in the hierarchical version, it is the block of this point in the previous hierarchy 
+                const IndexType fatherBlock = rOldBlock[i]; 
                 const IndexType veryLocalI = std::distance(firstIndex, it);
 
                 if (not settings.repartition) {
@@ -769,8 +796,8 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
             comm->synchronize();
         }// assignment block
 
-        for (IndexType j = 0; j < numNodeWeights; j++)
-        {
+        //get the total weight of the blocks
+        for (IndexType j = 0; j < numNodeWeights; j++){
             SCAI_REGION("KMeans.assignBlocks.balanceLoop.blockWeightSum");
             comm->sumImpl(blockWeights[j].data(), blockWeights[j].data(), numNewBlocks, scai::common::TypeTraits<ValueType>::stype);
         }
@@ -795,7 +822,10 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
             }
         }
 
-        // adapt influence values
+        //
+        // adapt influence values based on the weight of each block
+        //
+
         ValueType minRatio = std::numeric_limits<ValueType>::max();
         ValueType maxRatio = -std::numeric_limits<ValueType>::min();
         std::vector<std::vector<ValueType>> oldInfluence = influence;// size=numNewBlocks
@@ -807,6 +837,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
 
                 ValueType ratio = ValueType(blockWeights[i][j])/targetBlockWeights[i][j];
                 if (std::abs(ratio - 1) < settings.epsilon) {
+                    //this block is balanced
                     balancedBlocks++; // TODO: update for multiple weights
                     if (settings.freezeBalancedInfluence) {
                         if (1 < minRatio) minRatio = 1;
@@ -815,10 +846,10 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
                     }
                 }
                 const ValueType thisInfluence = influence[i][j];
-                influence[i][j] = std::max( thisInfluence*influenceChangeLowerBound[j],
-                    std::min( ValueType(thisInfluence*std::pow(ratio, settings.influenceExponent)),
-                    thisInfluence*influenceChangeUpperBound[j] ) 
-                    );
+                //use ratio^exponent only if it is within the bounds; otherwise use the bound
+                const ValueType multiplier = std::max( influenceChangeLowerBound[j],
+                    std::min( (ValueType)std::pow(ratio, settings.influenceExponent), influenceChangeUpperBound[j]) );
+                influence[i][j] = thisInfluence*multiplier;
 
                 assert(influence[i][j] > 0);
 
@@ -880,7 +911,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
                 typename std::vector<IndexType>::iterator startIt = clusterIndicesAllBlocks.begin()+rangeStart;
                 typename std::vector<IndexType>::iterator endIt = clusterIndicesAllBlocks.begin()+rangeEnd;
                 // TODO: remove not needed assertions
-                SCAI_ASSERT_LT_ERROR(rangeStart, rangeEnd, "Prefix sum vectos is wrong");
+                SCAI_ASSERT_LT_ERROR(rangeStart, rangeEnd, "Prefix sum vector is wrong");
                 SCAI_ASSERT_LE_ERROR(rangeEnd, numNewBlocks, "Range out of bounds");
                 // SCAI_ASSERT_ERROR(endIt!=clusterIndicesAllBlocks.end(), "Iterator out of bounds");
 
@@ -1035,7 +1066,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeRepartition(
     } else {
         std::vector<IndexType> indices(localN);
         std::iota(indices.begin(), indices.end(), 0);
-        initialCenters = findCenters(coordinates, previous, settings.numBlocks, indices.begin(), indices.end(), nodeWeights[0]);
+        initialCenters = findCenters(coordinates, previous, settings.numBlocks, indices.begin(), indices.end(), nodeWeights);
     }
 
     std::vector<point<ValueType>> transpCenters = vectorTranspose(initialCenters);
@@ -1169,6 +1200,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
             }
         }
     }
+
 
     //
     // copy coordinates
@@ -1372,7 +1404,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
         }
 
         // TODO: adapt for multiple weights
-        std::vector<std::vector<ValueType>> newCenters = findCenters(coordinates, result, totalNumNewBlocks, firstIndex, lastIndex, nodeWeights[0]);
+        std::vector<std::vector<ValueType>> newCenters = findCenters(coordinates, result, totalNumNewBlocks, firstIndex, lastIndex, nodeWeights);
 
         // newCenters have reversed order of the vectors
         // maybe turn centers to a 1D vector already in computePartition?

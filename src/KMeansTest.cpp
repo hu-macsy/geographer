@@ -114,11 +114,14 @@ TYPED_TEST(KMeansTest, testFindCenters) {
     part.redistribute(dist);
 
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
+    DenseVector<ValueType> randomWeights( graph.getRowDistributionPtr(), 1 ); 
+    randomWeights.fillRandom(3.0);
+    std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { uniformWeights, randomWeights };
 
     //get centers
     std::vector<IndexType> nodeIndices(uniformWeights.getLocalValues().size());
     std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
-    std::vector<std::vector<ValueType> > centers = KMeans<IndexType,ValueType>::findCenters(coords, part, k,	nodeIndices.begin(), nodeIndices.end(), uniformWeights);
+    std::vector<std::vector<ValueType> > centers = KMeans<IndexType,ValueType>::findCenters(coords, part, k, nodeIndices.begin(), nodeIndices.end(), nodeWeights);
 
     //check for size
     EXPECT_EQ(dimensions, centers.size());
@@ -128,7 +131,7 @@ TYPED_TEST(KMeansTest, testFindCenters) {
     part = DenseVector<IndexType>(dist, 0);
 
     //get centers
-    centers = KMeans<IndexType,ValueType>::findCenters(coords, part, k, nodeIndices.begin(), nodeIndices.end(), uniformWeights);
+    centers = KMeans<IndexType,ValueType>::findCenters(coords, part, k, nodeIndices.begin(), nodeIndices.end(), nodeWeights);
 }
 
 

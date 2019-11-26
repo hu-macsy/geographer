@@ -248,7 +248,7 @@ static std::vector< std::vector<ValueType> > findCenters(
     const IndexType k,
     const Iterator firstIndex,
     const Iterator lastIndex,
-    const DenseVector<ValueType>& nodeWeights);
+    const std::vector<DenseVector<ValueType>>& nodeWeights);
 
 
 /** @brief Get minimum and maximum of the local coordinates.
@@ -295,8 +295,7 @@ static ValueType computeEffectiveDistance(
  * @param[in] previousAssignment previous assignment of points
  * @param[in] oldBlock The block from the previous hierarchy that every point
  belongs to. In case of the non-hierarchical version, this is 0 for all points. This is different from previousAssignment
- because it does not chacge inbetween kmeans iteration while
- previousAssignement changes until it converges and the
+ because it does not change in-between k-means iteration while previousAssignement changes until it converges and the
  algorithm stops.
  * @param[in] blockSizesPerCent A value indicating a percentage per block of
  the points weight. If, W is the sum of weights of all the points, then
