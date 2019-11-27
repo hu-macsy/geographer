@@ -138,20 +138,8 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         settings.coordFormat = settings.fileFormat;
     }
 
-    //if outFile was provided but storeInfo was not given as an argument
-    if( !vm.count("storeInfo") && settings.outFile!="-" ) {
-        PRINT0("WARNING: Option for outFile was given but no option to store information (--storeInfo). Will store metrics anyway. Give --metricsDetail=no to, at least, not calculate the metrics");
-        settings.storeInfo = true;
-    }
-    if( settings.storeInfo && settings.outFile=="-" ) {
-        PRINT0("Option to store information used but no output file given to write to. Specify an output file name using the option --outFile. Aborting.");
-        settings.isValid = false;
-        //return 126;
-    }
-    
-    if( settings.storePartition && settings.outFile=="-" ) {
-        PRINT0("Option to store partition used but no output file given to write to. Specify an output file name using the option --outFile. Aborting.");
-        settings.isValid = false;
+    if (vm.count("outFile")) {
+        settings.outFile = vm["outFile"].as<std::string>();
     }
 
     if (!vm.count("influenceExponent")) {
@@ -190,6 +178,27 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.bisect = vm.count("bisect");
     settings.writeDebugCoordinates = vm.count("writeDebugCoordinates");
     settings.setAutoSettings = vm.count("autoSettings");
+
+    //if outFile was provided but storeInfo was not given as an argument
+    if( !vm.count("storeInfo") && settings.outFile!="-" ) {
+        if(comm->getRank()==0){
+            std::cout << "WARNING: Option for outFile was given but no option to store information (--storeInfo). Will store metrics anyway. Give --metricsDetail=no to, at least, not calculate the metrics" << std::endl;
+        }
+        settings.storeInfo = true;
+    }
+    if( settings.storeInfo && settings.outFile=="-" ) {
+        if(comm->getRank()==0){
+            std::cout << "Option to store information used but no output file given to write to. Specify an output file name using the option --outFile. Aborting." << std::endl;
+        }
+        settings.isValid = false;
+    }
+    
+    if( settings.storePartition && settings.outFile=="-" ) {
+        if(comm->getRank()==0){
+            std::cout << "Option to store partition used but no output file given to write to. Specify an output file name using the option --outFile. Aborting." << std::endl;
+        }
+        settings.isValid = false;
+    }
 
     if (vm.count("fileFormat")) {
         settings.fileFormat = vm["fileFormat"].as<ITI::Format>();
@@ -311,9 +320,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
             }
         }
     }
-    if (vm.count("outFile")) {
-        settings.outFile = vm["outFile"].as<std::string>();
-    }
+
     if (vm.count("repeatTimes")) {
         settings.repeatTimes = vm["repeatTimes"].as<IndexType>();
     }
