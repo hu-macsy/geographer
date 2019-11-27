@@ -142,6 +142,10 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         settings.outFile = vm["outFile"].as<std::string>();
     }
 
+    if (vm.count("outDir")) {
+        settings.outDir = vm["outDir"].as<std::string>();
+    }
+
     if (!vm.count("influenceExponent")) {
         settings.influenceExponent = 1.0/settings.dimensions;
     }
@@ -329,9 +333,6 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     }
     if (vm.count("metricsDetail")) {
         settings.metricsDetail = vm["metricsDetail"].as<std::string>();
-    }
-    if (vm.count("outDir")) {
-        settings.outDir = vm["outDir"].as<std::string>();
     }
 
     /*** consistency checks ***/
