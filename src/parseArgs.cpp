@@ -190,7 +190,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         }
         settings.storeInfo = true;
     }
-    if( settings.storeInfo && (settings.outFile=="-" or settings.outDir=="-") ) {
+    if( settings.storeInfo and settings.outFile=="-" and settings.outDir=="-" ) {
         if(comm->getRank()==0){
             std::cout << "Option to store information used but no output file given to write to. Specify an output file name using the option --outFile. Aborting." << std::endl;
         }
