@@ -141,6 +141,7 @@ std::string to_string(const ITI::Format& f);
 
 ITI::Tool to_tool(const std::string& s);
 
+std::string getCallingCommand( const int argc, char** argv );
 
 /** @brief A structure that holds several options for partitioning, input, output, metrics e.t.c.
 */
@@ -173,7 +174,9 @@ struct Settings {
     bool useDiffusionCoordinates = false;		///< if not coordinates are provided, we can use artificial coordinates
     IndexType diffusionRounds = 20;				///< number of rounds to create the diffusion coordinates
     IndexType numNodeWeights = -1;		///< number of vertex weights
-    std::string machine;
+    std::string machine;                ///< name of the machine that the executable is running
+    double seed;                        ///< random seed used for some routines
+    std::string callingCommand;         ///< the complete calling command used
     //@}
 
     /** @name Mesh generation settings
@@ -250,8 +253,9 @@ struct Settings {
     bool debugMode = false; 				///< even more checks and prints
     bool writeDebugCoordinates = false;		///< store coordinates and block id
     bool writePEgraph = false;				///< store the processor graph
+    //TODO: storeInfo is mostly ignore. remove?
     bool storeInfo = false;					///< store metrics info
-    bool storePartition = false;            ///< store metrics info
+    bool storePartition = false;            ///< store partition info
     IndexType repeatTimes = 1;				///< for benchmarking, how many times is the partition repeated
     IndexType thisRound=-1; //TODO: what is this? This has nothing to do with the settings.
 
