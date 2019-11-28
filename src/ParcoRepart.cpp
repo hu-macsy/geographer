@@ -305,8 +305,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
                 Settings tmpSettings = settings;
                 tmpSettings.computeDiameter = false;
                 tmpMetrics.getEasyMetrics( input, result, nodeWeights, tmpSettings);
+                //now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
                 metrics.MM["preliminaryMaxCommVol"] = tmpMetrics.MM["maxCommVolume"];
                 metrics.MM["preliminaryTotalCommVol"] = tmpMetrics.MM["totalCommVolume"];
+                metrics.MM["preliminaryCut"] = tmpMetrics.MM["preliminaryCut"];
+                metrics.MM["preliminaryImbalance"] = tmpMetrics.MM["preliminaryImbalance"];
             }
 
 			doLocalRefinement( result,  input, coordinates, nodeWeights, comm, settings, metrics );
@@ -519,17 +522,9 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 	aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, useRedistributor);
 	
 	std::chrono::duration<double> redistTime =  std::chrono::steady_clock::now() - start;
-	
-	const IndexType k = settings.numBlocks;
-	
-	ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( input, result, true);
-	ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights[0]);
-	
 	//now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
 	metrics.MM["timeSecondDistribution"] = redistTime.count();
-	metrics.MM["preliminaryCut"] = cut;
-	metrics.MM["preliminaryImbalance"] = imbalance;
-	
+
 	//
 	// output: in std and file
 	//	

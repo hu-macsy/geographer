@@ -373,7 +373,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeCut(const CSRSparseMatrix<Valu
     double totalTime= comm->max(endTime.count() );
 
     if( comm->getRank()==0 ) {
-        std::cout<<" done in " << totalTime << " seconds " << std::endl;
+        std::cout<< result/2 << ", done in " << totalTime << " seconds " << std::endl;
     }
 
     return result / 2; //counted each edge from both sides

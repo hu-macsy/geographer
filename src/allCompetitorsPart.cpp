@@ -141,10 +141,8 @@ int main(int argc, char** argv) {
             }else{     
                 copyName = "generate_"+vm["numX"].as<std::string>()+"_"+vm["numY"].as<std::string>();
             }
-            std::reverse( copyName.begin(), copyName.end() );
             std::vector<std::string> strs = aux<IndexType,ValueType>::split( copyName, '/' );
             std::string graphName = aux<IndexType,ValueType>::split(strs.back(), '.')[0];
-            std::reverse( graphName.begin(), graphName.end() );
             //add specific folder for each tool
             outFile = settings.outDir+ ITI::to_string(thisTool)+ "/"+ graphName+ "_k"+ std::to_string(settings.numBlocks)+ "_"+ ITI::to_string(thisTool)+ ".info";
         }
