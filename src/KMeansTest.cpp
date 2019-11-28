@@ -381,11 +381,15 @@ TYPED_TEST(KMeansTest, testComputePartitionWithMultipleWeights) {
 TYPED_TEST(KMeansTest, testGetGlobalMinMax) {
     using ValueType = TypeParam;
 
-    std::string coordFile = "bubbles-00010.graph.xyz";
+    std::string graphFile = "bubbles-00010.graph";
+    std::string coordFile = graphFile + ".xyz";
     const IndexType dimensions = 2;
-    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
-    const numPEs = comm->getSize();
-
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    IndexType n;
+    {
+        CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+        n = graph.getNumRows();
+    }
     //load coords
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
 
@@ -393,7 +397,7 @@ TYPED_TEST(KMeansTest, testGetGlobalMinMax) {
     std::vector<ValueType> minCoords, maxCoords;
     std::tie(minCoords, maxCoords) = KMeans<IndexType,ValueType>::getGlobalMinMaxCoords(coords);
 
-    for( int d=0; d<dimensions; d++;){
+    for( int d=0; d<dimensions; d++){
         ValueType minMin=comm->min(minCoords[d]);
         ValueType maxMax=comm->max(maxCoords[d]);
 
