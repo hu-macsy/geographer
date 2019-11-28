@@ -192,6 +192,7 @@ int main(int argc, char** argv) {
 
     std::vector<Metrics<ValueType>> metricsVec;
 
+    std::string outFile = getOutFileName(settings, "", comm);
     //------------------------------------------------------------
     //
     // partition the graph
@@ -290,9 +291,9 @@ int main(int argc, char** argv) {
         if (comm->getRank() == 0 && settings.metricsDetail.compare("no") != 0) {
             metricsVec[r].print( std::cout );
         }
-        if( settings.storeInfo && settings.outFile!="-" ) {
+        if( settings.storeInfo && outFile!="-" ) {
             //TODO: create a better tmp name
-            std::string fileName = settings.outFile+ "_r"+ std::to_string(r);
+            std::string fileName = outFile+ "_r"+ std::to_string(r);
             if( comm->getRank()==0 ) {
                 std::ofstream outF( fileName, std::ios::out);
                 if(outF.is_open()) {
@@ -326,9 +327,9 @@ int main(int argc, char** argv) {
     }
 
 
-    if( settings.storeInfo && settings.outFile!="-" ) {
+    if( settings.storeInfo && outFile!="-" ) {
         if( comm->getRank()==0) {
-            std::ofstream outF( settings.outFile, std::ios::out);
+            std::ofstream outF( outFile, std::ios::out);
             if(outF.is_open()) {
                 outF << "Running " << __FILE__ << std::endl;
                 printInfo( outF, comm, settings);
@@ -354,17 +355,17 @@ int main(int argc, char** argv) {
                 //
 
                 //printVectorMetrics( metricsVec, outF );
-                std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;
+                std::cout<< "Output information written to file " << outFile << " in total time " << totalT << std::endl;
             }	else	{
-                std::cout<< "Could not open file " << settings.outFile << " information not stored"<< std::endl;
+                std::cout<< "Could not open file " << outFile << " information not stored"<< std::endl;
             }
         }
     }
 
 
-    if( settings.outFile!="-" and settings.storePartition ) {
+    if( outFile!="-" and settings.storePartition ) {
         std::chrono::time_point<std::chrono::steady_clock> beforePartWrite = std::chrono::steady_clock::now();
-        std::string partOutFile = settings.outFile+".part";
+        std::string partOutFile = outFile+".part";
         ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
 
         std::chrono::duration<double> writePartTime =  std::chrono::steady_clock::now() - beforePartWrite;
