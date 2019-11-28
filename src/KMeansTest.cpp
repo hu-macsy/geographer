@@ -156,7 +156,7 @@ TYPED_TEST(KMeansTest, testCentersOnlySfc) {
 
     //get min and max
     std::vector<ValueType> minCoords, maxCoords;
-    std::tie(minCoords, maxCoords) = KMeans<IndexType,ValueType>::getLocalMinMaxCoords(coords);
+    std::tie(minCoords, maxCoords) = KMeans<IndexType,ValueType>::getGlobalMinMaxCoords(coords);
 
     // get centers
     std::vector<std::vector<ValueType>> centers1 = KMeans<IndexType,ValueType>::findInitialCentersSFC(coords, minCoords, maxCoords, settings);
@@ -378,6 +378,29 @@ TYPED_TEST(KMeansTest, testComputePartitionWithMultipleWeights) {
     //check for correct error messages: block sizes not aligned to node weights, different distributions in coordinates and weights, weights not fitting into blocks, balance
 }
 
+TYPED_TEST(KMeansTest, testGetGlobalMinMax) {
+    using ValueType = TypeParam;
+
+    std::string coordFile = "bubbles-00010.graph.xyz";
+    const IndexType dimensions = 2;
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+    const numPEs = comm->getSize();
+
+    //load coords
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
+
+    //get min and max
+    std::vector<ValueType> minCoords, maxCoords;
+    std::tie(minCoords, maxCoords) = KMeans<IndexType,ValueType>::getGlobalMinMaxCoords(coords);
+
+    for( int d=0; d<dimensions; d++;){
+        ValueType minMin=comm->min(minCoords[d]);
+        ValueType maxMax=comm->max(maxCoords[d]);
+
+        EXPECT_EQ(minCoords[d], minMin);
+        EXPECT_EQ(maxCoords[d], maxMax);
+    }
+}
 /*
 TYPED_TEST(KMeansTest, testPartitionWithNodeWeights) {
     using ValueType = TypeParam;

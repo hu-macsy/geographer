@@ -528,13 +528,14 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 	//
 	// output: in std and file
 	//	
-	if (settings.verbose ) {
-		ValueType timeForSecondRedistr = comm->max( redistTime.count() );
-		if(comm->getRank() == 0 ) {
-			std::cout<< std::endl << "\033[1;32mTiming: 2nd redist before local refinement: "<< timeForSecondRedistr << std::endl;
-			std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
-		}
-	}
+    if (settings.verbose ) {
+        ValueType timeForSecondRedistr = comm->max( redistTime.count() );
+        if(comm->getRank() == 0 ) {
+            std::cout<< std::endl << "\033[1;32mTiming: 2nd redist before local refinement: "<< timeForSecondRedistr << std::endl;
+            std::cout << "# of cut edges:" << metrics.MM["preliminaryCut"] << ", imbalance:" << metrics.MM["preliminaryImbalance"]<< " \033[0m" <<std::endl << std::endl;
+        }
+    }
+	
 
     if( settings.localRefAlgo==Tool::parMetisRefine){
 #ifdef PARMETIS_FOUND
