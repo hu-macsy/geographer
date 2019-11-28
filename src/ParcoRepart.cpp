@@ -308,8 +308,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
                 //now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
                 metrics.MM["preliminaryMaxCommVol"] = tmpMetrics.MM["maxCommVolume"];
                 metrics.MM["preliminaryTotalCommVol"] = tmpMetrics.MM["totalCommVolume"];
-                metrics.MM["preliminaryCut"] = tmpMetrics.MM["preliminaryCut"];
-                metrics.MM["preliminaryImbalance"] = tmpMetrics.MM["preliminaryImbalance"];
+                metrics.MM["preliminaryCut"] = tmpMetrics.MM["finalCut"];
+                metrics.MM["preliminaryImbalance"] = tmpMetrics.MM["finalImbalance"];
             }
 
 			doLocalRefinement( result,  input, coordinates, nodeWeights, comm, settings, metrics );

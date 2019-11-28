@@ -235,7 +235,7 @@ std::string getOutFileName( const Settings& settings, const std::string& toolNam
     //we are given a directory 
     if( settings.outDir!="-" ) {
         std::string dash = "";
-        if( (settings.outDir.compare(settings.outDir.length()-1, 1, "/")!=0) and (settings.outDir.compare(settings.outDir.length()-1, 1, "\\")!=0) ){
+        if( (settings.outDir.compare(settings.outDir.length()-1, 1, "/")!=0) and (settings.outDir.compare(settings.outDir.length()-1, 1, "\\")!=0) and toolName!="" ){
             dash= "/";
         }        
         //but no outFile
