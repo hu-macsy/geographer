@@ -305,8 +305,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
                 Settings tmpSettings = settings;
                 tmpSettings.computeDiameter = false;
                 tmpMetrics.getEasyMetrics( input, result, nodeWeights, tmpSettings);
+                //now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
                 metrics.MM["preliminaryMaxCommVol"] = tmpMetrics.MM["maxCommVolume"];
                 metrics.MM["preliminaryTotalCommVol"] = tmpMetrics.MM["totalCommVolume"];
+                metrics.MM["preliminaryCut"] = tmpMetrics.MM["preliminaryCut"];
+                metrics.MM["preliminaryImbalance"] = tmpMetrics.MM["preliminaryImbalance"];
             }
 
 			doLocalRefinement( result,  input, coordinates, nodeWeights, comm, settings, metrics );
@@ -519,27 +522,20 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 	aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, useRedistributor);
 	
 	std::chrono::duration<double> redistTime =  std::chrono::steady_clock::now() - start;
-	
-	const IndexType k = settings.numBlocks;
-	
-	ValueType cut = GraphUtils<IndexType,ValueType>::computeCut( input, result, true);
-	ValueType imbalance = GraphUtils<IndexType, ValueType>::computeImbalance(result, k, nodeWeights[0]);
-	
 	//now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
 	metrics.MM["timeSecondDistribution"] = redistTime.count();
-	metrics.MM["preliminaryCut"] = cut;
-	metrics.MM["preliminaryImbalance"] = imbalance;
-	
+
 	//
 	// output: in std and file
 	//	
-	if (settings.verbose ) {
-		ValueType timeForSecondRedistr = comm->max( redistTime.count() );
-		if(comm->getRank() == 0 ) {
-			std::cout<< std::endl << "\033[1;32mTiming: 2nd redist before local refinement: "<< timeForSecondRedistr << std::endl;
-			std::cout << "# of cut edges:" << cut << ", imbalance:" << imbalance<< " \033[0m" <<std::endl << std::endl;
-		}
-	}
+    if (settings.verbose ) {
+        ValueType timeForSecondRedistr = comm->max( redistTime.count() );
+        if(comm->getRank() == 0 ) {
+            std::cout<< std::endl << "\033[1;32mTiming: 2nd redist before local refinement: "<< timeForSecondRedistr << std::endl;
+            std::cout << "# of cut edges:" << metrics.MM["preliminaryCut"] << ", imbalance:" << metrics.MM["preliminaryImbalance"]<< " \033[0m" <<std::endl << std::endl;
+        }
+    }
+	
 
     if( settings.localRefAlgo==Tool::parMetisRefine){
 #ifdef PARMETIS_FOUND

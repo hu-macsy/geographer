@@ -32,9 +32,9 @@ namespace ITI{
 
 template <typename ValueType>
 IndexType readInput( 
-    const cxxopts::ParseResult vm,
-    const Settings settings,
-    const scai::dmemo::CommunicatorPtr comm,
+    const cxxopts::ParseResult& vm,
+    const Settings& settings,
+    const scai::dmemo::CommunicatorPtr& comm,
     scai::lama::CSRSparseMatrix<ValueType>& graph,
     std::vector<scai::lama::DenseVector<ValueType>>& coords,
     std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights ){
@@ -181,6 +181,42 @@ IndexType readInput(
     }
 
     return N;
+}
+
+
+void printInfo(std::ostream& out, const scai::dmemo::CommunicatorPtr comm, const Settings settings){
+    if (comm->getRank() == 0) {
+        std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+        std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
+        out << "date and time: " << std::ctime(&timeNow);
+
+        out<< "commit: "<< version << " , machine: " << settings.machine << " , p: "<< comm->getSize();
+
+        auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
+        out <<" seed:" << settings.seed << std::endl;
+        out.precision(oldprecision);
+
+        out << "Calling command:" << std::endl;
+        out << settings.callingCommand << std::endl << std::endl;
+    }
+}
+
+
+Settings initialize( const int argc, char** argv, const cxxopts::ParseResult& vm, const scai::dmemo::CommunicatorPtr& comm){
+
+    if (comm->getType() != scai::dmemo::CommunicatorType::MPI) {
+        std::cout << "The linked lama version was compiled without MPI. Only sequential partitioning is supported." << std::endl;
+    }
+      
+    std::string callingCommand = ITI::getCallingCommand(argc, argv);
+    
+    Settings settings = ITI::interpretSettings(vm);
+    //add the calling command to the setting so it can be extracted later
+    settings.callingCommand = callingCommand;
+    if( !settings.isValid )
+        throw std::runtime_error("Invalid settings");
+
+    return settings;
 }
 
 }

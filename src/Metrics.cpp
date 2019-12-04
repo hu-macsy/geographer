@@ -30,6 +30,7 @@ void Metrics<ValueType>::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueTy
 template<typename ValueType>
 void Metrics<ValueType>::print( std::ostream& out) const {
 
+    out.precision(5);
     out<<"\nMetrics:" << std::endl;
     for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ) {
         if( mapIt->second!=-1)
@@ -42,6 +43,7 @@ void Metrics<ValueType>::print( std::ostream& out) const {
 template<typename ValueType>
 void Metrics<ValueType>::printHorizontal( std::ostream& out) const {
 
+    out.precision(5);
     for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ) {
         if( mapIt->second!=-1)
             out<< mapIt->first << ", ";
@@ -58,6 +60,7 @@ void Metrics<ValueType>::printHorizontal( std::ostream& out) const {
 template<typename ValueType>
 void Metrics<ValueType>::printHorizontal2( std::ostream& out) const {
 
+    out.precision(5);
     for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ) {
         if( mapIt->second!=-1)
             out<< mapIt->first <<" " << mapIt->second << " , ";

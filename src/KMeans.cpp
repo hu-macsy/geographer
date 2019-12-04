@@ -1591,7 +1591,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
-    std::tie(minCoords, maxCoords) = getLocalMinMaxCoords(coordinates);
+    std::tie(minCoords, maxCoords) = getGlobalMinMaxCoords(coordinates);
 
     std::vector<point<ValueType>> centers = findInitialCentersSFC(coordinates, minCoords, maxCoords, settings);
     SCAI_ASSERT_EQ_ERROR(centers.size(), settings.numBlocks, "Number of centers is not correct");
@@ -1652,7 +1652,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierarchicalPartition
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
-    std::tie(minCoords, maxCoords) = getLocalMinMaxCoords(coordinates);
+    std::tie(minCoords, maxCoords) = getGlobalMinMaxCoords(coordinates);
 
     // used later for debugging and calculating imbalance
     std::vector<ValueType> totalWeightSum(numNodeWeights);
@@ -1809,7 +1809,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierPlusRepart(
  * TODO: This isn't used any more! Remove?
  */
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<ValueType>,std::vector<ValueType>> KMeans<IndexType,ValueType>::getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates) {
+std::pair<std::vector<ValueType>,std::vector<ValueType>> KMeans<IndexType,ValueType>::getGlobalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates) {
     const int dim = coordinates.size();
     std::vector<ValueType> minCoords(dim);
     std::vector<ValueType> maxCoords(dim);

@@ -147,6 +147,14 @@ ITI::Tool ITI::to_tool(const std::string& s) {
     return t;
 }
 
+std::string ITI::getCallingCommand( const int argc, char** argv ){
+    std::string callingCommand = "";
+    for (IndexType i = 0; i < argc; i++) {
+        callingCommand += std::string(argv[i]) + " ";
+    }  
+    return callingCommand;
+}
+
 ITI::Settings::Settings() {
     char machineChar[255];
     gethostname(machineChar, 255);

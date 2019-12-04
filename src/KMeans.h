@@ -251,10 +251,10 @@ static std::vector< std::vector<ValueType> > findCenters(
     const std::vector<DenseVector<ValueType>>& nodeWeights);
 
 
-/** @brief Get minimum and maximum of the local coordinates.
+/** @brief Get minimum and maximum of the global coordinates.
  */
 //template<typename ValueType>
-static std::pair<std::vector<ValueType>, std::vector<ValueType> > getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
+static std::pair<std::vector<ValueType>, std::vector<ValueType> > getGlobalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
 
 
 /**
