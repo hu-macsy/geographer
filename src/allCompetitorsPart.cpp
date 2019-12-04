@@ -131,26 +131,7 @@ int main(int argc, char** argv) {
         } 
      
         //set outFile depending if we get outDir or outFile parameter
-        std::string outFile = settings.outFile;
-		
-        if( vm.count("outDir") and settings.storeInfo ) {
-            //set the graphName in order to create the outFile name
-            std::string copyName;
-            if( vm.count("graphFile") ){
-                copyName = vm["graphFile"].as<std::string>();
-            }else{     
-                copyName = "generate_"+vm["numX"].as<std::string>()+"_"+vm["numY"].as<std::string>();
-            }
-            std::vector<std::string> strs = aux<IndexType,ValueType>::split( copyName, '/' );
-            std::string graphName = aux<IndexType,ValueType>::split(strs.back(), '.')[0];
-            //add specific folder for each tool
-            outFile = settings.outDir+ ITI::to_string(thisTool)+ "/"+ graphName+ "_k"+ std::to_string(settings.numBlocks)+ "_"+ ITI::to_string(thisTool)+ ".info";
-        }
-
-        //we are given just one file name, not a directory, append tool nane
-        if( not vm.count("outDir") and vm.count("outFile") and settings.storeInfo){
-            outFile += ("_" + ITI::to_string(thisTool));
-        }
+        std::string outFile = getOutFileName(settings, ITI::to_string(thisTool), comm);
 
         std::ifstream f(outFile);
         if( f.good() and settings.storeInfo ) {

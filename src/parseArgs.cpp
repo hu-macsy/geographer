@@ -142,10 +142,12 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
 
     if (vm.count("outFile")) {
         settings.outFile = vm["outFile"].as<std::string>();
+        settings.storeInfo = true;
     }
 
     if (vm.count("outDir")) {
         settings.outDir = vm["outDir"].as<std::string>();
+        settings.storeInfo = true;
     }
 
     if (!vm.count("influenceExponent")) {
@@ -170,7 +172,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     using std::vector;
     settings.verbose = vm.count("verbose");
     settings.debugMode = vm.count("debugMode");
-    settings.storeInfo = vm.count("storeInfo");
+    //settings.storeInfo = vm.count("storeInfo");
     settings.storePartition = vm.count("storePartition");
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
@@ -186,25 +188,13 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.writePEgraph = vm.count("writePEgraph");
     settings.setAutoSettings = vm.count("autoSettings");
 
+    //28/11/19, deprecate storeInfo parameter. Leaving it as an option for backwards compatibility.    
     //if outFile was provided but storeInfo was not given as an argument
-    if( !vm.count("storeInfo") && settings.outFile!="-" ) {
+    if( vm.count("storeInfo") ) {
         if(comm->getRank()==0){
-            std::cout << "WARNING: Option for outFile was given but no option to store information (--storeInfo). Will store metrics anyway. Give --metricsDetail=no to, at least, not calculate the metrics" << std::endl;
+            std::cout << "WARNING: Option --storeInfo is deprecated and (most probably) will be ignored; metrics will be stored depending on the options --outFile and --outDir" << std::endl;
         }
         settings.storeInfo = true;
-    }
-    if( settings.storeInfo and settings.outFile=="-" and settings.outDir=="-" ) {
-        if(comm->getRank()==0){
-            std::cout << "Option to store information used but no output file given to write to. Specify an output file name using the option --outFile. Aborting." << std::endl;
-        }
-        settings.isValid = false;
-    }
-    
-    if( settings.storePartition && settings.outFile=="-" ) {
-        if(comm->getRank()==0){
-            std::cout << "Option to store partition used but no output file given to write to. Specify an output file name using the option --outFile. Aborting." << std::endl;
-        }
-        settings.isValid = false;
     }
 
     if (vm.count("graphFile")) {
