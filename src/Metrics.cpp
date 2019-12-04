@@ -1,4 +1,5 @@
 #include "Metrics.h"
+#include "FileIO.h"
 
 using namespace ITI;
 
@@ -10,6 +11,29 @@ void Metrics<ValueType>::getMetrics(const scai::lama::CSRSparseMatrix<ValueType>
     }
     if( settings.metricsDetail=="easy" ) {
         getEasyMetrics( graph, partition, nodeWeights, settings );
+    }
+    if( settings.metricsDetail=="mapping" ) {
+        const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
+
+        scai::lama::CSRSparseMatrix<ValueType> PEgraph;
+        std::vector<scai::lama::DenseVector<ValueType>>  PEnodeWeights;
+
+        if( settings.PEGraphFile!="-" ){ // a processor graph is provides by the user
+            PEgraph = ITI::FileIO<IndexType, ValueType>::readGraph( settings.PEGraphFile, PEnodeWeights, comm, settings.fileFormat );
+        }else{// if not, create the processor graph
+            if( settings.numBlocks!=comm->getSize()){
+                if( comm->getRank()==0 ){
+                    std::cout<< "ERROR: no processor (aka communication) graph was provided for the mapping metrics." << std::endl;
+                    std::cout<< "\tAlso, the currently used processor network does not have the same number of PEs as the provided partition."<< std::endl;
+                    std::cout<< "\tWill not calculate mapping metrics."<< std::endl;
+                }
+                return;
+            }
+            PEgraph = ITI::GraphUtils<IndexType, ValueType>::getPEGraph( graph );
+        }
+        //PE graph needs to be replicated
+        PEgraph.replicate();
+        getMappingMetrics( graph, partition, PEgraph );        
     }
 }
 
@@ -26,6 +50,7 @@ void Metrics<ValueType>::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueTy
         getRedistRequiredMetrics( graph, partition, settings, numIter );
     }
 }
+//---------------------------------------------------------------------------
 
 template<typename ValueType>
 void Metrics<ValueType>::print( std::ostream& out) const {
@@ -93,6 +118,7 @@ template<typename ValueType>
 void Metrics<ValueType>::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
 
     MM["finalCut"] = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
+
     for( unsigned int w=0; w<nodeWeights.size(); w++ ) {
         imbalances.push_back(  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights[w]) );
         MM["finalImbalance_w"+std::to_string(w)] = imbalances.back();
@@ -331,8 +357,8 @@ void Metrics<ValueType>::getMappingMetrics(
     SCAI_ASSERT_EQ_ERROR( std::accumulate(mapping.begin(), mapping.end(), 0), (N*(N-1)/2), "Wrong mapping" );
 
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
-    SCAI_ASSERT( PEGraph.getRowDistributionPtr()->isEqual(*noDist), "Function expects the graph to bre relicated" );
-    SCAI_ASSERT( blockGraph.getRowDistributionPtr()->isEqual(*noDist), "Function expects the graph to bre relicated" );
+    SCAI_ASSERT( PEGraph.getRowDistributionPtr()->isEqual(*noDist), "Function expects the graph to be replicated" );
+    SCAI_ASSERT( blockGraph.getRowDistributionPtr()->isEqual(*noDist), "Function expects the graph to be replicated" );
 
     ValueType sumDilation = 0;
     ValueType maxDilation = 0;

@@ -387,8 +387,8 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
     IndexType k,
     const DenseVector<ValueType> &nodeWeights,
     const std::vector<ValueType> &optBlockSizes) {
-
     SCAI_REGION( "ParcoRepart.computeImbalance" )
+
     const IndexType globalN = part.getDistributionPtr()->getGlobalSize();
     const IndexType localN = part.getDistributionPtr()->getLocalSize();
     const IndexType weightsSize = nodeWeights.getDistributionPtr()->getGlobalSize();
@@ -398,13 +398,6 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
     const bool homogeneous = (optBlockSizes.size()==0);
 
     scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
-
-    /*
-    if( comm->getRank()==0 ){
-        std::cout<<"Computing the imbalance...";
-        std::cout.flush();
-    }
-    */
 
     SCAI_ASSERT_EQ_ERROR(weighted, comm->any(weighted), "inconsistent input!");
 
@@ -427,7 +420,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
         throw std::runtime_error("Negative node weights not supported.");
     }
 
-    //TODO: is this needed here? remove or wrap around settigns.debugMode?
+    //TODO: is this needed here? remove or wrap around settings.debugMode?
     const IndexType minK = part.min();
     const IndexType maxK = part.max();
 
@@ -868,7 +861,7 @@ template<typename IndexType, typename ValueType>
 std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType>> GraphUtils<IndexType, ValueType>::computeCommBndInner(
             const CSRSparseMatrix<ValueType> &adjM,
             const DenseVector<IndexType> &part,
-Settings settings) {
+            Settings settings) {
 
     const IndexType numBlocks = settings.numBlocks;
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();

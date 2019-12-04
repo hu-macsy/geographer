@@ -365,12 +365,18 @@ int main(int argc, char** argv) {
     if( settings.outFile!="-" and settings.storePartition ) {
         std::chrono::time_point<std::chrono::steady_clock> beforePartWrite = std::chrono::steady_clock::now();
         std::string partOutFile = settings.outFile+".part";
-        ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+        if( settings.noRefinement ){
+            ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+        }else{
+            //refinement redistributes the data and must be redistributes before writing the partition
+            aux<IndexType,ValueType>::redistributeInput( rowDistPtr, partition, graph, coordinates, nodeWeights);
+            ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+        }
 
         std::chrono::duration<double> writePartTime =  std::chrono::steady_clock::now() - beforePartWrite;
         if( comm->getRank()==0 ) {
             std::cout << " and last partition of the series in file " << partOutFile << std::endl;
-            std::cout<< " Time needed to write .part file: " << writePartTime.count() <<  std::endl;
+            std::cout<< "Time needed to write .part file: " << writePartTime.count() <<  std::endl;
         }
     }
 
@@ -388,6 +394,24 @@ int main(int argc, char** argv) {
 
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, settings.dimensions, "debugResult");
         comm->synchronize();
+    }
+
+    // write the PE graph for further experiments
+    if(settings.writePEgraph) { 
+        std::string filename;
+        if( settings.outFile!="-"){
+            filename = settings.outFile + ".PEgraph";
+        }else if( settings.fileName!="-"){
+            filename = settings.fileName + ".PEgraph";
+        }else{
+            filename = "someGraph.PEgraph";
+        }
+        scai::lama::CSRSparseMatrix<ValueType> processGraph = GraphUtils<IndexType, ValueType>::getPEGraph(graph);
+        if( not ITI::FileIO<IndexType,ValueType>::fileExists(filename) ) {
+            ITI::FileIO<IndexType,ValueType>::writeGraph(processGraph, filename, 1);
+        }
+        
+        PRINT0("PE graph stored in " << filename );
     }
 
     if (vm.count("callExit")) {

@@ -64,6 +64,7 @@ Options populateOptions() {
     ("outFile", "write result partition into file", value<std::string>())
     //debug
     ("writeDebugCoordinates", "Write Coordinates of nodes in each block", value<bool>())
+    ("writePEgraph", "Write the processor graph to a file", value<bool>())
     ("verbose", "Increase output.")
     ("debugMode", "Increase output and more expensive checks")
     ("storeInfo", "Store timing and other metrics in file.")
@@ -75,6 +76,7 @@ Options populateOptions() {
     ("maxDiameterRounds", "abort diameter algorithm after that many BFS rounds", value<IndexType>())
     ("metricsDetail", "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV", value<std::string>())
     ("autoSettings", "Set some settings automatically to some values possibly overwriting some user passed parameters. ", value<bool>() )
+    ("partition", "file of partition (typically used by tools/analyzePartition)", value<std::string>())
     //used for the competitors main
     ("outDir", "write result partition into folder", value<std::string>())
     ("tools", "choose which supported tools to use. For multiple tool use comma to separate without spaces. See in Settings::Tools for the supported tools and how to call them.", value<std::string>() )
@@ -151,7 +153,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     }
 
     if( vm.count("metricsDetail") ) {
-        if( not (settings.metricsDetail=="no" or settings.metricsDetail=="easy" or settings.metricsDetail=="all") ) {
+        if( not (settings.metricsDetail=="no" or settings.metricsDetail=="easy" or settings.metricsDetail=="all" or settings.metricsDetail=="mapping") ) {
             if(comm->getRank() ==0 ) {
                 std::cout<<"WARNING: wrong value for parameter metricsDetail= " << settings.metricsDetail << ". Setting to all" <<std::endl;
                 settings.metricsDetail="all";
@@ -181,6 +183,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.nnCoarsening = vm.count("nnCoarsening");
     settings.bisect = vm.count("bisect");
     settings.writeDebugCoordinates = vm.count("writeDebugCoordinates");
+    settings.writePEgraph = vm.count("writePEgraph");
     settings.setAutoSettings = vm.count("autoSettings");
 
     //if outFile was provided but storeInfo was not given as an argument
@@ -204,6 +207,9 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         settings.isValid = false;
     }
 
+    if (vm.count("graphFile")) {
+        settings.fileName = vm["graphFile"].as<std::string>();
+    }
     if (vm.count("fileFormat")) {
         settings.fileFormat = vm["fileFormat"].as<ITI::Format>();
     }
