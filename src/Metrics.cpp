@@ -523,7 +523,7 @@ ValueType Metrics<ValueType>::getLinearSolverTime( const scai::lama::CSRSparseMa
     //const IndexType globalN= graph.getNumRows();
     const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
     const scai::dmemo::DistributionPtr colDist = graph.getColDistributionPtr();
-PRINT(comm->getRank() << ": " << rowDist->getLocalSize() );
+
     //this throws a forbidden self-loop error in the solver
     //const scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian( graph );
 
