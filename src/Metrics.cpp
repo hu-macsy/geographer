@@ -1,3 +1,6 @@
+#include <scai/solver/criteria/IterationCount.hpp>
+#include <scai/solver/CG.hpp>
+
 #include "Metrics.h"
 #include "FileIO.h"
 
@@ -233,7 +236,7 @@ std::tuple<IndexType,IndexType,IndexType> Metrics<ValueType>::getDiameter( const
 //---------------------------------------------------------------------------
 
 template<typename ValueType>
-void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings, const IndexType repeatTimes ) {
+void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueType>& graph, const scai::lama::DenseVector<IndexType>& partition, struct Settings settings, const IndexType repeatTimes ) {
 
     scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const IndexType N = graph.getNumRows();
@@ -248,7 +251,7 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
 
     //TODO: change NoDist with graph.getColumnDistribution() ?
     scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( graph.getNumRows() ));
-    scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph );
+    scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph ); 
     copyGraph.redistribute(distFromPartition, noDistPtr);
 
     std::chrono::duration<ValueType> redistributionTime =  std::chrono::steady_clock::now() - beforeRedistribution;
@@ -278,6 +281,8 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
     copyGraph.redistribute( distFromPartition, distFromPartition );
 
     MM["SpMVtime"] = getSPMVtime(copyGraph, repeatTimes);
+
+    MM["CGtime"] = getLinearSolverTime( copyGraph );
 
     //TODO: maybe extract this time from the actual SpMV above
     // comm time in SpMV
@@ -477,6 +482,7 @@ void Metrics<ValueType>::getMappingMetrics(
     getMappingMetrics( blockGraph, PEGraph, identityMapping);
 }//getMappingMetrics
 //---------------------------------------------------------------------------------------
+
 template<typename ValueType>
 ValueType Metrics<ValueType>::getSPMVtime(
     scai::lama::CSRSparseMatrix<ValueType> graph,
@@ -491,7 +497,7 @@ ValueType Metrics<ValueType>::getSPMVtime(
     graph.setCommunicationKind( scai::lama::SyncKind::ASYNC_COMM );
     comm->synchronize();
     
-    // perfom the actual multiplication
+    // perform the actual multiplication
     std::chrono::time_point<std::chrono::steady_clock> beforeSpMVTime = std::chrono::steady_clock::now();
     for(IndexType r=0; r<repeatTimes; r++) {
         y = graph *x +y;
@@ -508,7 +514,45 @@ ValueType Metrics<ValueType>::getSPMVtime(
 
     return time;
 }
+//---------------------------------------------------------------------------------------
 
+template<typename ValueType>
+ValueType Metrics<ValueType>::getLinearSolverTime( const scai::lama::CSRSparseMatrix<ValueType>& graph){ //, const scai::lama::DenseVector<IndexType>& partition ){
+
+    const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
+    //const IndexType globalN= graph.getNumRows();
+    const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
+    const scai::dmemo::DistributionPtr colDist = graph.getColDistributionPtr();
+PRINT(comm->getRank() << ": " << rowDist->getLocalSize() );
+    //this throws a forbidden self-loop error in the solver
+    //const scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian( graph );
+
+    scai::lama::DenseVector<ValueType> solution( colDist, ValueType(1.0) );
+    const scai::lama::DenseVector<ValueType> rhs( colDist, ValueType(1.0) );
+
+    scai::solver::CG<ValueType> solver("CGSolver");
+
+    const IndexType maxIterations = 2000; //TODO?: turn it to input parameter?
+    scai::solver::CriterionPtr<ValueType> criterion( new scai::solver::IterationCount<ValueType>( maxIterations ) );
+    solver.setStoppingCriterion( criterion );
+    solver.initialize( graph );
+
+    std::chrono::time_point<std::chrono::steady_clock> beforeTime = std::chrono::steady_clock::now();
+
+    solver.solve(solution, rhs);
+
+    std::chrono::duration<ValueType> elapTime = std::chrono::steady_clock::now() - beforeTime;
+    //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
+
+    ValueType time = comm->max(elapTime.count());
+    //time = time/repeatTimes;
+
+    ValueType minTime = comm->min( elapTime.count() );
+    PRINT0("max time " << time << " , min time " << minTime);
+
+    return time;
+}
 
 template class Metrics<double>;
 template class Metrics<float>;
+
