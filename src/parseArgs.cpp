@@ -50,6 +50,8 @@ Options populateOptions() {
     ("bisect", "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached", value<bool>())
     ("cutsPerDim", "If MultiSection is chosen, then provide d values that define the number of cuts per dimension. You must provide as many numbers as the dimensions separated with commas. For example, --cutsPerDim=3,4,10 for 3 dimensions resulting in 3*4*10=120 blocks", value<std::string>())
     ("pixeledSideLen", "The resolution for the pixeled partition or the spectral", value<IndexType>())
+    //sfc
+    ("sfcResolution", "The resolution depth of the hilbert space filling curve", value<IndexType>())
     // K-Means
     ("minSamplingNodes", "Tuning parameter for K-Means", value<IndexType>())
     ("influenceExponent", "Tuning parameter for K-Means, default is ", value<double>()->default_value(std::to_string(settings.influenceExponent)))
@@ -228,6 +230,9 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         settings.numBlocks = vm["numBlocks"].as<IndexType>();
     } else {
         settings.numBlocks = comm->getSize();
+    }
+    if (vm.count("sfcResolution")) {
+        settings.sfcResolution = vm["sfcResolution"].as<IndexType>();
     }
 
     if (vm.count("epsilon")) {

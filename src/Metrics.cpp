@@ -507,12 +507,11 @@ ValueType Metrics<ValueType>::getSPMVtime(
     //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
 
     ValueType time = comm->max(SpMVTime.count());
-    time = time/repeatTimes;
 
     ValueType minTime = comm->min( SpMVTime.count() );
     PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
 
-    return time;
+    return time/repeatTimes;
 }
 //---------------------------------------------------------------------------------------
 
@@ -520,7 +519,6 @@ template<typename ValueType>
 ValueType Metrics<ValueType>::getLinearSolverTime( const scai::lama::CSRSparseMatrix<ValueType>& graph){ //, const scai::lama::DenseVector<IndexType>& partition ){
 
     const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
-    //const IndexType globalN= graph.getNumRows();
     const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
     const scai::dmemo::DistributionPtr colDist = graph.getColDistributionPtr();
 
@@ -532,7 +530,7 @@ ValueType Metrics<ValueType>::getLinearSolverTime( const scai::lama::CSRSparseMa
 
     scai::solver::CG<ValueType> solver("CGSolver");
 
-    const IndexType maxIterations = 2000; //TODO?: turn it to input parameter?
+    const IndexType maxIterations = 100; //TODO?: turn it to input parameter?
     scai::solver::CriterionPtr<ValueType> criterion( new scai::solver::IterationCount<ValueType>( maxIterations ) );
     solver.setStoppingCriterion( criterion );
     solver.initialize( graph );

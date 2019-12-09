@@ -205,7 +205,7 @@ struct Settings {
     /** @name Space filling curve parameters
     */
     //@{
-    IndexType sfcResolution = 7; 			///<tuning parameters for SFC, the resolution depth for the curve
+    IndexType sfcResolution = 9; 			///<tuning parameters for SFC, the resolution depth for the curve
     //@}
 
 

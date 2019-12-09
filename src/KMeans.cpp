@@ -1201,7 +1201,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     ValueType localVolume = 1;
     for (IndexType d = 0; d < dim; d++) {
         const ValueType diff = globalMaxCoords[d] - globalMinCoords[d];
-        const ValueType localDiff = maxCoords[d] - minCoords[d];
+        const ValueType localDiff = maxCoords[d] - minCoords[d]; 
         diagonalLength += diff*diff;
         volume *= diff;
         localVolume *= localDiff;
