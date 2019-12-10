@@ -282,7 +282,8 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
 
     MM["SpMVtime"] = getSPMVtime(copyGraph, repeatTimes);
 
-    MM["CGtime"] = getLinearSolverTime( copyGraph );
+    //TODO: take a percentage of repeatTimes; maybe all repeatTimes are too much for CG
+    MM["CGtime"] = getLinearSolverTime( copyGraph, 10 ); 
 
     //TODO: maybe extract this time from the actual SpMV above
     // comm time in SpMV
@@ -516,7 +517,9 @@ ValueType Metrics<ValueType>::getSPMVtime(
 //---------------------------------------------------------------------------------------
 
 template<typename ValueType>
-ValueType Metrics<ValueType>::getLinearSolverTime( const scai::lama::CSRSparseMatrix<ValueType>& graph){ //, const scai::lama::DenseVector<IndexType>& partition ){
+ValueType Metrics<ValueType>::getLinearSolverTime( 
+    const scai::lama::CSRSparseMatrix<ValueType>& graph,
+    const IndexType repeatTimes){
 
     const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
@@ -526,29 +529,31 @@ ValueType Metrics<ValueType>::getLinearSolverTime( const scai::lama::CSRSparseMa
     //const scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian( graph );
 
     scai::lama::DenseVector<ValueType> solution( colDist, ValueType(1.0) );
-    const scai::lama::DenseVector<ValueType> rhs( colDist, ValueType(1.0) );
-
+    
     scai::solver::CG<ValueType> solver("CGSolver");
 
-    const IndexType maxIterations = 100; //TODO?: turn it to input parameter?
+    const IndexType maxIterations = 1000; //TODO?: turn it to input parameter?
     scai::solver::CriterionPtr<ValueType> criterion( new scai::solver::IterationCount<ValueType>( maxIterations ) );
     solver.setStoppingCriterion( criterion );
-    solver.initialize( graph );
+    ValueType totalTime = 0.0;
 
-    std::chrono::time_point<std::chrono::steady_clock> beforeTime = std::chrono::steady_clock::now();
+    for(IndexType r=0; r<repeatTimes; r++) {
+        const scai::lama::DenseVector<ValueType> rhs( colDist, ValueType(1.0) );
+        solver.initialize( graph );
 
-    solver.solve(solution, rhs);
+        std::chrono::time_point<std::chrono::steady_clock> beforeTime = std::chrono::steady_clock::now();
 
-    std::chrono::duration<ValueType> elapTime = std::chrono::steady_clock::now() - beforeTime;
-    //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
+        solver.solve(solution, rhs);
 
-    ValueType time = comm->max(elapTime.count());
-    //time = time/repeatTimes;
+        std::chrono::duration<ValueType> elapTime = std::chrono::steady_clock::now() - beforeTime;
+        totalTime += elapTime.count();
+        //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
+    }
+    ValueType globTime = comm->max(totalTime)/repeatTimes;
+    
+    PRINT0("max time for "<< repeatTimes << " calls to CG solver: " << totalTime );
 
-    ValueType minTime = comm->min( elapTime.count() );
-    PRINT0("max time " << time << " , min time " << minTime);
-
-    return time;
+    return globTime;
 }
 
 template class Metrics<double>;

@@ -189,9 +189,8 @@ protected:
         @return The time needed to solve the linear system.
     */
     ValueType getLinearSolverTime(
-        const scai::lama::CSRSparseMatrix<ValueType>& graph
-        //,
-        //const scai::lama::DenseVector<IndexType>& partition
+        const scai::lama::CSRSparseMatrix<ValueType>& graph,
+        const IndexType repeatTimes
         );
 
 }; //struct Metrics
