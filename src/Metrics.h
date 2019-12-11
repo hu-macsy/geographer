@@ -40,7 +40,7 @@ public:
         {"preliminaryCut",-1.0}, {"preliminaryImbalance",-1.0}, {"finalCut",-1.0}, {"finalImbalance",-1.0}, {"maxBlockGraphDegree",-1.0},
         {"preliminaryMaxCommVol",-1.0},{"preliminaryTotalCommVol",-1.0},
         {"totalBlockGraphEdges",-1.0}, {"maxCommVolume",-1.0}, {"totalCommVolume",-1.0}, {"maxBoundaryNodes",-1.0}, {"totalBoundaryNodes",-1.0},
-        {"SpMVtime",-1.0}, {"commTime",-1.0}, {"CGtime", -1.0},
+        {"SpMVtime",-1.0}, {"commTime",-1.0}, {"CGtime", -1.0}, {"edgeImbalance", -1.0},
         {"maxBorderNodesPercent",-1.0}, {"avgBorderNodesPercent",-1.0},
         {"maxBlockDiameter",-1.0}, {"harmMeanDiam",-1.0}, {"numDisconBlocks",-1.0},
         {"maxRedistVol",-1.0}, {"totRedistVol",-1.0},	 //redistribution metrics
@@ -64,11 +64,12 @@ public:
     */
     Metrics( ) {	}
 
-
+    
     Metrics operator=(const Metrics &m) {
         this->MM = m.MM;
         return *this;
     }
+
 
     /**Wrapper function to call metrics depending on setting.metricsDetail
 

@@ -45,7 +45,9 @@ void Metrics<ValueType>::getMetrics(const scai::lama::CSRSparseMatrix<ValueType>
 template<typename ValueType>
 void Metrics<ValueType>::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
 
-    getEasyMetrics( graph, partition, nodeWeights, settings );
+    Settings tmpSettings = settings;
+    settings.computeDiameter=false; //diameter will be computed inside getRedistRequiredMetrics
+    getEasyMetrics( graph, partition, nodeWeights, tmpSettings );
 
     scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     if (settings.numBlocks == comm->getSize()) {
@@ -315,6 +317,22 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
         PRINT0("max time for " << repeatTimes <<" communications: " << time << " , min time " << minTime);
     }
 
+    //get the NNZ imbalance
+    {
+        const IndexType localNNZ = copyGraph.getLocalNumValues();   
+        const IndexType sumNNZ = comm->sum(localNNZ);
+        //this fails because the cut edges are not counted; it is sumNNZ+ 2*cutedges = copyGraph.getNumValues()
+        //SCAI_ASSERT_EQ_ERROR( sumNNZ, copyGraph.getNumValues(), "??" ); 
+        
+        const IndexType optNNZ = sumNNZ/comm->getSize();
+        const IndexType maxLocalNNZ = comm->max(localNNZ);
+        const IndexType minLocalNNZ = comm->min(localNNZ);
+
+        ValueType edgeImbalance = ValueType( maxLocalNNZ - optNNZ)/optNNZ;
+        PRINT0("minLocalNNZ= "<< minLocalNNZ <<", maxLocalNNZ= " << maxLocalNNZ << ", edge imbalance= " << edgeImbalance);
+        MM["edgeImbalance"] = edgeImbalance;
+    }
+
 }
 
 
@@ -534,7 +552,7 @@ ValueType Metrics<ValueType>::getLinearSolverTime(
     
     scai::solver::CG<ValueType> solver("CGSolver");
 
-    const IndexType maxIterations = 1000; //TODO?: turn it to input parameter?
+    const IndexType maxIterations = 300; //TODO?: turn it to input parameter?
     scai::solver::CriterionPtr<ValueType> criterion( new scai::solver::IterationCount<ValueType>( maxIterations ) );
     solver.setStoppingCriterion( criterion );
     ValueType totalTime = 0.0;

@@ -111,12 +111,6 @@ int main(int argc, char** argv) {
 
         ITI::Tool thisTool = wantedTools[t];
 
-        // get the partition and metrics
-        //
-        scai::lama::DenseVector<IndexType> partition;
-
-        //Metrics<ValueType> metrics( settings );
-
         // if using unit weights, set flag for wrappers
         bool nodeWeightsUse = true;
 
@@ -163,6 +157,10 @@ int main(int argc, char** argv) {
             throw std::runtime_error("Provided tool: "+ ITI::to_string(thisTool) + " not supported.\nAborting..." );
         }
 
+        // get the partition and metrics
+        //
+        scai::lama::DenseVector<IndexType> partition;
+        scai::lama::DenseVector<IndexType> oldPartition(dist, 1);
         std::vector<Metrics<ValueType>> metricsVec;
 
         for( int r=0; r<settings.repeatTimes; r++){
@@ -173,7 +171,20 @@ int main(int argc, char** argv) {
             // partition has the the same distribution as the graph rows
             SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
 
-            metricsVec[r].getMetrics( graph, partition, nodeWeights, settings );
+            //ValueType partDiff = oldPartition.maxDiffNorm(partition); // another way to check if partitions are close but is more expensive
+            bool isIdentical = partition.all(scai::common::CompareOp::EQ, oldPartition);
+            if( isIdentical ){
+                if(comm->getRank()==0){
+                    std::cout<< "Partition is identical, not calculating metrics" << std::endl;  
+                }
+                //keep only the run time of this run
+                ValueType runTime = metricsVec[r].MM["timeTotal"];
+                metricsVec[r] = metricsVec[r-1];
+                metricsVec[r].MM["timeTotal"] = runTime;
+            }else{
+                metricsVec[r].getMetrics( graph, partition, nodeWeights, settings );
+            }
+
             PRINT0("time to get the partition with " << ITI::to_string(thisTool) << ": " << metricsVec[r].MM["timeTotal"] );
 
             //if one run exceeds the time limit, do not execute the rest of the runs
@@ -181,6 +192,7 @@ int main(int argc, char** argv) {
                 std::cout<< "Stopping runs because of excessive running total running time: " << metricsVec[r].MM["timeTotal"] << std::endl;
                 break;
             }
+            oldPartition = partition;
         }
 
         //aggregate metrics in one struct
