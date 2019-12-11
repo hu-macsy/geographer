@@ -91,7 +91,7 @@ scai::lama::DenseVector<IndexType> parhipWrapper<IndexType, ValueType>::partitio
     
     std::chrono::duration<double> partitionTime = std::chrono::steady_clock::now() - startTime;
     double partTime= comm->max(partitionTime.count() );
-    metrics.MM["timeLocalRef"] = partTime;
+    metrics.MM["timeTotal"] = partTime;
 
     //
     // convert partition to a DenseVector

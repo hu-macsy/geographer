@@ -222,7 +222,9 @@ std::tuple<IndexType,IndexType,IndexType> Metrics<ValueType>::getDiameter( const
             maxBlockDiameter = comm->max(localDiameter);
 
         } else {
-            PRINT0("WARNING: Not computing diameter, not all vertices are in same block everywhere");
+            if(comm->getRank()==0){
+                std::cout<< "WARNING: Not computing diameter, not all vertices are in same block everywhere" << std::endl;
+            }
         }
     }
     std::chrono::duration<ValueType,std::ratio<1>> diameterTime = std::chrono::high_resolution_clock::now() - diameterStart;

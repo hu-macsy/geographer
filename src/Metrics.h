@@ -44,7 +44,7 @@ public:
         {"maxBorderNodesPercent",-1.0}, {"avgBorderNodesPercent",-1.0},
         {"maxBlockDiameter",-1.0}, {"harmMeanDiam",-1.0}, {"numDisconBlocks",-1.0},
         {"maxRedistVol",-1.0}, {"totRedistVol",-1.0},	 //redistribution metrics
-        {"maxCongestion",-1.0}, {"maxDilation",-1.0}, {"avgDilation",0.0}		//mapping metrics
+        {"maxCongestion",-1.0}, {"maxDilation",-1.0}, {"avgDilation",-1.0}		//mapping metrics
     };
 
     //constructors
@@ -220,8 +220,6 @@ inline Metrics<ValueType> aggregateVectorMetrics( const std::vector<Metrics<Valu
     for( auto metIt = aggregateMetrics.MM.begin(); metIt!=aggregateMetrics.MM.end(); metIt++){
 		metIt->second /= numRuns;
 	}
-    
-    
 
     return aggregateMetrics;
 }

@@ -115,9 +115,7 @@ int main(int argc, char** argv) {
         //
         scai::lama::DenseVector<IndexType> partition;
 
-        // the constructor with metrics(comm->getSize()) is needed for ParcoRepart timing details
-        Metrics<ValueType> metrics( settings );
-        //metrics.numBlocks = settings.numBlocks;
+        //Metrics<ValueType> metrics( settings );
 
         // if using unit weights, set flag for wrappers
         bool nodeWeightsUse = true;
@@ -165,21 +163,28 @@ int main(int argc, char** argv) {
             throw std::runtime_error("Provided tool: "+ ITI::to_string(thisTool) + " not supported.\nAborting..." );
         }
 
-        partition = partitioner->partition( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
+        std::vector<Metrics<ValueType>> metricsVec;
 
-        PRINT0("time to get the partition: " <<  metrics.MM["timeTotal"] );
+        for( int r=0; r<settings.repeatTimes; r++){
+            metricsVec.push_back( Metrics<ValueType>( settings ) );
 
-        // partition has the the same distribution as the graph rows
-        SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
+            partition = partitioner->partition( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metricsVec[r]);
+            
+            // partition has the the same distribution as the graph rows
+            SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
 
+            metricsVec[r].getMetrics( graph, partition, nodeWeights, settings );
+            PRINT0("time to get the partition with " << ITI::to_string(thisTool) << ": " << metricsVec[r].MM["timeTotal"] );
 
-        if( settings.metricsDetail=="all" ) {
-            metrics.getAllMetrics( graph, partition, nodeWeights, settings );
+            //if one run exceeds the time limit, do not execute the rest of the runs
+            if( metricsVec[r].MM["timeTotal"]>ITI::HARD_TIME_LIMIT) {
+                std::cout<< "Stopping runs because of excessive running total running time: " << metricsVec[r].MM["timeTotal"] << std::endl;
+                break;
+            }
         }
-        if( settings.metricsDetail=="easy" ) {
-            metrics.getEasyMetrics( graph, partition, nodeWeights, settings );
-        }
 
+        //aggregate metrics in one struct
+        const Metrics<ValueType> aggrMetrics = aggregateVectorMetrics( metricsVec, comm );
 
         //---------------------------------------------------------------
         //
@@ -193,7 +198,7 @@ int main(int argc, char** argv) {
             std::cout << "\n---> " << ITI::to_string(thisTool);
             std::cout<<  "\033[0m" << std::endl;
 
-            metrics.print( std::cout );
+            aggrMetrics.print( std::cout );
 
             // write in a file
             if( outFile!= "-" and settings.storeInfo) {
@@ -202,8 +207,8 @@ int main(int argc, char** argv) {
                     outF << "Running " << __FILE__ << " for tool " << ITI::to_string(thisTool) << std::endl;
                     printInfo( outF, comm, settings);
 
-                    metrics.print( outF );
-                    //printMetricsShort( metrics, outF);
+                    aggrMetrics.print( outF );
+                    //printMetricsShort( aggrMetrics, outF);
                     std::cout<< "Output information written to file " << outFile << std::endl;
                 } else {
                     std::cout<< "\n\tWARNING: Could not open file " << outFile << " informations not stored.\n"<< std::endl;
@@ -247,8 +252,10 @@ int main(int argc, char** argv) {
                 std::cout<< "WARNING: directrory " << destPath << " does not exist. De buf coordinates were not stored. Create directory and re-run" << std::endl;
             }
         }
+        if( thisPE==0) std::cout<< std::endl;
         comm->synchronize();    // needed when storing files 
     } // for wantedTools.size()
+
     std::chrono::duration<ValueType> totalTimeLocal = std::chrono::steady_clock::now() - startTime;
     ValueType totalTime = comm->max( totalTimeLocal.count() );
     if( thisPE==0 ) {

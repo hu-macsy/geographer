@@ -235,7 +235,6 @@ int main(int argc, char** argv) {
             }
         }
 
-        //metricsVec.push_back( Metrics( comm->getSize()) );
         metricsVec.push_back( Metrics<ValueType>( settings ) );
 
         std::chrono::time_point<std::chrono::steady_clock> beforePartTime =  std::chrono::steady_clock::now();
@@ -261,9 +260,7 @@ int main(int argc, char** argv) {
         std::chrono::time_point<std::chrono::steady_clock> beforeReport = std::chrono::steady_clock::now();
 
         metricsVec[r].getMetrics(graph, partition, nodeWeights, settings );
-
         metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
-        //metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));
 
         std::chrono::duration<double> reportTime =  std::chrono::steady_clock::now() - beforeReport;
 
