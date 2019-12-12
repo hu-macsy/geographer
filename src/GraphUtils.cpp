@@ -470,10 +470,10 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
         if( homogeneous) {
             //get global weight sum
             weightSum = comm->sum(weightSum);
-            ValueType optSize = std::ceil(weightSum / k + (maxWeight - minWeight));
-            imbalance = (ValueType(maxBlockSize - optSize)/ optSize);
+            ValueType optSize = weightSum / k + (maxWeight - minWeight);
+            assert(maxBlockSize >= optSize);
 
-            //optSize = std::ceil(ValueType(weightSum) / k );
+            imbalance = (ValueType(maxBlockSize - optSize)/ optSize);
         } else {
             //optBlockSizes is the optimum weight/size for every block
             SCAI_ASSERT_EQ_ERROR( k, optBlockSizes.size(), "Number of blocks do not agree with the size of the vector of the block sizes");
@@ -487,7 +487,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
         }
 //TODO: can we a have heterogeneous network but no node weights?
     } else {
-        ValueType optSize = std::ceil(ValueType(globalN) / k);
+        ValueType optSize = ValueType(globalN) / k;
         assert(maxBlockSize >= optSize);
 
         imbalance = (ValueType(maxBlockSize - optSize)/ optSize);

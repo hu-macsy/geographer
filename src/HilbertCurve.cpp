@@ -1070,7 +1070,6 @@ MPI_Datatype getMPITypePair<double,IndexType>(){
 
 template<>
 MPI_Datatype getMPITypePair<float,IndexType>(){
-    std::cout << __FILE__ << ", MPI_FLOAT_INT" << std::endl;
     return MPI_FLOAT_INT;
 }
 

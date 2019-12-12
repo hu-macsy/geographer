@@ -528,9 +528,7 @@ ValueType Metrics<ValueType>::getSPMVtime(
     //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
 
     ValueType time = comm->max(SpMVTime.count());
-
-    ValueType minTime = comm->min( SpMVTime.count() );
-    PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
+    PRINT0("max time for " << repeatTimes <<" SpMVs: " << time );
 
     return time/repeatTimes;
 }
