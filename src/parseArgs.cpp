@@ -76,6 +76,7 @@ Options populateOptions() {
     ("repeatTimes", "How many times we repeat the partitioning process.", value<IndexType>())
     ("noComputeDiameter", "Compute diameter of resulting block files.")
     ("maxDiameterRounds", "abort diameter algorithm after that many BFS rounds", value<IndexType>())
+    ("maxCGIterations", "max number of iterations of the CG solver in metrics",  value<IndexType>())
     ("metricsDetail", "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV", value<std::string>())
     ("autoSettings", "Set some settings automatically to some values possibly overwriting some user passed parameters. ", value<bool>() )
     ("partition", "file of partition (typically used by tools/analyzePartition)", value<std::string>())
@@ -332,6 +333,9 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("maxDiameterRounds")) {
         settings.maxDiameterRounds = vm["maxDiameterRounds"].as<IndexType>();
     }
+    if (vm.count("maxCGIterations")) {
+        settings.maxCGIterations = vm["maxCGIterations"].as<IndexType>();
+    }    
     if (vm.count("metricsDetail")) {
         settings.metricsDetail = vm["metricsDetail"].as<std::string>();
     }

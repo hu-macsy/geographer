@@ -306,7 +306,7 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
     MM["SpMVtime"] = getSPMVtime(copyGraph, repeatTimes);
 
     //TODO: take a percentage of repeatTimes; maybe all repeatTimes are too much for CG
-    MM["CGtime"] = getLinearSolverTime( copyGraph, 10 ); 
+    MM["CGtime"] = getLinearSolverTime( copyGraph, 10, settings.maxCGIterations); 
 
     //TODO: maybe extract this time from the actual SpMV above
     // comm time in SpMV
@@ -540,7 +540,8 @@ ValueType Metrics<ValueType>::getSPMVtime(
 template<typename ValueType>
 ValueType Metrics<ValueType>::getLinearSolverTime( 
     const scai::lama::CSRSparseMatrix<ValueType>& graph,
-    const IndexType repeatTimes){
+    const IndexType repeatTimes,
+    const IndexType maxIterations){
 
     const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
@@ -565,7 +566,6 @@ ValueType Metrics<ValueType>::getLinearSolverTime(
     
     scai::solver::CG<ValueType> solver("CGSolver");
 
-    const IndexType maxIterations = 100; //TODO?: turn it to input parameter?
     scai::solver::CriterionPtr<ValueType> criterion( new scai::solver::IterationCount<ValueType>( maxIterations ) );
     solver.setStoppingCriterion( criterion );
     ValueType totalTime = 0.0;

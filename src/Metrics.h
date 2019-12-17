@@ -191,7 +191,8 @@ protected:
     */
     ValueType getLinearSolverTime(
         const scai::lama::CSRSparseMatrix<ValueType>& graph,
-        const IndexType repeatTimes
+        const IndexType repeatTimes,
+        const IndexType maxIterations = 100
         );
 
 }; //struct Metrics
