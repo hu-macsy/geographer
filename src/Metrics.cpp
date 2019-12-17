@@ -546,8 +546,20 @@ ValueType Metrics<ValueType>::getLinearSolverTime(
     const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
     const scai::dmemo::DistributionPtr colDist = graph.getColDistributionPtr();
 
-    //this throws a forbidden self-loop error in the solver
-    //const scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian( graph );
+    //the construction of the laplacian does not work when both rows and columns are distributed
+    //based on a general distribution; TODO:fix
+    //workaround: copy graph to preserve const-ness, redistribute with a block distribution, get
+    //the laplacian, redistribute the laplacian with the same distribution as the input
+    scai::lama::CSRSparseMatrix<ValueType> laplacian;
+    {
+        scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph ); 
+        const IndexType N = graph.getNumRows();
+        const scai::dmemo::DistributionPtr blockDistPtr( new scai::dmemo::BlockDistribution(N, comm) );
+        copyGraph.redistribute( blockDistPtr, blockDistPtr );
+        
+        laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian( copyGraph );
+        laplacian.redistribute( rowDist, colDist);
+    }
 
     scai::lama::DenseVector<ValueType> solution( colDist, ValueType(1.0) );
     
@@ -560,7 +572,7 @@ ValueType Metrics<ValueType>::getLinearSolverTime(
 
     for(IndexType r=0; r<repeatTimes; r++) {
         const scai::lama::DenseVector<ValueType> rhs( colDist, ValueType(1.0) );
-        solver.initialize( graph );
+        solver.initialize( laplacian );
 
         std::chrono::time_point<std::chrono::steady_clock> beforeTime = std::chrono::steady_clock::now();
 

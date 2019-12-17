@@ -1756,7 +1756,8 @@ std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, Val
 }
 
 //---------------------------------------------------------------------------------------
-
+//TODO: diagonal elements wrongly found when row distribution and column distribution are some general distribution
+//  while it works if both are a block distribution
 template<typename IndexType, typename ValueType>
 CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(const CSRSparseMatrix<ValueType>& graph) {
     using scai::lama::CSRStorage;
@@ -1771,7 +1772,6 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(
     }
 
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-    scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
 
     const CSRStorage<ValueType>& storage = graph.getLocalStorage();
     const ReadAccess<IndexType> ia(storage.getIA());
@@ -2065,6 +2065,27 @@ ValueType GraphUtils<IndexType, ValueType>::localSumOutgoingEdges(const CSRSpars
     }
 
     return sumOutgoingEdgeWeights;
+}
+//------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+bool GraphUtils<IndexType, ValueType>::hasSelfLoops(const CSRSparseMatrix<ValueType> &graph){
+    
+    const CSRStorage<ValueType>& storage = graph.getLocalStorage();
+    const scai::hmemo::ReadAccess<IndexType> ia(storage.getIA());
+    const scai::hmemo::ReadAccess<IndexType> ja(storage.getJA());
+
+    scai::hmemo::HArray<ValueType> diagonal;
+    storage.getDiagonal( diagonal );
+    const IndexType diagonalSum = scai::utilskernel::HArrayUtils::sum(diagonal);
+    
+    const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
+    const IndexType diagonalSumSum = comm->sum( diagonalSum );
+PRINT(diagonalSumSum);
+    if( diagonalSumSum>0 ){
+        return true;
+    }
+    return false;
 }
 //------------------------------------------------------------------------------------
 

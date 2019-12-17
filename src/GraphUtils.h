@@ -364,6 +364,10 @@ public:
         return begin;
     }
 
+    
+    static bool hasSelfLoops(const scai::lama::CSRSparseMatrix<ValueType> &graph);
+   
+
     /**	Reordering a sequence of numbers from 0 to maxIndex.
      * The order is: maxIndex/2, maxIdnex/4, maxIndex*3/4, maxIndex/8, maxIndex*3/8, maxIndex*5/8, ...
      * @param[in] maxIndex The maximum number, the implied sequence is [0, 1, 2, 3, ..., maxIndex]
