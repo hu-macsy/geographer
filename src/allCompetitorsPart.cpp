@@ -110,6 +110,7 @@ int main(int argc, char** argv) {
     for( int t=0; t<wantedTools.size(); t++) {
 
         ITI::Tool thisTool = wantedTools[t];
+        std::cout.precision(5);
 
         // if using unit weights, set flag for wrappers
         bool nodeWeightsUse = true;
@@ -189,7 +190,9 @@ int main(int argc, char** argv) {
 
             //if one run exceeds the time limit, do not execute the rest of the runs
             if( metricsVec[r].MM["timeTotal"]>ITI::HARD_TIME_LIMIT) {
-                std::cout<< "Stopping runs because of excessive running total running time: " << metricsVec[r].MM["timeTotal"] << std::endl;
+                if(comm->getRank()==0){
+                    std::cout<< "Stopping runs because of excessive running total running time: " << metricsVec[r].MM["timeTotal"] << std::endl;
+                }
                 break;
             }
             oldPartition = partition;
