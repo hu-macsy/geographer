@@ -12,6 +12,7 @@ if( @WRAPPERS_FOUND@ )
 	find_library ( wrapper_LIB
 				NAMES wrappers
 				PATHS ${Geographer_ROOT}/@LIB_DEST@ )
+    set( WRAPPERS_FOUND true)
 endif()               
 
 set ( Geographer_LIBRARIES ${Geographer_LIB} ${wrapper_LIB} @EXTRA_LIBRARIES@ )
