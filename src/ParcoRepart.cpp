@@ -445,8 +445,11 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         assert(scai::utilskernel::HArrayUtils::min(result.getLocalValues()) >= 0);
         SCAI_ASSERT_LT_ERROR(scai::utilskernel::HArrayUtils::max(result.getLocalValues()),k, "");
 
-        if (settings.verbose) {
-            ValueType totKMeansTime = ValueType( comm->max(kMeansTime.count()) );
+        //warning: this comm->max implies a barrier but (probably) does not affect much
+        ValueType totKMeansTime = ValueType( comm->max(kMeansTime.count()) ); 
+        metrics.MM["timeKmeans"] = totKMeansTime; //possible overwrite but this time is more realistic
+
+        if (settings.verbose) {            
             if(comm->getRank() == 0)
                 std::cout << "K-Means, Time:" << totKMeansTime << std::endl;
         }
