@@ -494,10 +494,9 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         result.redistribute( coordinates[0].getDistributionPtr() );
 
         std::chrono::duration<double> redistTime = std::chrono::steady_clock::now() - beforeRedist;
-        if (settings.verbose) {
-            ValueType totRedistTime = ValueType( comm->max(redistTime.count()) );
-            if(comm->getRank() == 0)
-                std::cout << "redistribution after K-Means, Time:" << totRedistTime << std::endl;
+        ValueType totRedistTime = ValueType( comm->max(redistTime.count()) );
+        if(comm->getRank() == 0){
+            std::cout << "redistribution after K-Means, Time:" << totRedistTime << std::endl;
         }
     }
 
