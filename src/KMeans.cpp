@@ -1770,7 +1770,13 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierPlusRepart(
     PRINT0("Finished hierarchical partition");
 
     // refine using a repartition step
-    return  computeRepartition(coordinates, nodeWeights, blockSizes, result, settings);
+
+    std::chrono::time_point<std::chrono::high_resolution_clock> repartStart = std::chrono::high_resolution_clock::now();
+    DenseVector<IndexType> result2 = computeRepartition(coordinates, nodeWeights, blockSizes, result, settings);
+    std::chrono::duration<ValueType,std::ratio<1>> repartTime = std::chrono::high_resolution_clock::now() - repartStart;
+    metrics.MM["timeKmeans"] += repartTime.count();
+
+    return result2;
 }// computeHierPlusRepart
 
 /* Get local minimum and maximum coordinates

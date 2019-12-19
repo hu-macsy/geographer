@@ -441,7 +441,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
                 result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
         }
 
-        std::chrono::duration<double>  kMeansTime = std::chrono::steady_clock::now() - beforeKMeans;
+        std::chrono::duration<double> kMeansTime = std::chrono::steady_clock::now() - beforeKMeans;
         assert(scai::utilskernel::HArrayUtils::min(result.getLocalValues()) >= 0);
         SCAI_ASSERT_LT_ERROR(scai::utilskernel::HArrayUtils::max(result.getLocalValues()),k, "");
 
@@ -486,7 +486,16 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
 
     //if using k-means the result has different distribution
     if( not result.getDistributionPtr()->isEqual( coordinates[0].getDistribution()) ){
+        std::chrono::time_point<std::chrono::steady_clock> beforeRedist =  std::chrono::steady_clock::now();
+
         result.redistribute( coordinates[0].getDistributionPtr() );
+
+        std::chrono::duration<double> redistTime = std::chrono::steady_clock::now() - beforeRedist;
+        if (settings.verbose) {
+            ValueType totRedistTime = ValueType( comm->max(redistTime.count()) );
+            if(comm->getRank() == 0)
+                std::cout << "redistribution after K-Means, Time:" << totRedistTime << std::endl;
+        }
     }
 
     return result;
