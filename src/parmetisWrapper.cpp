@@ -2,6 +2,7 @@
 
 #include "parmetisWrapper.h"
 #include "AuxiliaryFunctions.h"
+#include "Mapping.h"
 
 namespace ITI {
 
@@ -305,6 +306,20 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
     }
 
     delete[] partKway;
+
+    //possible mapping at the end
+    if( settings.mappingRenumbering ) {
+        PRINT0("Applying renumbering of blocks based on the SFC index of their centers.");
+        std::vector<scai::lama::DenseVector<ValueType>> copyCoords;
+        if( not partitionKway.getDistribution().isEqual(coords[0].getDistribution()) ) {
+            PRINT0("WARNING:\nCoordinates and partition do not have the same distribution.\nRedistributing coordinates to match distribution");
+            for( int d=0; d<ndims; d++) {
+                copyCoords[d] = coords[d];
+                copyCoords[d].redistribute( partitionKway.getDistributionPtr() );
+            }
+        }
+        Mapping<IndexType,ValueType>::applySfcRenumber( coords, nodeWeights, partitionKway, settings );
+    }
 
     return partitionKway;
 
