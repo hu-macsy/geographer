@@ -30,7 +30,8 @@ Options populateOptions() {
     ("seed", "random seed, default is current time", value<double>()->default_value(std::to_string(time(NULL))))
     //mapping
     ("PEgraphFile", "read communication graph from file", value<std::string>())
-    ("blockSizesFile", " file to read the block sizes for every block", value<std::string>() )
+    ("blockSizesFile", "file to read the block sizes for every block", value<std::string>() )
+    ("mappingRenumbering", "map blocks to PEs using the SFC index of the block's center. This works better when PUs are numbered consecutively." )
     //repartitioning
     ("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
     //multi-level and local refinement
@@ -190,6 +191,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.writeDebugCoordinates = vm.count("writeDebugCoordinates");
     settings.writePEgraph = vm.count("writePEgraph");
     settings.setAutoSettings = vm.count("autoSettings");
+    settings.mappingRenumbering = vm.count("mappingRenumbering");
 
     //28/11/19, deprecate storeInfo parameter. Leaving it as an option for backwards compatibility.    
     //if outFile was provided but storeInfo was not given as an argument
