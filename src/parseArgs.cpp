@@ -36,6 +36,7 @@ Options populateOptions() {
     ("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
     //multi-level and local refinement
     ("initialPartition", "Choose initial partitioning method between space-filling curves (geoSFC), balanced k-means (geoKmeans) or the hierarchical version (geoHierKM) and MultiJagged (geoMS). If parmetis or zoltan are installed, you can also choose to partition with them using for example, parMetisGraph or zoltanMJ. For more information, see src/Settings.h file.", value<std::string>())
+    ("initialMigration", "The preprocessing step to distribute data before calling the partitioning algorithm", value<std::string>())
     ("noRefinement", "skip local refinement steps")
     ("multiLevelRounds", "Tuning Parameter: How many multi-level rounds with coarsening to perform", value<IndexType>()->default_value(std::to_string(settings.multiLevelRounds)))
     ("minBorderNodes", "Tuning parameter: Minimum number of border nodes used in each refinement step", value<IndexType>())
@@ -243,6 +244,10 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     }
     if (vm.count("blockSizesFile")) {
         settings.blockSizesFile = vm["blockSizesFile"].as<std::string>();
+    }
+    if ( vm.count("initialMigration") ){
+        std::string s = vm["initialMigration"].as<std::string>();
+        settings.initialMigration = to_tool(s);        
     }
     if (vm.count("initialPartition")) {
         std::string s = vm["initialPartition"].as<std::string>();

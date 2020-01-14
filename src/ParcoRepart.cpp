@@ -396,11 +396,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
 
             if (!settings.repartition || comm->getSize() != settings.numBlocks) {
 
-                if (settings.initialMigration != ITI::Tool::geoSFC) {
-                    throw std::logic_error("KMeans depends on pre-sorting with space filling curves.");
+                if (settings.initialMigration == ITI::Tool::geoSFC) {
+                    HilbertCurve<IndexType,ValueType>::redistribute(coordinateCopy, nodeWeightCopy, settings, metrics);
+                }else if(settings.initialMigration == ITI::Tool::none) {
+                    //do nothing
+                }else{
+                    throw std::logic_error("Wrong option for data migration: " + to_string(settings.initialMigration) );
                 }
-
-                HilbertCurve<IndexType,ValueType>::redistribute(coordinateCopy, nodeWeightCopy, settings, metrics);
             }
         }
 

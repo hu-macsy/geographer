@@ -157,7 +157,8 @@ struct Settings {
     bool repartition = false; 	///< set to true to respect the initial partition
 
     ITI::Tool initialPartition = ITI::Tool::geoKmeans;			///< the tool to use to get the initial partition, \sa Tool
-    static const ITI::Tool initialMigration = ITI::Tool::geoSFC;///< pre-processing step to redistribute/migrate coordinates
+    //static const ITI::Tool initialMigration = ITI::Tool::geoSFC;///< pre-processing step to redistribute/migrate coordinates
+    ITI::Tool initialMigration = ITI::Tool::geoSFC;
     //@}
 
     /** @name Input data and other info
