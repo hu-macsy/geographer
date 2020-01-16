@@ -335,7 +335,7 @@ struct Settings {
         else if(ITI::to_string(initialPartition).rfind("geoHier",0)==0 ){
             out<< "\tminSamplingNodes: " << minSamplingNodes << std::endl;
             out<< "\thier levels: ";
-            for(int i=0; i<hierLevels.size(); i++) {
+            for(unsigned int i=0; i<hierLevels.size(); i++) {
                out<< hierLevels[i] << ", ";
             }
             out<< std::endl;
