@@ -118,7 +118,16 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     assert(!settings.repartition);
 
     CommTree<IndexType,ValueType> commTree;
-    commTree.createFlatHomogeneous( settings.numBlocks );
+    
+    //if argument hierLevels is provided
+    if( settings.hierLevels.size()!=0 ){
+        const IndexType numWeights = nodeWeights.size();
+        commTree.createFromLevels(settings.hierLevels, numWeights );
+    } else {
+        commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
+    }
+
+    //commTree.createFlatHomogeneous( settings.numBlocks );
     commTree.adaptWeights( nodeWeights );
 
     return partitionGraph(input, coordinates, nodeWeights, previous, commTree, comm, settings, metrics);
