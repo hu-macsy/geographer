@@ -1151,7 +1151,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
             for (ValueType blockSize : targetBlockWeights[i]) {
                 PRINT0(std::to_string(blockSize) + " ");
             }
-            throw std::invalid_argument("Block weight sum " + std::to_string(blockWeightSum) + " too small for node weight sum " + std::to_string(nodeWeightSum[i]) + ". Maybe you should try calling CommTree::adaptWeights().");
+            throw std::invalid_argument("The total weight of the wanted blocks is " + std::to_string(blockWeightSum) + " which is smaller than the total vertex weight which is " + std::to_string(nodeWeightSum[i]) + "; i.e., the given input does not fit into the given block weights. Maybe you should try calling CommTree::adaptWeights().");
         }
     }
 
