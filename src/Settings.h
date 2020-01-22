@@ -157,7 +157,8 @@ struct Settings {
     bool repartition = false; 	///< set to true to respect the initial partition
 
     ITI::Tool initialPartition = ITI::Tool::geoKmeans;			///< the tool to use to get the initial partition, \sa Tool
-    static const ITI::Tool initialMigration = ITI::Tool::geoSFC;///< pre-processing step to redistribute/migrate coordinates
+    //static const ITI::Tool initialMigration = ITI::Tool::geoSFC;///< pre-processing step to redistribute/migrate coordinates
+    ITI::Tool initialMigration = ITI::Tool::geoSFC;
     //@}
 
     /** @name Input data and other info
@@ -205,7 +206,7 @@ struct Settings {
     /** @name Space filling curve parameters
     */
     //@{
-    IndexType sfcResolution = 7; 			///<tuning parameters for SFC, the resolution depth for the curve
+    IndexType sfcResolution = 9; 			///<tuning parameters for SFC, the resolution depth for the curve
     //@}
 
 
@@ -263,6 +264,7 @@ struct Settings {
     //calculate expensive performance metrics?
     bool computeDiameter = false;			///< if the diameter should be computed (can be expensive)
     IndexType maxDiameterRounds = 2;		///< max number of rounds to approximate the diameter
+    IndexType maxCGIterations = 500;        ///< max number of iterations of the CG solver in metrics
     //@}
 
     /** @name Various parameters
@@ -319,17 +321,27 @@ struct Settings {
         }
 
         out<< "initial migration: " << initialMigration << std::endl;
+        out<< "initial partition: " << initialPartition << std::endl;
 
-        if (initialPartition==ITI::Tool::geoSFC) {
-            out<< "initial partition: hilbert curve" << std::endl;
+        if(ITI::to_string(initialPartition).rfind("geoSFC",0)==0 ){
+        //if (initialPartition==ITI::Tool::geoSFC) {
             out<< "\tsfcResolution: " << sfcResolution << std::endl;
         }
-        else if (initialPartition==ITI::Tool::geoKmeans) {
-            out<< "initial partition: K-Means" << std::endl;
+        //else if (initialPartition==ITI::Tool::geoKmeans) {
+        else if(ITI::to_string(initialPartition).rfind("geoKmeans",0)==0 ){
             out<< "\tminSamplingNodes: " << minSamplingNodes << std::endl;
             out<< "\tinfluenceExponent: " << influenceExponent << std::endl;
-        } else if (initialPartition==ITI::Tool::geoMS) {
-            out<< "initial partition: MultiSection" << std::endl;
+        }
+        else if(ITI::to_string(initialPartition).rfind("geoHier",0)==0 ){
+            out<< "\tminSamplingNodes: " << minSamplingNodes << std::endl;
+            out<< "\thier levels: ";
+            for(unsigned int i=0; i<hierLevels.size(); i++) {
+               out<< hierLevels[i] << ", ";
+            }
+            out<< std::endl;
+        }
+        // else if (initialPartition==ITI::Tool::geoMS) {
+        else if(ITI::to_string(initialPartition).rfind("geoMS",0)==0 ){
             out<< "\tbisect: " << bisect << std::endl;
             out<< "\tuseIter "<< useIter << std::endl;
         } else {

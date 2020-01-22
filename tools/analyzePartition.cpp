@@ -1,7 +1,7 @@
 /**
  * @file analyzePartition.cpp
  *
- * A standalone executable to analyze an existing partition stored in a file.
+ * A standalone executable to analyze an existing partition stored in a file. Can get
  */
 
 #include <cxxopts.hpp>
@@ -10,6 +10,8 @@
 #include "../src/Metrics.h"
 #include "../src/GraphUtils.h"
 #include "../src/Settings.h"
+#include "../src/parseArgs.h"
+#include "../src/AuxiliaryFunctions.h"
 
 using ITI::Settings;
 using ITI::IndexType;
@@ -22,75 +24,56 @@ int main(int argc, char** argv) {
 	typedef double ValueType;   //use double
 	
     using namespace cxxopts;
-    cxxopts::Options options("analyze", "Analyzing existing partitions");
 
-    struct Settings settings;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const IndexType rank = comm->getRank();
 
-    std::string blockSizesFile;
-
+    cxxopts::Options options = ITI::populateOptions();
     options.add_options()
-    ("help", "display options")
-    ("version", "show version")
-    //input and coordinates
-    ("graphFile", "read graph from file", value<std::string>())
-    ("fileFormat", "The format of the file to read, available are AUTO, METIS, ADCRIC and MatrixMarket format. See FileIO.h for more details.", value<ITI::Format>())
-    ("dimensions", "Number of dimensions of generated graph", value<IndexType>()->default_value(std::to_string(settings.dimensions)))
-    ("partition", "file of partition", value<std::string>())
-    ("blockSizesFile", " file to read the block sizes for every block", value<std::string>() )
-    ("computeDiameter", "Compute Diameter of resulting block files.")
-    ("maxDiameterRounds", "abort diameter algorithm after that many BFS rounds", value<IndexType>()->default_value(std::to_string(settings.maxDiameterRounds)))
-    ;
-
-
+    ("PEgraphFormat", "the file format of the PEgraph", value<ITI::Format>());    
     cxxopts::ParseResult vm = options.parse(argc, argv);
+    Settings settings = ITI::interpretSettings(vm);
+
+
 
     if (vm.count("help")) {
-        std::cout << options.help() << "\n";
+        if(rank==0){
+            std::cout << options.help() << "\n";
+            std::cout << "Example of usage:\n>./tools/analyze --graphFile meshes/rotation-00000.graph --partition tmp/rotation_k8.part --metricsDetail=mappingALL --PEgraphFile tmp/rotation_k8.PEgraph" << std::endl;
+            std::cout << ">mpirun -np 4 ./tools/analyze --graphFile meshes/rotation-00000.graph --partition tmp/rotation_k8.part --metricsDetail=easy" << std::endl;
+            std::cout << ">mpirun -np 4 ./tools/analyze --graphFile meshes/rotation-00000.graph --partition tmp/rotation_k8.part --metricsDetail=easy --PEgraphFile tmp/rotation_k8.PEgraph --PEgraphFormat METIS" << std::endl;
+        }
         return 0;
     }
 
     if (vm.count("version")) {
-        std::cout << "Git commit " << ITI::version << std::endl;
+        if(rank==0)
+            std::cout << "Git commit " << ITI::version << std::endl;
         return 0;
     }
 
     if (!vm.count("graphFile")) {
-        std::cout << "Graph file needed." << std::endl;
-        return 126;
+        if(rank==0)
+            std::cout << "ERROR: Graph file needed." << std::endl;
+        return -1;
     }
 
     if (!vm.count("partition")) {
-        std::cout << "Partition needed." << std::endl;
-        return 126;
+        if(rank==0)
+            std::cout << "ERROR: Partition needed." << std::endl;
+        return -1;
     }
 
-    settings.computeDiameter = vm.count("computeDiameter");
-
     std::string graphFile = vm["graphFile"].as<std::string>();
-    settings.fileName = graphFile;
     std::string coordFile;
+
     if (vm.count("coordFile")) {
         coordFile = vm["coordFile"].as<std::string>();
     } else {
         coordFile = graphFile + ".xyz";
     }
 
-    if (vm.count("fileFormat")) {
-        settings.fileFormat = vm["fileFormat"].as<ITI::Format>();
-    }
-
-    if (vm.count("maxDiameterRounds")) {
-        settings.maxDiameterRounds = vm["maxDiameterRounds"].as<IndexType>();
-    }
-
-    if (vm.count("dimensions")) {
-        settings.dimensions = vm["dimensions"].as<IndexType>();
-    }
-
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
-    //std::vector<DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
-
-    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     std::vector<DenseVector<ValueType>>  nodeWeights;
     graph = ITI::FileIO<IndexType, ValueType>::readGraph( graphFile, nodeWeights, comm, settings.fileFormat );
 
@@ -98,7 +81,15 @@ int main(int argc, char** argv) {
     scai::dmemo::DistributionPtr rowDistPtr = graph.getRowDistributionPtr();
     scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ));
 
+    // set the node weights
+    IndexType numReadNodeWeights = nodeWeights.size();
+    if (numReadNodeWeights == 0) {
+        nodeWeights.resize(1);
+        nodeWeights[0] = scai::lama::fill<DenseVector<ValueType>>(rowDistPtr, 1);
+    }
+
     std::vector<std::vector<ValueType>> blockSizes;
+    std::string blockSizesFile;
 
     if( vm.count("blockSizesFile") ) {
         std::string blockSizesFile = vm["blockSizesFile"].as<std::string>();
@@ -110,28 +101,43 @@ int main(int argc, char** argv) {
         }
     }
 
+    //read partition from file
     std::string partname = vm["partition"].as<std::string>();
     DenseVector<IndexType> part = ITI::FileIO<IndexType, ValueType>::readPartition(partname, N);
     settings.numBlocks = part.max() +1;
+
+    SCAI_ASSERT_EQ_ERROR( part.getDistributionPtr()->getLocalSize(), nodeWeights[0].getDistributionPtr()->getLocalSize(), "Wrong distributions" );
+
+    if( vm.count("numBlocks") ){
+        std::cout << "## Warning, numBlocks option was given but is ignored. The number of blocks is inferred by the provided partition and is " << settings.numBlocks << std::endl;
+    }
 
     if (part.min() != 0) {
         throw std::runtime_error("Illegal minimum block ID in partition:" + std::to_string(part.min()));
     }
 
-    if (settings.computeDiameter) {
-        if (comm->getSize() != settings.numBlocks) {
-            if (comm->getRank() == 0) {
-                std::cout << "Can only compute diameter if number of processes is equal to number of blocks." << std::endl;
-            }
-        } else {
-            scai::dmemo::DistributionPtr newDist = scai::dmemo::generalDistributionByNewOwners(part.getDistribution(), part.getLocalValues());
-            graph.redistribute(newDist, noDistPtr);
-            part.redistribute(newDist);
-        }
-    }
+    //calculate metrics
 
     Metrics<ValueType> metrics(settings);
-    metrics.getEasyMetrics( graph, part, nodeWeights, settings );
+
+    if (settings.numBlocks != comm->getSize() and comm->getRank() == 0) {
+        std::cout<<"WARNING: the number of block in the partition and the number of mpi processes differ. Some metrics will not be calculated." << std::endl;
+    }
+    
+    if( settings.metricsDetail=="mappingALL" ) {
+        settings.metricsDetail="all";
+        metrics.getMetrics(graph, part, nodeWeights, settings );
+        settings.metricsDetail="mapping";
+        //abuse fileFormat for the PEgraph format
+        if( vm.count("PEgraphFormat"))
+            settings.fileFormat= vm["PEgraphFormat"].as<ITI::Format>();
+
+        metrics.getMetrics(graph, part, nodeWeights, settings );
+        //metrics.getMappingMetrics( graph, part, PEgraph );
+        //metrics.getAllMetrics( graph, part, nodeWeights, settings );
+    }else{
+        metrics.getMetrics(graph, part, nodeWeights, settings );
+    }
 
     if (comm->getRank() == 0) {
         metrics.print(std::cout);//TODO: adapt this

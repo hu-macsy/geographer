@@ -40,11 +40,11 @@ public:
         {"preliminaryCut",-1.0}, {"preliminaryImbalance",-1.0}, {"finalCut",-1.0}, {"finalImbalance",-1.0}, {"maxBlockGraphDegree",-1.0},
         {"preliminaryMaxCommVol",-1.0},{"preliminaryTotalCommVol",-1.0},
         {"totalBlockGraphEdges",-1.0}, {"maxCommVolume",-1.0}, {"totalCommVolume",-1.0}, {"maxBoundaryNodes",-1.0}, {"totalBoundaryNodes",-1.0},
-        {"SpMVtime",-1.0}, {"commTime",-1.0}, 
+        {"SpMVtime",-1.0}, {"commTime",-1.0}, {"CGtime", -1.0}, {"edgeImbalance", -1.0},
         {"maxBorderNodesPercent",-1.0}, {"avgBorderNodesPercent",-1.0},
         {"maxBlockDiameter",-1.0}, {"harmMeanDiam",-1.0}, {"numDisconBlocks",-1.0},
         {"maxRedistVol",-1.0}, {"totRedistVol",-1.0},	 //redistribution metrics
-        {"maxCongestion",-1.0}, {"maxDilation",-1.0}, {"avgDilation",0.0}		//mapping metrics
+        {"maxCongestion",-1.0}, {"maxDilation",-1.0}, {"avgDilation",-1.0}		//mapping metrics
     };
 
     //constructors
@@ -64,11 +64,12 @@ public:
     */
     Metrics( ) {	}
 
-
+    
     Metrics operator=(const Metrics &m) {
         this->MM = m.MM;
         return *this;
     }
+
 
     /**Wrapper function to call metrics depending on setting.metricsDetail
 
@@ -102,7 +103,7 @@ public:
     @param[in] nodeWeights The weights for the vertices of the graph.
     @param[in] settings A Settings struct.
     */
-    void getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings, const IndexType repeatTimes );
+    void getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueType>& graph, const scai::lama::DenseVector<IndexType>& partition, struct Settings settings, const IndexType repeatTimes );
 
     /** @brief Get metrics that fast to get. These are: cut, imbalance, max and total communication volume,
     max and total number of boundary nodes per block, max and total percentage of boundary nodes over all nodes.
@@ -159,14 +160,6 @@ public:
         const scai::lama::DenseVector<IndexType> partition,
         const scai::lama::CSRSparseMatrix<ValueType> PEGraph );
 
-    /** Given a distributed matrix (aka graph) it operates a multiplication with a vector for the
-        given number of repetitions and returns the average running time. The matrix is not const
-        because inside we set: matrix.setCommunicationKind( scai::lama::SyncKind::ASYNC_COMM );
-    */
-    ValueType getSPMVtime(
-    scai::lama::CSRSparseMatrix<ValueType> matrix,
-    const IndexType repeatTimes);
-
     //@{
     /** @name Print metrics
 
@@ -181,6 +174,26 @@ public:
 
     void printKMeansProfiling( std::ostream& out ) const ;
     //@}
+
+protected:
+
+    /** Given a distributed matrix (aka graph) it operates a multiplication with a vector for the
+        given number of repetitions and returns the average running time. The matrix is not const
+        because inside we set: matrix.setCommunicationKind( scai::lama::SyncKind::ASYNC_COMM );
+    */
+    ValueType getSPMVtime(
+        scai::lama::CSRSparseMatrix<ValueType> matrix,
+        const IndexType repeatTimes);
+
+    /** @brief Given a graph and a partition, solve the linear system implied by the laplacian of the graph.
+
+        @return The time needed to solve the linear system.
+    */
+    ValueType getLinearSolverTime(
+        const scai::lama::CSRSparseMatrix<ValueType>& graph,
+        const IndexType repeatTimes,
+        const IndexType maxIterations = 100
+        );
 
 }; //struct Metrics
 
@@ -209,8 +222,6 @@ inline Metrics<ValueType> aggregateVectorMetrics( const std::vector<Metrics<Valu
     for( auto metIt = aggregateMetrics.MM.begin(); metIt!=aggregateMetrics.MM.end(); metIt++){
 		metIt->second /= numRuns;
 	}
-    
-    
 
     return aggregateMetrics;
 }

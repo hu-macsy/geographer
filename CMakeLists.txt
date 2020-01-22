@@ -139,9 +139,8 @@ add_subdirectory(src)
 
 add_subdirectory(tools)
 
-
 if( TARGET wrappers )
-	set( WRAPPERS_FOUND TRUE)
+	set( WRAPPERS_FOUND TRUE CACHE INTERNAL "")
 	#set( EXTRA_LIBS "")
 endif()
 

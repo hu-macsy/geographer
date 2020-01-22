@@ -94,6 +94,20 @@ void CommTree<IndexType, ValueType>::createFromLevels( const std::vector<IndexTy
 
     CommTree tmpTree( levels, numWeights );
 
+    {
+        auto leaves = tmpTree.getLeaves();
+        IndexType tmpHierarchyLevels = leaves.front().hierarchy.size();
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        if( comm->getRank()==0 ) {
+            std::cout << "There are " << tmpHierarchyLevels << " levels of hierarchy and " << leaves.size() << " leaves.";
+            std::cout <<" Level sizes: ";
+            for( IndexType x : levels){
+                std::cout<< x << ", ";
+            }
+            std::cout << std::endl<< std::endl;
+        }
+    }
+
     *this = tmpTree;
 }
 //------------------------------------------------------------------------
@@ -110,12 +124,6 @@ IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vecto
     IndexType size = levelBelow.size();
 
     IndexType tmpHierarchyLevels = leaves.front().hierarchy.size();
-    {
-        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-        if( comm->getRank()==0 ) {
-            PRINT("There are " << tmpHierarchyLevels << " levels of hierarchy and " << leaves.size() << " leaves");
-        }
-    }
 
     for(int h = tmpHierarchyLevels-1; h>=0; h--) {
         //PRINT("starting level " << h);

@@ -387,8 +387,8 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
     IndexType k,
     const DenseVector<ValueType> &nodeWeights,
     const std::vector<ValueType> &optBlockSizes) {
-
     SCAI_REGION( "ParcoRepart.computeImbalance" )
+
     const IndexType globalN = part.getDistributionPtr()->getGlobalSize();
     const IndexType localN = part.getDistributionPtr()->getLocalSize();
     const IndexType weightsSize = nodeWeights.getDistributionPtr()->getGlobalSize();
@@ -398,13 +398,6 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
     const bool homogeneous = (optBlockSizes.size()==0);
 
     scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
-
-    /*
-    if( comm->getRank()==0 ){
-        std::cout<<"Computing the imbalance...";
-        std::cout.flush();
-    }
-    */
 
     SCAI_ASSERT_EQ_ERROR(weighted, comm->any(weighted), "inconsistent input!");
 
@@ -427,7 +420,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
         throw std::runtime_error("Negative node weights not supported.");
     }
 
-    //TODO: is this needed here? remove or wrap around settigns.debugMode?
+    //TODO: is this needed here? remove or wrap around settings.debugMode?
     const IndexType minK = part.min();
     const IndexType maxK = part.max();
 
@@ -477,10 +470,10 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
         if( homogeneous) {
             //get global weight sum
             weightSum = comm->sum(weightSum);
-            ValueType optSize = std::ceil(weightSum / k + (maxWeight - minWeight));
-            imbalance = (ValueType(maxBlockSize - optSize)/ optSize);
+            ValueType optSize = weightSum / k + (maxWeight - minWeight);
+            assert(maxBlockSize >= optSize);
 
-            //optSize = std::ceil(ValueType(weightSum) / k );
+            imbalance = (ValueType(maxBlockSize - optSize)/ optSize);
         } else {
             //optBlockSizes is the optimum weight/size for every block
             SCAI_ASSERT_EQ_ERROR( k, optBlockSizes.size(), "Number of blocks do not agree with the size of the vector of the block sizes");
@@ -494,7 +487,7 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
         }
 //TODO: can we a have heterogeneous network but no node weights?
     } else {
-        ValueType optSize = std::ceil(ValueType(globalN) / k);
+        ValueType optSize = ValueType(globalN) / k;
         assert(maxBlockSize >= optSize);
 
         imbalance = (ValueType(maxBlockSize - optSize)/ optSize);
@@ -868,7 +861,7 @@ template<typename IndexType, typename ValueType>
 std::tuple<std::vector<IndexType>, std::vector<IndexType>, std::vector<IndexType>> GraphUtils<IndexType, ValueType>::computeCommBndInner(
             const CSRSparseMatrix<ValueType> &adjM,
             const DenseVector<IndexType> &part,
-Settings settings) {
+            Settings settings) {
 
     const IndexType numBlocks = settings.numBlocks;
     const scai::dmemo::DistributionPtr dist = adjM.getRowDistributionPtr();
@@ -1763,7 +1756,8 @@ std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, Val
 }
 
 //---------------------------------------------------------------------------------------
-
+//TODO: diagonal elements wrongly found when row distribution and column distribution are some general distribution
+//  while it works if both are a block distribution
 template<typename IndexType, typename ValueType>
 CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(const CSRSparseMatrix<ValueType>& graph) {
     using scai::lama::CSRStorage;
@@ -1778,7 +1772,6 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(
     }
 
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
-    scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(globalN));
 
     const CSRStorage<ValueType>& storage = graph.getLocalStorage();
     const ReadAccess<IndexType> ia(storage.getIA());
@@ -2072,6 +2065,27 @@ ValueType GraphUtils<IndexType, ValueType>::localSumOutgoingEdges(const CSRSpars
     }
 
     return sumOutgoingEdgeWeights;
+}
+//------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+bool GraphUtils<IndexType, ValueType>::hasSelfLoops(const CSRSparseMatrix<ValueType> &graph){
+    
+    const CSRStorage<ValueType>& storage = graph.getLocalStorage();
+    const scai::hmemo::ReadAccess<IndexType> ia(storage.getIA());
+    const scai::hmemo::ReadAccess<IndexType> ja(storage.getJA());
+
+    scai::hmemo::HArray<ValueType> diagonal;
+    storage.getDiagonal( diagonal );
+    const IndexType diagonalSum = scai::utilskernel::HArrayUtils::sum(diagonal);
+    
+    const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
+    const IndexType diagonalSumSum = comm->sum( diagonalSum );
+PRINT(diagonalSumSum);
+    if( diagonalSumSum>0 ){
+        return true;
+    }
+    return false;
 }
 //------------------------------------------------------------------------------------
 

@@ -110,14 +110,7 @@ int main(int argc, char** argv) {
     for( int t=0; t<wantedTools.size(); t++) {
 
         ITI::Tool thisTool = wantedTools[t];
-
-        // get the partition and metrics
-        //
-        scai::lama::DenseVector<IndexType> partition;
-
-        // the constructor with metrics(comm->getSize()) is needed for ParcoRepart timing details
-        Metrics<ValueType> metrics( settings );
-        //metrics.numBlocks = settings.numBlocks;
+        std::cout.precision(5);
 
         // if using unit weights, set flag for wrappers
         bool nodeWeightsUse = true;
@@ -131,26 +124,7 @@ int main(int argc, char** argv) {
         } 
      
         //set outFile depending if we get outDir or outFile parameter
-        std::string outFile = settings.outFile;
-		
-        if( vm.count("outDir") and settings.storeInfo ) {
-            //set the graphName in order to create the outFile name
-            std::string copyName;
-            if( vm.count("graphFile") ){
-                copyName = vm["graphFile"].as<std::string>();
-            }else{     
-                copyName = "generate_"+vm["numX"].as<std::string>()+"_"+vm["numY"].as<std::string>();
-            }
-            std::vector<std::string> strs = aux<IndexType,ValueType>::split( copyName, '/' );
-            std::string graphName = aux<IndexType,ValueType>::split(strs.back(), '.')[0];
-            //add specific folder for each tool
-            outFile = settings.outDir+ ITI::to_string(thisTool)+ "/"+ graphName+ "_k"+ std::to_string(settings.numBlocks)+ "_"+ ITI::to_string(thisTool)+ ".info";
-        }
-
-        //we are given just one file name, not a directory, append tool nane
-        if( not vm.count("outDir") and vm.count("outFile") and settings.storeInfo){
-            outFile += ("_" + ITI::to_string(thisTool));
-        }
+        std::string outFile = getOutFileName(settings, ITI::to_string(thisTool), comm);
 
         std::ifstream f(outFile);
         if( f.good() and settings.storeInfo ) {
@@ -184,21 +158,48 @@ int main(int argc, char** argv) {
             throw std::runtime_error("Provided tool: "+ ITI::to_string(thisTool) + " not supported.\nAborting..." );
         }
 
-        partition = partitioner->partition( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
+        // get the partition and metrics
+        //
+        scai::lama::DenseVector<IndexType> partition;
+        scai::lama::DenseVector<IndexType> oldPartition(dist, 1);
+        std::vector<Metrics<ValueType>> metricsVec;
 
-        PRINT0("time to get the partition: " <<  metrics.MM["timeTotal"] );
+        for( int r=0; r<settings.repeatTimes; r++){
+            metricsVec.push_back( Metrics<ValueType>( settings ) );
 
-        // partition has the the same distribution as the graph rows
-        SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
+            partition = partitioner->partition( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metricsVec[r]);
+            
+            // partition has the the same distribution as the graph rows
+            SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
 
+            //ValueType partDiff = oldPartition.maxDiffNorm(partition); // another way to check if partitions are close but is more expensive
+            bool isIdentical = partition.all(scai::common::CompareOp::EQ, oldPartition);
+            if( isIdentical ){
+                if(comm->getRank()==0){
+                    std::cout<< "Partition is identical, not calculating metrics" << std::endl;  
+                }
+                //keep only the run time of this run
+                ValueType runTime = metricsVec[r].MM["timeTotal"];
+                metricsVec[r] = metricsVec[r-1];
+                metricsVec[r].MM["timeTotal"] = runTime;
+            }else{
+                metricsVec[r].getMetrics( graph, partition, nodeWeights, settings );
+            }
 
-        if( settings.metricsDetail=="all" ) {
-            metrics.getAllMetrics( graph, partition, nodeWeights, settings );
+            PRINT0("time to get the partition with " << ITI::to_string(thisTool) << ": " << metricsVec[r].MM["timeTotal"] );
+
+            //if one run exceeds the time limit, do not execute the rest of the runs
+            if( metricsVec[r].MM["timeTotal"]>ITI::HARD_TIME_LIMIT) {
+                if(comm->getRank()==0){
+                    std::cout<< "Stopping runs because of excessive running total running time: " << metricsVec[r].MM["timeTotal"] << std::endl;
+                }
+                break;
+            }
+            oldPartition = partition;
         }
-        if( settings.metricsDetail=="easy" ) {
-            metrics.getEasyMetrics( graph, partition, nodeWeights, settings );
-        }
 
+        //aggregate metrics in one struct
+        const Metrics<ValueType> aggrMetrics = aggregateVectorMetrics( metricsVec, comm );
 
         //---------------------------------------------------------------
         //
@@ -212,7 +213,7 @@ int main(int argc, char** argv) {
             std::cout << "\n---> " << ITI::to_string(thisTool);
             std::cout<<  "\033[0m" << std::endl;
 
-            metrics.print( std::cout );
+            aggrMetrics.print( std::cout );
 
             // write in a file
             if( outFile!= "-" and settings.storeInfo) {
@@ -221,8 +222,8 @@ int main(int argc, char** argv) {
                     outF << "Running " << __FILE__ << " for tool " << ITI::to_string(thisTool) << std::endl;
                     printInfo( outF, comm, settings);
 
-                    metrics.print( outF );
-                    //printMetricsShort( metrics, outF);
+                    aggrMetrics.print( outF );
+                    //printMetricsShort( aggrMetrics, outF);
                     std::cout<< "Output information written to file " << outFile << std::endl;
                 } else {
                     std::cout<< "\n\tWARNING: Could not open file " << outFile << " informations not stored.\n"<< std::endl;
@@ -266,8 +267,10 @@ int main(int argc, char** argv) {
                 std::cout<< "WARNING: directrory " << destPath << " does not exist. De buf coordinates were not stored. Create directory and re-run" << std::endl;
             }
         }
+        if( thisPE==0) std::cout<< std::endl;
         comm->synchronize();    // needed when storing files 
     } // for wantedTools.size()
+
     std::chrono::duration<ValueType> totalTimeLocal = std::chrono::steady_clock::now() - startTime;
     ValueType totalTime = comm->max( totalTimeLocal.count() );
     if( thisPE==0 ) {

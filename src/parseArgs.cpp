@@ -30,11 +30,13 @@ Options populateOptions() {
     ("seed", "random seed, default is current time", value<double>()->default_value(std::to_string(time(NULL))))
     //mapping
     ("PEgraphFile", "read communication graph from file", value<std::string>())
-    ("blockSizesFile", " file to read the block sizes for every block", value<std::string>() )
+    ("blockSizesFile", "file to read the block sizes for every block", value<std::string>() )
+    ("mappingRenumbering", "map blocks to PEs using the SFC index of the block's center. This works better when PUs are numbered consecutively." )
     //repartitioning
     ("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
     //multi-level and local refinement
     ("initialPartition", "Choose initial partitioning method between space-filling curves (geoSFC), balanced k-means (geoKmeans) or the hierarchical version (geoHierKM) and MultiJagged (geoMS). If parmetis or zoltan are installed, you can also choose to partition with them using for example, parMetisGraph or zoltanMJ. For more information, see src/Settings.h file.", value<std::string>())
+    ("initialMigration", "The preprocessing step to distribute data before calling the partitioning algorithm", value<std::string>())
     ("noRefinement", "skip local refinement steps")
     ("multiLevelRounds", "Tuning Parameter: How many multi-level rounds with coarsening to perform", value<IndexType>()->default_value(std::to_string(settings.multiLevelRounds)))
     ("minBorderNodes", "Tuning parameter: Minimum number of border nodes used in each refinement step", value<IndexType>())
@@ -50,6 +52,8 @@ Options populateOptions() {
     ("bisect", "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached", value<bool>())
     ("cutsPerDim", "If MultiSection is chosen, then provide d values that define the number of cuts per dimension. You must provide as many numbers as the dimensions separated with commas. For example, --cutsPerDim=3,4,10 for 3 dimensions resulting in 3*4*10=120 blocks", value<std::string>())
     ("pixeledSideLen", "The resolution for the pixeled partition or the spectral", value<IndexType>())
+    //sfc
+    ("sfcResolution", "The resolution depth of the hilbert space filling curve", value<IndexType>())
     // K-Means
     ("minSamplingNodes", "Tuning parameter for K-Means", value<IndexType>())
     ("influenceExponent", "Tuning parameter for K-Means, default is ", value<double>()->default_value(std::to_string(settings.influenceExponent)))
@@ -64,6 +68,7 @@ Options populateOptions() {
     ("outFile", "write result partition into file", value<std::string>())
     //debug
     ("writeDebugCoordinates", "Write Coordinates of nodes in each block", value<bool>())
+    ("writePEgraph", "Write the processor graph to a file", value<bool>())
     ("verbose", "Increase output.")
     ("debugMode", "Increase output and more expensive checks")
     ("storeInfo", "Store timing and other metrics in file.")
@@ -73,8 +78,10 @@ Options populateOptions() {
     ("repeatTimes", "How many times we repeat the partitioning process.", value<IndexType>())
     ("noComputeDiameter", "Compute diameter of resulting block files.")
     ("maxDiameterRounds", "abort diameter algorithm after that many BFS rounds", value<IndexType>())
+    ("maxCGIterations", "max number of iterations of the CG solver in metrics",  value<IndexType>())
     ("metricsDetail", "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV", value<std::string>())
     ("autoSettings", "Set some settings automatically to some values possibly overwriting some user passed parameters. ", value<bool>() )
+    ("partition", "file of partition (typically used by tools/analyzePartition)", value<std::string>())
     //used for the competitors main
     ("outDir", "write result partition into folder", value<std::string>())
     ("tools", "choose which supported tools to use. For multiple tool use comma to separate without spaces. See in Settings::Tools for the supported tools and how to call them.", value<std::string>() )
@@ -140,10 +147,12 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
 
     if (vm.count("outFile")) {
         settings.outFile = vm["outFile"].as<std::string>();
+        settings.storeInfo = true;
     }
 
     if (vm.count("outDir")) {
         settings.outDir = vm["outDir"].as<std::string>();
+        settings.storeInfo = true;
     }
 
     if (!vm.count("influenceExponent")) {
@@ -151,7 +160,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     }
 
     if( vm.count("metricsDetail") ) {
-        if( not (settings.metricsDetail=="no" or settings.metricsDetail=="easy" or settings.metricsDetail=="all") ) {
+        if( not (settings.metricsDetail=="no" or settings.metricsDetail=="easy" or settings.metricsDetail=="all" or settings.metricsDetail=="mapping") ) {
             if(comm->getRank() ==0 ) {
                 std::cout<<"WARNING: wrong value for parameter metricsDetail= " << settings.metricsDetail << ". Setting to all" <<std::endl;
                 settings.metricsDetail="all";
@@ -168,7 +177,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     using std::vector;
     settings.verbose = vm.count("verbose");
     settings.debugMode = vm.count("debugMode");
-    settings.storeInfo = vm.count("storeInfo");
+    //settings.storeInfo = vm.count("storeInfo");
     settings.storePartition = vm.count("storePartition");
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
@@ -181,29 +190,22 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.nnCoarsening = vm.count("nnCoarsening");
     settings.bisect = vm.count("bisect");
     settings.writeDebugCoordinates = vm.count("writeDebugCoordinates");
+    settings.writePEgraph = vm.count("writePEgraph");
     settings.setAutoSettings = vm.count("autoSettings");
+    settings.mappingRenumbering = vm.count("mappingRenumbering");
 
+    //28/11/19, deprecate storeInfo parameter. Leaving it as an option for backwards compatibility.    
     //if outFile was provided but storeInfo was not given as an argument
-    if( !vm.count("storeInfo") && settings.outFile!="-" ) {
+    if( vm.count("storeInfo") ) {
         if(comm->getRank()==0){
-            std::cout << "WARNING: Option for outFile was given but no option to store information (--storeInfo). Will store metrics anyway. Give --metricsDetail=no to, at least, not calculate the metrics" << std::endl;
+            std::cout << "WARNING: Option --storeInfo is deprecated and (most probably) will be ignored; metrics will be stored depending on the options --outFile and --outDir" << std::endl;
         }
         settings.storeInfo = true;
     }
-    if( settings.storeInfo and settings.outFile=="-" and settings.outDir=="-" ) {
-        if(comm->getRank()==0){
-            std::cout << "Option to store information used but no output file given to write to. Specify an output file name using the option --outFile. Aborting." << std::endl;
-        }
-        settings.isValid = false;
-    }
-    
-    if( settings.storePartition && settings.outFile=="-" ) {
-        if(comm->getRank()==0){
-            std::cout << "Option to store partition used but no output file given to write to. Specify an output file name using the option --outFile. Aborting." << std::endl;
-        }
-        settings.isValid = false;
-    }
 
+    if (vm.count("graphFile")) {
+        settings.fileName = vm["graphFile"].as<std::string>();
+    }
     if (vm.count("fileFormat")) {
         settings.fileFormat = vm["fileFormat"].as<ITI::Format>();
     }
@@ -233,12 +235,19 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     } else {
         settings.numBlocks = comm->getSize();
     }
+    if (vm.count("sfcResolution")) {
+        settings.sfcResolution = vm["sfcResolution"].as<IndexType>();
+    }
 
     if (vm.count("epsilon")) {
         settings.epsilon = vm["epsilon"].as<double>();
     }
     if (vm.count("blockSizesFile")) {
         settings.blockSizesFile = vm["blockSizesFile"].as<std::string>();
+    }
+    if ( vm.count("initialMigration") ){
+        std::string s = vm["initialMigration"].as<std::string>();
+        settings.initialMigration = to_tool(s);        
     }
     if (vm.count("initialPartition")) {
         std::string s = vm["initialPartition"].as<std::string>();
@@ -331,6 +340,9 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("maxDiameterRounds")) {
         settings.maxDiameterRounds = vm["maxDiameterRounds"].as<IndexType>();
     }
+    if (vm.count("maxCGIterations")) {
+        settings.maxCGIterations = vm["maxCGIterations"].as<IndexType>();
+    }    
     if (vm.count("metricsDetail")) {
         settings.metricsDetail = vm["metricsDetail"].as<std::string>();
     }

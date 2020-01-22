@@ -118,7 +118,16 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     assert(!settings.repartition);
 
     CommTree<IndexType,ValueType> commTree;
-    commTree.createFlatHomogeneous( settings.numBlocks );
+    
+    //if argument hierLevels is provided
+    if( settings.hierLevels.size()!=0 ){
+        const IndexType numWeights = nodeWeights.size();
+        commTree.createFromLevels(settings.hierLevels, numWeights );
+    } else {
+        commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
+    }
+
+    //commTree.createFlatHomogeneous( settings.numBlocks );
     commTree.adaptWeights( nodeWeights );
 
     return partitionGraph(input, coordinates, nodeWeights, previous, commTree, comm, settings, metrics);
@@ -308,8 +317,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
                 //now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
                 metrics.MM["preliminaryMaxCommVol"] = tmpMetrics.MM["maxCommVolume"];
                 metrics.MM["preliminaryTotalCommVol"] = tmpMetrics.MM["totalCommVolume"];
-                metrics.MM["preliminaryCut"] = tmpMetrics.MM["preliminaryCut"];
-                metrics.MM["preliminaryImbalance"] = tmpMetrics.MM["preliminaryImbalance"];
+                metrics.MM["preliminaryCut"] = tmpMetrics.MM["finalCut"];
+                metrics.MM["preliminaryImbalance"] = tmpMetrics.MM["finalImbalance"];
             }
 
 			doLocalRefinement( result,  input, coordinates, nodeWeights, comm, settings, metrics );
@@ -396,11 +405,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
 
             if (!settings.repartition || comm->getSize() != settings.numBlocks) {
 
-                if (settings.initialMigration != ITI::Tool::geoSFC) {
-                    throw std::logic_error("KMeans depends on pre-sorting with space filling curves.");
+                if (settings.initialMigration == ITI::Tool::geoSFC) {
+                    HilbertCurve<IndexType,ValueType>::redistribute(coordinateCopy, nodeWeightCopy, settings, metrics);
+                }else if(settings.initialMigration == ITI::Tool::none) {
+                    //do nothing
+                }else{
+                    throw std::logic_error("Wrong option for data migration: " + to_string(settings.initialMigration) );
                 }
-
-                HilbertCurve<IndexType,ValueType>::redistribute(coordinateCopy, nodeWeightCopy, settings, metrics);
             }
         }
 
@@ -441,12 +452,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
                 result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
         }
 
-        std::chrono::duration<double>  kMeansTime = std::chrono::steady_clock::now() - beforeKMeans;
+        std::chrono::duration<double> kMeansTime = std::chrono::steady_clock::now() - beforeKMeans;
         assert(scai::utilskernel::HArrayUtils::min(result.getLocalValues()) >= 0);
         SCAI_ASSERT_LT_ERROR(scai::utilskernel::HArrayUtils::max(result.getLocalValues()),k, "");
 
-        if (settings.verbose) {
-            ValueType totKMeansTime = ValueType( comm->max(kMeansTime.count()) );
+        //warning: this comm->max implies a barrier but (probably) does not affect much
+        ValueType totKMeansTime = ValueType( comm->max(kMeansTime.count()) ); 
+        metrics.MM["timeKmeans"] = totKMeansTime; //possible overwrite but this time is more realistic
+
+        if (settings.verbose) {            
             if(comm->getRank() == 0)
                 std::cout << "K-Means, Time:" << totKMeansTime << std::endl;
         }
@@ -486,7 +500,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
 
     //if using k-means the result has different distribution
     if( not result.getDistributionPtr()->isEqual( coordinates[0].getDistribution()) ){
+        std::chrono::time_point<std::chrono::steady_clock> beforeRedist =  std::chrono::steady_clock::now();
+
         result.redistribute( coordinates[0].getDistributionPtr() );
+
+        std::chrono::duration<double> redistTime = std::chrono::steady_clock::now() - beforeRedist;
+        ValueType totRedistTime = ValueType( comm->max(redistTime.count()) );
+        if(comm->getRank() == 0){
+            std::cout << "redistribution after K-Means, Time:" << totRedistTime << std::endl;
+        }
     }
 
     return result;

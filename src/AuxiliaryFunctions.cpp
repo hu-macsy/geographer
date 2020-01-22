@@ -209,11 +209,6 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 
     scai::dmemo::DistributionPtr distFromPartition;
 
-//    if( useRedistributor ) {
-//        PRINT0("***\tWarning: using a redistributor creates inconsistencies and is currently deprecated. Switching to no-redistributor version");
-//        useRedistributor = false;
-//    }
-
     if( useRedistributor ) {
         scai::dmemo::RedistributePlan resultRedist = scai::dmemo::redistributePlanByNewOwners(partition.getLocalValues(), partition.getDistributionPtr());
         distFromPartition = resultRedist.getTargetDistributionPtr();

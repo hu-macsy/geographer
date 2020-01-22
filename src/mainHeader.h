@@ -219,4 +219,55 @@ Settings initialize( const int argc, char** argv, const cxxopts::ParseResult& vm
     return settings;
 }
 
+
+std::string getOutFileName( const Settings& settings, const std::string& toolName, const scai::dmemo::CommunicatorPtr& comm){
+    const IndexType rank = comm->getRank();
+    std::string outFile = settings.outFile;
+
+    //want to store partition but outFile was not provided
+    if( settings.storePartition and outFile=="-"){
+        outFile = toolName+"_k"+ std::to_string(settings.numBlocks);
+        if(rank==0){
+            std::cout << "Option to store partition was given but no filename (--outFile). Created prefix: " << outFile << std::endl;
+        }
+    }
+
+    //we are given a directory 
+    if( settings.outDir!="-" ) {
+        std::string dash = "";
+        if( (settings.outDir.compare(settings.outDir.length()-1, 1, "/")!=0) and (settings.outDir.compare(settings.outDir.length()-1, 1, "\\")!=0) and toolName!="" ){
+            dash= "/";
+        }        
+        //but no outFile
+        if( settings.outFile=="-" ){
+            //set the graphName in order to create the outFile name
+            std::string copyName;
+            if( settings.fileName!="-" ){
+                copyName = settings.fileName;
+            }else{     
+                copyName = "generate_"+ std::to_string(settings.numX)+ "_"+ std::to_string(settings.numY);
+            }
+            std::vector<std::string> strs = aux<IndexType,double>::split( copyName, '/' );
+            std::string graphName = aux<IndexType,double>::split(strs.back(), '.')[0];
+            //add specific folder for each tool
+            outFile = settings.outDir+ dash+ toolName+ "/"+ graphName+ "_k"+ std::to_string(settings.numBlocks)+ ".info";
+        }
+        //we are given both a file name and a directory append toolName
+        else{
+            outFile = settings.outDir+ dash+ settings.outFile;
+            if(toolName!=""){
+                outFile += ("_"+toolName);
+            }
+        }
+    }
+
+    //we are given just one file name, not a directory
+    if( settings.outFile!="-" and settings.outDir=="-"){
+        //outFile += ("_" + ITI::to_string(thisTool));
+        //do nothing
+    }
+
+    return outFile;
+}
+
 }
