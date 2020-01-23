@@ -479,9 +479,10 @@ std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::findCenters(
             }
 
             comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
+
         }
 
-        allWeightsCenters[w] = result;
+        allWeightsCenters[w]= result ;
     }
 
     //
@@ -494,7 +495,7 @@ std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::findCenters(
         for (IndexType j = 0; j < k; j++) {
             for(unsigned int w=0; w<numWeights; w++){
                 //remember, allWeightsCenters size: numWeights*dim*k
-                result[d][j] += allWeightsCenters[w][d][k]/numWeights;
+                result[d][j] += allWeightsCenters[w][d][j]/numWeights;
             }
         }
     }
@@ -845,11 +846,11 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
                         continue;
                     }
                 }
-                const ValueType thisInfluence = influence[i][j];
+                
                 //use ratio^exponent only if it is within the bounds; otherwise use the bound
                 const ValueType multiplier = std::max( influenceChangeLowerBound[j],
                     std::min( (ValueType)std::pow(ratio, settings.influenceExponent), influenceChangeUpperBound[j]) );
-                influence[i][j] = thisInfluence*multiplier;
+                influence[i][j] =  influence[i][j]*multiplier;
 
                 assert(influence[i][j] > 0);
 
@@ -1325,6 +1326,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     DenseVector<IndexType> result(coordinates[0].getDistributionPtr(), 0);
     DenseVector<IndexType> mostBalancedResult(coordinates[0].getDistributionPtr(), 0);
     ValueType minImbalance = 1; //to store the solution with the minimum imbalance
+    ValueType minAchievedImbalance = settings.epsilon; //used with multiple weights; TODO: adapt for multiple balance constrains
 
     // TODO, recheck:
     // if repartition, should it be result = previous???
@@ -1548,9 +1550,37 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
             std::cout << std::endl;
         }
 
-        ValueType currMinImbalance = *std::min_element( imbalances.begin(), imbalances.end() );
-        if (currMinImbalance<minImbalance and settings.keepMostBalanced){
-            mostBalancedResult.assign(result);
+        
+        if(settings.keepMostBalanced){
+            ValueType currMinImbalance = *std::min_element( imbalances.begin(), imbalances.end() );
+            ValueType currMaxImbalance = *std::max_element( imbalances.begin(), imbalances.end() );
+
+            //if only one weight, keep the solution with minimum imbalance
+            if( numNodeWeights<2 and currMinImbalance<minImbalance ){
+                 if(comm->getRank()==0){
+                    std::cout <<"Storing most balanced solution with minimum imbalance " << currMinImbalance << std::endl;
+                }
+                mostBalancedResult.assign(result);
+                minImbalance = currMinImbalance;               
+            }
+
+            //for more weights, try to keep solution that fulfills all balance constrains first
+            if( numNodeWeights>1){
+                //if max is less than epsilon then all weights are
+                if(currMaxImbalance<minAchievedImbalance){
+                    if(comm->getRank()==0){
+                        std::cout <<"Storing most balanced solution with maximum imbalance " << currMaxImbalance << std::endl;
+                    }
+                    mostBalancedResult.assign(result);
+                    minAchievedImbalance = currMaxImbalance;
+                }else if (currMinImbalance<minImbalance){
+                    if(comm->getRank()==0){
+                        std::cout <<"Storing most balanced solution with minimum imbalance " << currMinImbalance << std::endl;
+                    }
+                    mostBalancedResult.assign(result);
+                    minImbalance = currMinImbalance;
+                }
+            }
         }
         metrics.kmeansProfiling.push_back(std::make_tuple(delta, maxTime, imbalances[0]));
 
