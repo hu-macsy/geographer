@@ -1323,6 +1323,8 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
 
     // result[i]=b, means that point i belongs to cluster/block b
     DenseVector<IndexType> result(coordinates[0].getDistributionPtr(), 0);
+    DenseVector<IndexType> mostBalancedResult(coordinates[0].getDistributionPtr(), 0);
+    ValueType minImbalance = 1; //to store the solution with the minimum imbalance
 
     // TODO, recheck:
     // if repartition, should it be result = previous???
@@ -1546,6 +1548,10 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
             std::cout << std::endl;
         }
 
+        ValueType currMinImbalance = *std::min_element( imbalances.begin(), imbalances.end() );
+        if (currMinImbalance<minImbalance and settings.keepMostBalanced){
+            mostBalancedResult.assign(result);
+        }
         metrics.kmeansProfiling.push_back(std::make_tuple(delta, maxTime, imbalances[0]));
 
         iter++;
@@ -1560,7 +1566,12 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     //special time for the core kmeans
     metrics.MM["timeKmeans"] = time;
 
-    return result;
+    if(settings.keepMostBalanced){
+        return mostBalancedResult;
+    }else{
+        return result;
+    }
+
 }// computePartition
 
 

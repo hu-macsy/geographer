@@ -224,6 +224,7 @@ struct Settings {
     bool tightenBounds = false;
     bool freezeBalancedInfluence = false;
     bool erodeInfluence = false;
+    bool keepMostBalanced = true;
     //bool manhattanDistance = false;
     std::vector<IndexType> hierLevels; 		///< for hierarchial kMeans, the number of blocks per level
     //@}
