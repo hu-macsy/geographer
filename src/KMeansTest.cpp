@@ -408,6 +408,30 @@ TYPED_TEST(KMeansTest, testGetGlobalMinMax) {
         EXPECT_EQ(maxCoords[d], maxMax);
     }
 }
+
+
+TYPED_TEST(KMeansTest, testFuzzify) {
+    using ValueType = TypeParam;
+
+    std::string graphFile = "bubbles-00010.graph";
+    std::string coordFile = graphFile + ".xyz";
+    const IndexType dimensions = 2;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    IndexType n;
+    {
+        CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+        n = graph.getNumRows();
+    }
+    //load coords
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
+
+    DenseVector<IndexType> partition( 1, n);
+    Settings settings;
+
+    std::vector<std::vector<ValueType>> fuzzyClustering = KMeans<IndexType,ValueType>::fuzzify( coordinates, partition, settings);
+
+}
+
 /*
 TYPED_TEST(KMeansTest, testPartitionWithNodeWeights) {
     using ValueType = TypeParam;

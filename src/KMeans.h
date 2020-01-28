@@ -155,7 +155,7 @@ static DenseVector<IndexType> computeRepartition(
     const Settings settings,
     Metrics<ValueType>& metrics);
 
-/**
+/** Version of k-means that does multiplie runs to achieve balance.
 */
 static DenseVector<IndexType> computePartition_targetBalance(
     const std::vector<DenseVector<ValueType>> &coordinates,
@@ -163,6 +163,14 @@ static DenseVector<IndexType> computePartition_targetBalance(
     const std::vector<std::vector<ValueType>> &blockSizes,
     const Settings settings,
     Metrics<ValueType>& metrics);
+
+
+static std::vector<std::vector<ValueType>> fuzzify( 
+    const std::vector<DenseVector<ValueType>>& coordinates,
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const DenseVector<IndexType>& partition,
+    const Settings settings,
+    const IndexType centerToUse=4);
 
 
 /** @brief Version for hierarchical version. The returned centers now are a vector of vectors,

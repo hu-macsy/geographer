@@ -1900,11 +1900,11 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
     result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinates, nodeWeightCopy, blockSizes, settingsCopy, metrics);
 
     PRINT0( std::endl<< "Repartitioning"<< std::endl );
-    settingsCopy.numNodeWeights = 2;
-    nodeWeightCopy.push_back(nodeWeights[1] );
+    //settingsCopy.numNodeWeights = 2;
+    //nodeWeightCopy.push_back(nodeWeights[1] );
     
-    result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinates, nodeWeightCopy, blockSizes, result, settingsCopy);  
-    PRINT0( std::endl<< "Repartitioning"<< std::endl );
+    //result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinates, nodeWeightCopy, blockSizes, result, settingsCopy);  
+    //PRINT0( std::endl<< "Repartitioning"<< std::endl );
 
     settingsCopy.minSamplingNodes = -1;
     //result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinates, nodeWeights, blockSizes, result, settingsCopy);  
@@ -1915,6 +1915,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
     std::vector<ValueType> imbalances(1, settingsCopy.numNodeWeights);
     ValueType maxMinImbalance = 1;
     IndexType numTries = 5;
+    IndexType currWeights = 2;
     settingsCopy.epsilon =  settings.epsilon + numTries*0.01;
 
     for(int i=0; i<numTries; i++){
@@ -1924,7 +1925,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
 
         std::vector<ValueType> imbalances(settingsCopy.numNodeWeights);
         for(int w=0; w<settingsCopy.numNodeWeights; w++){
-            imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, settingsCopy.numBlocks, nodeWeights[w], blockSizes[w] );
+            imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, settingsCopy.numBlocks, nodeWeightCopy[w], blockSizes[w] );
         }
         ValueType maxCurrImbalance = *std::max_element( imbalances.begin(), imbalances.end() );
         if( maxCurrImbalance<maxMinImbalance){
@@ -1932,11 +1933,59 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
             bestResult = result;
             maxMinImbalance = maxCurrImbalance;
         }
+        
         settingsCopy.epsilon -= 0.01;
+        if(currWeights<nodeWeights.size()){
+            //TODO: this copies the weights every time, use pointers?
+            nodeWeightCopy.push_back( nodeWeights[currWeights] );
+            currWeights++;
+        }
     }
 
     return bestResult;
+    
 }//computePartition_targetBalance
+
+
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::fuzzify( 
+    const std::vector<DenseVector<ValueType>>& coordinates,
+    const std::vector<DenseVector<ValueType>>& nodeWeights,
+    const DenseVector<IndexType>& partition,
+    const Settings settings,
+    const IndexType centersToUse){
+
+    SCAI_REGION("KMeans.fuzzify");
+    const IndexType localN = coordinates[0].getLocalValues().size();
+    const IndexType dimensions = settings.dimensions;
+    const scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
+
+    //find the centers of the provided partition
+    std::vector<IndexType> indices(localN);
+    std::iota(indices.begin(), indices.end(), 0);
+    const std::vector< point<ValueType> > centers = findCenters( coordinates, partition, settings.numBlocks, indices.begin(), indices.end(), nodeWeights);
+
+    const IndexType numCenters = centers.size();
+    //if more centers to use were given, use all
+    const IndexType ctu = std::min(centersToUse, numCenters ); 
+
+    std::vector<std::vector<ValueType>> fuzzyClustering( localN );
+
+    for(IndexType i=0; i<localN; i++){
+        std::vector<ValueType> allSqDistances(0.0, numCenters);
+        for(IndexType c=0; c<numCenters; c++ ){
+            const point<ValueType>& thisCenter = centers[c];
+            for (IndexType d=0; d<dimensions; d++) {
+                allSqDistances[c] += std::pow(thisCenter[d]-coordinates[d][i], 2);
+            }
+        }
+        std::sort( allSqDistances.begin(), allSqDistances.end() );
+        fuzzyClustering[i] = std::vector<ValueType>( allSqDistances.begin(), allSqDistances.begin()+ctu );
+    }
+
+    return fuzzyClustering;
+}//fuzzify
+
 
 
 /* Get local minimum and maximum coordinates
