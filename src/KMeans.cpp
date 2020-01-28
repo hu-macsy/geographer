@@ -1905,18 +1905,17 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
     
     result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinates, nodeWeightCopy, blockSizes, result, settingsCopy);  
     PRINT0( std::endl<< "Repartitioning"<< std::endl );
+
     settingsCopy.minSamplingNodes = -1;
-    //settingsCopy.epsilon = 1.06;
-    result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinates, nodeWeights, blockSizes, result, settingsCopy);  
-    PRINT0( std::endl<< "Repartitioning"<< std::endl );
+    //result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinates, nodeWeights, blockSizes, result, settingsCopy);  
     
-    settingsCopy.epsilon = 1.1;
-//settingsCopy.minSamplingNodes = 200;
+    //settingsCopy.minSamplingNodes = 200;
 
     DenseVector<IndexType> bestResult = result;
     std::vector<ValueType> imbalances(1, settingsCopy.numNodeWeights);
     ValueType maxMinImbalance = 1;
-IndexType numTries = (settingsCopy.epsilon - settings.epsilon)*10;
+    IndexType numTries = 5;
+    settingsCopy.epsilon =  settings.epsilon + numTries*0.01;
 
     for(int i=0; i<numTries; i++){
         //settingsCopy.minSamplingNodes *= 2;
@@ -1933,7 +1932,7 @@ IndexType numTries = (settingsCopy.epsilon - settings.epsilon)*10;
             bestResult = result;
             maxMinImbalance = maxCurrImbalance;
         }
-        settingsCopy.epsilon -= 0.1;
+        settingsCopy.epsilon -= 0.01;
     }
 
     return bestResult;
