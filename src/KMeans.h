@@ -155,6 +155,15 @@ static DenseVector<IndexType> computeRepartition(
     const Settings settings,
     Metrics<ValueType>& metrics);
 
+/**
+*/
+static DenseVector<IndexType> computePartition_targetBalance(
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const std::vector<std::vector<ValueType>> &blockSizes,
+    const Settings settings,
+    Metrics<ValueType>& metrics);
+
 
 /** @brief Version for hierarchical version. The returned centers now are a vector of vectors,
 	a vector of centers for every block/center in the previous hierarchy level.
@@ -304,7 +313,7 @@ static ValueType computeEffectiveDistance(
  * @param[in] boundingBox min and max coordinates of local points, used to compute distance bounds
  * @param[in,out] upperBoundOwnCenter for each point, an upper bound of the effective distance to its own center
  * @param[in,out] lowerBoundNextCenter for each point, a lower bound of the effective distance to the next-closest center
- * @param[in,out] influence a multiplier for each block to compute the effective distance
+ * @param[in,out] influence a multiplier for each block and for each balance constrain, to compute the effective distance
  * @param[in] settings
  *
  * @return assignment of points to blocks
