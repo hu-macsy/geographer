@@ -164,10 +164,14 @@ static DenseVector<IndexType> computePartition_targetBalance(
     const Settings settings,
     Metrics<ValueType>& metrics);
 
+/**
+    Returns one entry for every local point. each entry has size centerToUse and stores a pair:
+    first is the distance value, second is the center that realizes this distance
+*/
 
-static std::vector<std::vector<ValueType>> fuzzify( 
+static std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzify( 
     const std::vector<DenseVector<ValueType>>& coordinates,
-    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const std::vector<DenseVector<ValueType>>& nodeWeights,
     const DenseVector<IndexType>& partition,
     const Settings settings,
     const IndexType centerToUse=4);

@@ -413,23 +413,36 @@ TYPED_TEST(KMeansTest, testGetGlobalMinMax) {
 TYPED_TEST(KMeansTest, testFuzzify) {
     using ValueType = TypeParam;
 
-    std::string graphFile = "bubbles-00010.graph";
+    //std::string fileName = "bubbles-00010.graph";
+    std::string fileName = "Grid8x8";
+    std::string graphFile = KMeansTest<ValueType>::graphPath + fileName;
     std::string coordFile = graphFile + ".xyz";
     const IndexType dimensions = 2;
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    IndexType n;
-    {
-        CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
-        n = graph.getNumRows();
-    }
+
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+    const IndexType n = graph.getNumRows();
+    const IndexType localN = graph.getLocalNumRows();
+
     //load coords
-    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
+    const std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
 
-    DenseVector<IndexType> partition( 1, n);
+    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    const scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+    const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights, unitNodeWeights, unitNodeWeights };
+    
     Settings settings;
+    settings.numBlocks = comm->getSize();
+    const DenseVector<IndexType> partition = KMeans<IndexType,ValueType>::computePartition(coordinates, settings );
 
-    std::vector<std::vector<ValueType>> fuzzyClustering = KMeans<IndexType,ValueType>::fuzzify( coordinates, partition, settings);
+    std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzyClustering = KMeans<IndexType,ValueType>::fuzzify( coordinates, nodeWeights, partition, settings);
 
+    EXPECT_EQ( fuzzyClustering.size(), localN );
+    EXPECT_EQ( fuzzyClustering[0].size(), 4); //the default value
+
+    for( IndexType i=0; i<localN; i++){
+        EXPECT_EQ( partition[i], fuzzyClustering[i][0].second );
+    }
 }
 
 /*

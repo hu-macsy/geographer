@@ -1948,7 +1948,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
 
 
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::fuzzify( 
+std::vector<std::vector<std::pair<ValueType,IndexType>>> KMeans<IndexType,ValueType>::fuzzify( 
     const std::vector<DenseVector<ValueType>>& coordinates,
     const std::vector<DenseVector<ValueType>>& nodeWeights,
     const DenseVector<IndexType>& partition,
@@ -1963,24 +1963,44 @@ std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::fuzzify(
     //find the centers of the provided partition
     std::vector<IndexType> indices(localN);
     std::iota(indices.begin(), indices.end(), 0);
-    const std::vector< point<ValueType> > centers = findCenters( coordinates, partition, settings.numBlocks, indices.begin(), indices.end(), nodeWeights);
+    const std::vector< std::vector<ValueType> > centers = findCenters( coordinates, partition, settings.numBlocks, indices.begin(), indices.end(), nodeWeights);
+    SCAI_ASSERT_EQ_ERROR( centers.size(), dimensions, "Wrong centers vector" );
+    assert( centers[0].size()==settings.numBlocks );
 
-    const IndexType numCenters = centers.size();
+    //reverse the vectors; TODO: is this needed?
+    const std::vector< point<ValueType> > centersTranspose = vectorTranspose( centers );
+    assert( centersTranspose.size()==settings.numBlocks );
+    assert( centersTranspose[0].size()==dimensions );
+
+    const IndexType numCenters = centersTranspose.size();
     //if more centers to use were given, use all
     const IndexType ctu = std::min(centersToUse, numCenters ); 
 
-    std::vector<std::vector<ValueType>> fuzzyClustering( localN );
+    //convert the local coords to vector<vector>
+    std::vector<std::vector<ValueType> > convertedCoords(dimensions);
+   
+    for (IndexType d = 0; d < dimensions; d++) {
+        scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
+        assert(rAccess.size() == localN);
+        convertedCoords[d] = std::vector<ValueType>(rAccess.get(), rAccess.get()+localN);
+        assert(convertedCoords[d].size() == localN);
+    }
+
+    //one entry for every point. each entry has size ctu and stores a pair:
+    //first is the distance value, second is the center that realizes this distance
+    std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzyClustering( localN );
 
     for(IndexType i=0; i<localN; i++){
-        std::vector<ValueType> allSqDistances(0.0, numCenters);
+        std::vector<std::pair<ValueType,IndexType>> allSqDistances( numCenters );
         for(IndexType c=0; c<numCenters; c++ ){
-            const point<ValueType>& thisCenter = centers[c];
+            allSqDistances[c] = std::pair<ValueType,IndexType>(0.0, c);
+            const point<ValueType>& thisCenter = centersTranspose[c];
             for (IndexType d=0; d<dimensions; d++) {
-                allSqDistances[c] += std::pow(thisCenter[d]-coordinates[d][i], 2);
+                allSqDistances[c].first += std::pow(thisCenter[d]-convertedCoords[d][i], 2);
             }
         }
         std::sort( allSqDistances.begin(), allSqDistances.end() );
-        fuzzyClustering[i] = std::vector<ValueType>( allSqDistances.begin(), allSqDistances.begin()+ctu );
+        fuzzyClustering[i] = std::vector<std::pair<ValueType,IndexType>>( allSqDistances.begin(), allSqDistances.begin()+ctu);
     }
 
     return fuzzyClustering;
