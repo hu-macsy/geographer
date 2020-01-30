@@ -1107,7 +1107,8 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     const std::vector<DenseVector<ValueType>> &nodeWeights, \
     const std::vector<std::vector<ValueType>> &targetBlockWeights, \
     const DenseVector<IndexType> &partition, // if repartition, this is the partition to be rebalanced
-    std::vector<std::vector<point<ValueType>>> centers, \
+    std::vector<std::vector<point<ValueType>>> &centers, \
+    std::vector<std::vector<ValueType>> &influence, \
     const Settings settings, \
     Metrics<ValueType>& metrics) {
 
@@ -1331,7 +1332,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     std::vector<ValueType> imbalances(numNodeWeights, 1);
     std::vector<ValueType> imbalancesOld(numNodeWeights, 0);
 
-    std::vector<std::vector<ValueType>> influence(numNodeWeights, std::vector<ValueType>(totalNumNewBlocks, 1));
+//std::vector<std::vector<ValueType>> influence(numNodeWeights, std::vector<ValueType>(totalNumNewBlocks, 1));
 
     // result[i]=b, means that point i belongs to cluster/block b
     DenseVector<IndexType> result(coordinates[0].getDistributionPtr(), 0);
@@ -1449,7 +1450,6 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
                 SCAI_ASSERT_GE_ERROR(transCenters[j][d], globalMinCoords[d]- 1e-6, "New center coordinate out of bounds");
                 ValueType diff = (centers1DVector[j][d] - transCenters[j][d]);
                 squaredDeltas[j] += diff*diff;
-//squaredDeltas[j] += diff*diff*std::pow(0.99,iter);
             }
 
             deltas[j] = std::sqrt(squaredDeltas[j]);
@@ -1498,7 +1498,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
 
                 // update due to delta
                 upperBoundOwnCenter[i] += (2*deltas[cluster]*std::sqrt(upperBoundOwnCenter[i]/influenceEffect) + squaredDeltas[cluster])*(influenceEffect + 1e-6);
-upperBoundOwnCenter[i] *= 1.3;
+
                 ValueType pureSqrt(std::sqrt(lowerBoundNextCenter[i]/maxInfluence));
                 if (pureSqrt < delta) {
                     lowerBoundNextCenter[i] = 0;
@@ -1632,6 +1632,33 @@ upperBoundOwnCenter[i] *= 1.3;
     }
 
 }// computePartition
+// ------------------------------------------------------------------------------
+
+
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
+    const std::vector<DenseVector<ValueType>> &coordinates, \
+    const std::vector<DenseVector<ValueType>> &nodeWeights, \
+    const std::vector<std::vector<ValueType>> &targetBlockWeights, \
+    const DenseVector<IndexType> &partition, // if repartition, this is the partition to be rebalanced
+    std::vector<std::vector<point<ValueType>>> centers, \
+    const Settings settings, \
+    Metrics<ValueType>& metrics) {
+
+    const IndexType numNodeWeights = nodeWeights.size();
+
+    IndexType totalNumNewBlocks = 0;
+    for (int b=0; b<centers.size(); b++) {
+        totalNumNewBlocks += centers[b].size();
+    }
+
+    //initialize influence with 1
+    std::vector<std::vector<ValueType>> influence(numNodeWeights, std::vector<ValueType>(totalNumNewBlocks, 1));
+
+    return computePartition(coordinates, nodeWeights, targetBlockWeights, partition, centers, influence, settings, metrics);
+}//computePartition
+// ------------------------------------------------------------------------------
+
 
 
 template<typename IndexType, typename ValueType>
@@ -1643,12 +1670,12 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     const IndexType globalN = dist->getGlobalSize();
     const scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>(dist, 1);
     const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = {unitNodeWeights};
-    std::vector<std::vector<ValueType>> blockSizes(1, std::vector<ValueType>(settings.numBlocks, std::ceil(globalN/settings.numBlocks)));
+    std::vector<std::vector<ValueType>> blockSizes(1, std::vector<ValueType>(settings.numBlocks, std::ceil( (ValueType)globalN/settings.numBlocks)));
     Metrics<ValueType> metrics(settings);
 
     return computePartition(coordinates, nodeWeights, blockSizes, settings, metrics);
 }
-
+// ------------------------------------------------------------------------------
 
 // wrapper 1 - called initially with no centers parameter
 template<typename IndexType, typename ValueType>
@@ -1677,7 +1704,8 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
 }
 
 
-// ---------------------------------------
+// ------------------------------------------------------------------------------
+
 template<typename IndexType, typename ValueType>
 DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierarchicalPartition(
     std::vector<DenseVector<ValueType>> &coordinates,
@@ -1952,6 +1980,7 @@ std::vector<std::vector<std::pair<ValueType,IndexType>>> KMeans<IndexType,ValueT
     const std::vector<DenseVector<ValueType>>& coordinates,
     const std::vector<DenseVector<ValueType>>& nodeWeights,
     const DenseVector<IndexType>& partition,
+    const std::vector<ValueType>& centerInfluence, //TODO: use or discard
     const Settings settings,
     const IndexType centersToUse){
 
@@ -1972,12 +2001,8 @@ std::vector<std::vector<std::pair<ValueType,IndexType>>> KMeans<IndexType,ValueT
     assert( centersTranspose.size()==settings.numBlocks );
     assert( centersTranspose[0].size()==dimensions );
 
-    const IndexType numCenters = centersTranspose.size();
-    //if more centers to use were given, use all
-    const IndexType ctu = std::min(centersToUse, numCenters ); 
-
-    //convert the local coords to vector<vector>
-    std::vector<std::vector<ValueType> > convertedCoords(dimensions);
+    //convert the local coords to vector<vector>; TODO: maybe we can (or we need to) avoid that
+    std::vector<std::vector<ValueType>> convertedCoords(dimensions);
    
     for (IndexType d = 0; d < dimensions; d++) {
         scai::hmemo::ReadAccess<ValueType> rAccess(coordinates[d].getLocalValues());
@@ -1986,27 +2011,114 @@ std::vector<std::vector<std::pair<ValueType,IndexType>>> KMeans<IndexType,ValueT
         assert(convertedCoords[d].size() == localN);
     }
 
+    const IndexType numCenters = centersTranspose.size();
+    //if more centers to use were given, use all
+    const IndexType ctu = std::min(centersToUse, numCenters ); 
+
     //one entry for every point. each entry has size ctu and stores a pair:
     //first is the distance value, second is the center that realizes this distance
     std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzyClustering( localN );
 
     for(IndexType i=0; i<localN; i++){
-        std::vector<std::pair<ValueType,IndexType>> allSqDistances( numCenters );
+        std::vector<std::pair<ValueType,IndexType>> allDistances( numCenters );
         for(IndexType c=0; c<numCenters; c++ ){
-            allSqDistances[c] = std::pair<ValueType,IndexType>(0.0, c);
+            allDistances[c] = std::pair<ValueType,IndexType>(0.0, c);
             const point<ValueType>& thisCenter = centersTranspose[c];
             for (IndexType d=0; d<dimensions; d++) {
-                allSqDistances[c].first += std::pow(thisCenter[d]-convertedCoords[d][i], 2);
+                allDistances[c].first += std::pow(thisCenter[d]-convertedCoords[d][i], 2);
             }
+            allDistances[c].first = std::sqrt( allDistances[c].first ); //*centerInfluence[c];
         }
-        std::sort( allSqDistances.begin(), allSqDistances.end() );
-        fuzzyClustering[i] = std::vector<std::pair<ValueType,IndexType>>( allSqDistances.begin(), allSqDistances.begin()+ctu);
+        std::sort( allDistances.begin(), allDistances.end() );
+        fuzzyClustering[i] = std::vector<std::pair<ValueType,IndexType>>( allDistances.begin(), allDistances.begin()+ctu);
     }
 
     return fuzzyClustering;
 }//fuzzify
 
 
+template<typename IndexType, typename ValueType>
+std::vector<ValueType> KMeans<IndexType,ValueType>::computeFuziness(
+    const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering,
+    const DenseVector<IndexType>& partition){
+
+    //one entry for every point. each entry has size ctu and stores a pair:
+    //first is the distance value, second is the center that realizes this distance
+    const IndexType localN = fuzzyClustering.size();
+    assert(partition.size()==localN);
+
+    std::vector<ValueType> fuzziness(localN, 0.0);
+    for( IndexType i=0; i<localN; i++ ){
+        IndexType myPart = partition[i];
+        std::vector<std::pair<ValueType,IndexType>> myFuzzV = fuzzyClustering[i];
+        ValueType minDist = myFuzzV[0].first;
+        //IndexType closestCenter = myFuzzV[0].second;
+
+        //find the distance from this point to the cluster it is assigned.
+        //There is a chance that this cluster does not appear in the fuzzy vector.
+        //In this case use the last cluster in the vector
+        ValueType myBlockDist= myFuzzV.back().first;
+        for(IndexType j=0; j<myFuzzV.size(); j++ ){
+            if( myFuzzV[i].second==myPart){
+                myBlockDist= myFuzzV[i].first;
+                break;
+            }
+        }
+        assert( myBlockDist> minDist);
+
+        fuzziness[i] = myBlockDist-minDist;
+    }
+
+    return fuzziness;
+}//computeFuziness
+
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::computeMembership(
+    const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering){
+
+    const IndexType localN = fuzzyClustering.size();
+    const IndexType vectorSize = fuzzyClustering[0].size();
+    
+    std::vector<std::vector<ValueType>> membership(localN, std::vector<ValueType>(vectorSize, 0.0));
+    for( IndexType i=0; i<localN; i++ ){
+        //IndexType myPart = partition[i];
+        std::vector<std::pair<ValueType,IndexType>> myFuzzV = fuzzyClustering[i];
+        ValueType minDist = myFuzzV[0].first;
+        //IndexType closestCenter = myFuzzV[0].second;
+        ValueType centerDistSum= 0;
+        for(IndexType t=0; t<vectorSize; t++ ){
+            centerDistSum += 1/(myFuzzV[t].first*myFuzzV[t].first);
+        }
+        
+        ValueType minDistSq = minDist*minDist;
+        for(IndexType j=0; j<vectorSize; j++ ){
+            membership[i][j] = 1/( minDistSq *centerDistSum);
+        }
+    }
+    return membership;
+}
+
+//version with no influence
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<std::pair<ValueType,IndexType>>> KMeans<IndexType,ValueType>::fuzzify( 
+    const std::vector<DenseVector<ValueType>>& coordinates,
+    const std::vector<DenseVector<ValueType>>& nodeWeights,
+    const DenseVector<IndexType>& partition,
+    const Settings settings,
+    const IndexType centersToUse){
+
+/*    const IndexType numNodeWeights = nodeWeights.size();
+
+    IndexType totalNumNewBlocks = 0;
+    for (int b=0; b<centers.size(); b++) {
+        totalNumNewBlocks += centers[b].size();
+    }
+*/    
+    //initialize influence with 1
+    std::vector<ValueType> influence(settings.numBlocks, 1);    
+
+    return fuzzify( coordinates, nodeWeights, partition, influence, settings, centersToUse);
+}
 
 /* Get local minimum and maximum coordinates
  * TODO: This isn't used any more! Remove?

@@ -66,6 +66,22 @@ static DenseVector<IndexType> computePartition(
     const Settings settings, \
     Metrics<ValueType>& metrics);
 
+/** Version that also returns the influences per center and the centers
+@param[in/out] centers The provided centers and their final position
+@param[out] influence The influence per center calculated by the algorithm
+*/
+
+static DenseVector<IndexType> computePartition(
+    const std::vector<DenseVector<ValueType>> &coordinates, \
+    const std::vector<DenseVector<ValueType>> &nodeWeights, \
+    const std::vector<std::vector<ValueType>> &blockSizes, \
+    const DenseVector<IndexType>& prevPartition,\
+    std::vector<std::vector< std::vector<ValueType>>> &centers, \
+    std::vector<std::vector<ValueType>> &influence, \
+    const Settings settings, \
+    Metrics<ValueType>& metrics);
+
+
 /** @brief Minimal wrapper with only the coordinates. Unit weights are assumed and uniform block sizes.
 */
 //template<typename IndexType, typename ValueType>
@@ -166,8 +182,20 @@ static DenseVector<IndexType> computePartition_targetBalance(
 
 /**
     Returns one entry for every local point. each entry has size centerToUse and stores a pair:
-    first is the distance value, second is the center that realizes this distance
+    first is the distance value, second is the center that realizes this distance.
+
+    @param[in] centerInfluence The weight/influence of each center that is used to calculate
+    the effective distance as: effDist = dist(p,c)*influence(c). centerInfluence.size()= the number
+    of node weights and centerInfluence[i]=number of blocks
 */
+
+static std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzify( 
+    const std::vector<DenseVector<ValueType>>& coordinates,
+    const std::vector<DenseVector<ValueType>>& nodeWeights,
+    const DenseVector<IndexType>& partition,
+    const std::vector<ValueType>& centerInfluence,
+    const Settings settings,
+    const IndexType centerToUse=4);
 
 static std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzify( 
     const std::vector<DenseVector<ValueType>>& coordinates,
@@ -176,7 +204,14 @@ static std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzify(
     const Settings settings,
     const IndexType centerToUse=4);
 
+/** compute the fuzziness of every local point provided a fuzzy clustering vector
+*/
+static std::vector<ValueType> computeFuziness(
+    const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering,
+    const DenseVector<IndexType>& partition);
 
+static std::vector<std::vector<ValueType>> computeMembership(
+    const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering);
 /** @brief Version for hierarchical version. The returned centers now are a vector of vectors,
 	a vector of centers for every block/center in the previous hierarchy level.
 	For every known block (given through \p partition), a number of centers is calculated independently

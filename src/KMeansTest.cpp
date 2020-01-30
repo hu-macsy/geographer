@@ -312,6 +312,7 @@ TYPED_TEST(KMeansTest, testHierarchicalPartition) {
     }
 }
 
+
 TYPED_TEST(KMeansTest, testComputePartitionWithMultipleWeights) {
     using ValueType = TypeParam;
 
@@ -384,7 +385,7 @@ TYPED_TEST(KMeansTest, testComputePartitionWithMultipleWeights) {
 TYPED_TEST(KMeansTest, testGetGlobalMinMax) {
     using ValueType = TypeParam;
 
-    std::string graphFile = "bubbles-00010.graph";
+    std::string graphFile = KMeansTest<ValueType>::graphPath + "bubbles-00010.graph";
     std::string coordFile = graphFile + ".xyz";
     const IndexType dimensions = 2;
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -413,8 +414,8 @@ TYPED_TEST(KMeansTest, testGetGlobalMinMax) {
 TYPED_TEST(KMeansTest, testFuzzify) {
     using ValueType = TypeParam;
 
-    //std::string fileName = "bubbles-00010.graph";
-    std::string fileName = "Grid8x8";
+    std::string fileName = "bubbles-00010.graph";
+   // std::string fileName = "Grid8x8";
     std::string graphFile = KMeansTest<ValueType>::graphPath + fileName;
     std::string coordFile = graphFile + ".xyz";
     const IndexType dimensions = 2;
@@ -429,20 +430,59 @@ TYPED_TEST(KMeansTest, testFuzzify) {
 
     const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     const scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
-    const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights, unitNodeWeights, unitNodeWeights };
-    
+    const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights}; //, unitNodeWeights, unitNodeWeights };
+    const IndexType numNodeWeights = 1;
+
     Settings settings;
     settings.numBlocks = comm->getSize();
-    const DenseVector<IndexType> partition = KMeans<IndexType,ValueType>::computePartition(coordinates, settings );
+    settings.numNodeWeights = numNodeWeights;
 
+    Metrics<ValueType> metrics(settings);
+
+    //call the core implementation to get the influence values
+    DenseVector<IndexType> partition;
+    std::vector<std::vector<ValueType>> influence(numNodeWeights, std::vector<ValueType>(settings.numBlocks, 1));
+    {
+        std::vector<ValueType> minCoords(settings.dimensions);
+        std::vector<ValueType> maxCoords(settings.dimensions);
+        std::tie(minCoords, maxCoords) = KMeans<IndexType,ValueType>::getGlobalMinMaxCoords(coordinates);
+        std::vector<std::vector<ValueType>> centers = KMeans<IndexType,ValueType>::findInitialCentersSFC(coordinates, minCoords, maxCoords, settings);
+        std::vector<std::vector<std::vector<ValueType>>> centers2 = { centers };
+
+        scai::lama::DenseVector<IndexType> partitionPrev(coordinates[0].getDistributionPtr(), 0);
+        std::vector<std::vector<ValueType>> blockSizes(1, std::vector<ValueType>(settings.numBlocks, std::ceil( (ValueType)n/settings.numBlocks)));
+
+        //partition = KMeans<IndexType,ValueType>::computePartition(coordinates, nodeWeights, blockSizes, partitionPrev, centers2, settings, metrics );
+        partition = KMeans<IndexType,ValueType>::computePartition(coordinates, settings);
+    }
+/*
+    //pre calculate the influence effect on every point
+    std::vector<ValueType> centerInfluence(localN, 1);
+    for (IndexType w=0; w<numNodeWeights; w++) {
+        for(IndexType i=0; i<localN; i++){
+            centerInfluence[i] += influence[w][oldCluster]*normalizedNodeWeights[j][i];
+    }
+*/
     std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzyClustering = KMeans<IndexType,ValueType>::fuzzify( coordinates, nodeWeights, partition, settings);
 
     EXPECT_EQ( fuzzyClustering.size(), localN );
-    EXPECT_EQ( fuzzyClustering[0].size(), 4); //the default value
+    EXPECT_EQ( fuzzyClustering[0].size(), std::min<int>(4, settings.numBlocks) ); //the default value for centers to use is 4
 
+    IndexType mismatches=0;
     for( IndexType i=0; i<localN; i++){
-        EXPECT_EQ( partition[i], fuzzyClustering[i][0].second );
+        //TODO: this is not actually an error. It would be in the standard k-means algorithm but because we have influence
+        // the center each point is assigned to it is not necessarily its closest center.
+        //if(comm->getRank()==0){
+        //    EXPECT_EQ( partition.getLocalValues()[i], fuzzyClustering[i][0].second ) << " for i= " << i << " in PE " << comm->getRank() ;
+        //}
+        if( partition.getLocalValues()[i]!=fuzzyClustering[i][0].second ){
+            mismatches++;
+//PRINT0( comm->getRank() << ": " << i << " -- " << partition.getLocalValues()[i]);
+//PRINT0( comm->getRank() << ": " << i << " -- " << fuzzyClustering[i][0].second << " with value " << fuzzyClustering[i][0].first << " (( " << fuzzyClustering[i][1].first  );
+        }
+
     }
+    PRINT("detected " << mismatches << " mismatched points in PE " << comm->getRank() );
 }
 
 /*
