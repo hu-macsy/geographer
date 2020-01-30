@@ -455,14 +455,7 @@ TYPED_TEST(KMeansTest, testFuzzify) {
         //partition = KMeans<IndexType,ValueType>::computePartition(coordinates, nodeWeights, blockSizes, partitionPrev, centers2, settings, metrics );
         partition = KMeans<IndexType,ValueType>::computePartition(coordinates, settings);
     }
-/*
-    //pre calculate the influence effect on every point
-    std::vector<ValueType> centerInfluence(localN, 1);
-    for (IndexType w=0; w<numNodeWeights; w++) {
-        for(IndexType i=0; i<localN; i++){
-            centerInfluence[i] += influence[w][oldCluster]*normalizedNodeWeights[j][i];
-    }
-*/
+
     std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzyClustering = KMeans<IndexType,ValueType>::fuzzify( coordinates, nodeWeights, partition, settings);
 
     EXPECT_EQ( fuzzyClustering.size(), localN );
@@ -477,12 +470,73 @@ TYPED_TEST(KMeansTest, testFuzzify) {
         //}
         if( partition.getLocalValues()[i]!=fuzzyClustering[i][0].second ){
             mismatches++;
-//PRINT0( comm->getRank() << ": " << i << " -- " << partition.getLocalValues()[i]);
-//PRINT0( comm->getRank() << ": " << i << " -- " << fuzzyClustering[i][0].second << " with value " << fuzzyClustering[i][0].first << " (( " << fuzzyClustering[i][1].first  );
         }
-
     }
     PRINT("detected " << mismatches << " mismatched points in PE " << comm->getRank() );
+}
+
+
+TYPED_TEST(KMeansTest, testMembership){
+    using ValueType = TypeParam;
+
+    //std::string fileName = "Grid8x8";
+    std::string fileName = "bubbles-00010.graph";
+    std::string graphFile = KMeansTest<ValueType>::graphPath + fileName;
+    std::string coordFile = graphFile + ".xyz";
+    const IndexType dimensions = 2;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    IndexType N;
+    {
+        CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+        N = graph.getNumRows();
+    }
+    
+
+    //load coords
+    const std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), N, dimensions);
+
+    const IndexType localN = coordinates[0].getLocalValues().size();
+
+    const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
+    const scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+    const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights}; //, unitNodeWeights, unitNodeWeights };
+    //const IndexType numNodeWeights = 1;
+
+    //initialize partition with rank
+    DenseVector<IndexType> partition(dist, comm->getRank() );
+
+    Settings settings;
+    settings.numBlocks = comm->getSize();
+
+    const IndexType commSize = IndexType ( comm->getSize()) ;
+    const IndexType ctu = std::min( commSize, IndexType (4) );
+
+    //get a fuzzy partition
+    std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzyClustering = KMeans<IndexType,ValueType>::fuzzify( coordinates, nodeWeights, partition, settings, ctu);
+
+    //get membership for every point
+    std::vector<std::vector<ValueType>> membershipV = KMeans<IndexType,ValueType>::computeMembership( fuzzyClustering );
+    assert( membershipV.size()==localN );
+
+    std::vector<ValueType> mshipOneValue = KMeans<IndexType,ValueType>::computeMembershipOneValue( fuzzyClustering);
+
+    for(IndexType i=0; i<localN; i++ ){
+        //std::cout<< comm->getRank() << ": i= " << i << ", mship= ";
+        std::vector<ValueType> myMships = membershipV[i];
+        assert(myMships.size()==ctu);
+        EXPECT_GE( mshipOneValue[i], 0 );
+        EXPECT_LE( mshipOneValue[i], 1 );
+
+        ValueType memSum =0.0;
+        for(IndexType c=0; c<ctu; c++ ){
+            //std::cout<< myMships[c] << ", ";
+            memSum +=myMships[c];
+        }
+
+        EXPECT_NEAR( memSum, 1, 1e-6 );
+        //std::cout << ", mship= " << mshipOneValue[i]<< std::endl;
+    }
 }
 
 /*

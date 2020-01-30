@@ -1988,6 +1988,7 @@ std::vector<std::vector<std::pair<ValueType,IndexType>>> KMeans<IndexType,ValueT
     const IndexType localN = coordinates[0].getLocalValues().size();
     const IndexType dimensions = settings.dimensions;
     const scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
+    assert(partition.getLocalValues().size()==localN);
 
     //find the centers of the provided partition
     std::vector<IndexType> indices(localN);
@@ -2037,40 +2038,21 @@ std::vector<std::vector<std::pair<ValueType,IndexType>>> KMeans<IndexType,ValueT
 }//fuzzify
 
 
+//version with no influence
 template<typename IndexType, typename ValueType>
-std::vector<ValueType> KMeans<IndexType,ValueType>::computeFuziness(
-    const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering,
-    const DenseVector<IndexType>& partition){
+std::vector<std::vector<std::pair<ValueType,IndexType>>> KMeans<IndexType,ValueType>::fuzzify( 
+    const std::vector<DenseVector<ValueType>>& coordinates,
+    const std::vector<DenseVector<ValueType>>& nodeWeights,
+    const DenseVector<IndexType>& partition,
+    const Settings settings,
+    const IndexType centersToUse){
 
-    //one entry for every point. each entry has size ctu and stores a pair:
-    //first is the distance value, second is the center that realizes this distance
-    const IndexType localN = fuzzyClustering.size();
-    assert(partition.size()==localN);
+    //initialize influence with 1
+    std::vector<ValueType> influence(settings.numBlocks, 1);    
 
-    std::vector<ValueType> fuzziness(localN, 0.0);
-    for( IndexType i=0; i<localN; i++ ){
-        IndexType myPart = partition[i];
-        std::vector<std::pair<ValueType,IndexType>> myFuzzV = fuzzyClustering[i];
-        ValueType minDist = myFuzzV[0].first;
-        //IndexType closestCenter = myFuzzV[0].second;
+    return fuzzify( coordinates, nodeWeights, partition, influence, settings, centersToUse);
+}
 
-        //find the distance from this point to the cluster it is assigned.
-        //There is a chance that this cluster does not appear in the fuzzy vector.
-        //In this case use the last cluster in the vector
-        ValueType myBlockDist= myFuzzV.back().first;
-        for(IndexType j=0; j<myFuzzV.size(); j++ ){
-            if( myFuzzV[i].second==myPart){
-                myBlockDist= myFuzzV[i].first;
-                break;
-            }
-        }
-        assert( myBlockDist> minDist);
-
-        fuzziness[i] = myBlockDist-minDist;
-    }
-
-    return fuzziness;
-}//computeFuziness
 
 template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::computeMembership(
@@ -2083,41 +2065,42 @@ std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::computeMembersh
     for( IndexType i=0; i<localN; i++ ){
         //IndexType myPart = partition[i];
         std::vector<std::pair<ValueType,IndexType>> myFuzzV = fuzzyClustering[i];
-        ValueType minDist = myFuzzV[0].first;
+        
         //IndexType closestCenter = myFuzzV[0].second;
         ValueType centerDistSum= 0;
         for(IndexType t=0; t<vectorSize; t++ ){
             centerDistSum += 1/(myFuzzV[t].first*myFuzzV[t].first);
         }
         
-        ValueType minDistSq = minDist*minDist;
+        //ValueType minDist = myFuzzV[0].first;
+        //ValueType minDistSq = minDist*minDist;
         for(IndexType j=0; j<vectorSize; j++ ){
-            membership[i][j] = 1/( minDistSq *centerDistSum);
+            ValueType distFromThisCenterSq = myFuzzV[j].first*myFuzzV[j].first;
+            membership[i][j] = 1/(  distFromThisCenterSq *centerDistSum);
         }
     }
     return membership;
 }
 
-//version with no influence
+
 template<typename IndexType, typename ValueType>
-std::vector<std::vector<std::pair<ValueType,IndexType>>> KMeans<IndexType,ValueType>::fuzzify( 
-    const std::vector<DenseVector<ValueType>>& coordinates,
-    const std::vector<DenseVector<ValueType>>& nodeWeights,
-    const DenseVector<IndexType>& partition,
-    const Settings settings,
-    const IndexType centersToUse){
+std::vector<ValueType> KMeans<IndexType,ValueType>::computeMembershipOneValue(
+    const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering){
 
-/*    const IndexType numNodeWeights = nodeWeights.size();
+    const std::vector<std::vector<ValueType>> membership = computeMembership( fuzzyClustering );
+    const IndexType localN = membership.size();
+    const IndexType ctu = membership[0].size();
+    //const a =
 
-    IndexType totalNumNewBlocks = 0;
-    for (int b=0; b<centers.size(); b++) {
-        totalNumNewBlocks += centers[b].size();
+    std::vector<ValueType> result( localN, 0.0);
+
+    for( IndexType i=0; i<localN; i++ ){
+        for( IndexType c=0; c<ctu; c++ ){
+            result[i] += std::pow( (membership[i][c]-1/ctu),2 );
+        }
     }
-*/    
-    //initialize influence with 1
-    std::vector<ValueType> influence(settings.numBlocks, 1);    
 
-    return fuzzify( coordinates, nodeWeights, partition, influence, settings, centersToUse);
+    return result;
 }
 
 /* Get local minimum and maximum coordinates

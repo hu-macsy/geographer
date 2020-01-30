@@ -204,14 +204,30 @@ static std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzify(
     const Settings settings,
     const IndexType centerToUse=4);
 
-/** compute the fuzziness of every local point provided a fuzzy clustering vector
+/**
+    Compute the membership values of every local point provided a fuzzy clustering vector.
+    Membership is calculated using the function mentioned in https://en.wikipedia.org/wiki/Fuzzy_clustering
+    using the euclidean distance.
+    \sa fuzzify
+
+    @return A vector for every point of size equal to the number of centers used to
+    obtain the fuzzy clustering. return[i][j] is the membership value of point \p i
+    to cluster \p j.
 */
-static std::vector<ValueType> computeFuziness(
-    const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering,
-    const DenseVector<IndexType>& partition);
 
 static std::vector<std::vector<ValueType>> computeMembership(
     const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering);
+
+/** 
+    Compute the membership values of every local point provided a fuzzy clustering vector.
+    Compared to the other version the function, it returns only one value per point.
+    First we calculate the membership vector of every point using computeMembership and 
+    the value for each point is the sum of ()
+*/
+static std::vector<ValueType> computeMembershipOneValue(
+    const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering);
+
+
 /** @brief Version for hierarchical version. The returned centers now are a vector of vectors,
 	a vector of centers for every block/center in the previous hierarchy level.
 	For every known block (given through \p partition), a number of centers is calculated independently
