@@ -41,14 +41,14 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::refine
     // tpwgts: array that is used to specify the fraction of
     // vertex weight that should be distributed to each sub-domain for each balance constraint.
     // Here we want equal sizes, so every value is 1/nparts; size = ncons*nparts 
-    std::vector<ValueType> tpwgts;
+    std::vector<real_t> tpwgts;
 
     // the xyz array for coordinates of size dim*localN contains the local coords
-    std::vector<ValueType> xyzLocal;    
+    std::vector<double> xyzLocal;    
 
     // ubvec: array of size ncon to specify imbalance for every vertex weigth.
     // 1 is perfect balance and nparts perfect imbalance. Here 1 for now
-    std::vector<ValueType> ubvec;
+    std::vector<real_t> ubvec;
 
     //local number of edges; number of node weights; flag about edge and vertex weights 
     IndexType numWeights=0, wgtFlag=0;
@@ -181,14 +181,14 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
     // tpwgts: array that is used to specify the fraction of
     // vertex weight that should be distributed to each sub-domain for each balance constraint.
     // Here we want equal sizes, so every value is 1/nparts; size = ncons*nparts 
-    std::vector<ValueType> tpwgts;
+    std::vector<double> tpwgts;
 
     // the xyz array for coordinates of size dim*localN contains the local coords
-    std::vector<ValueType> xyzLocal;
+    std::vector<double> xyzLocal;
 
     // ubvec: array of size ncon to specify imbalance for every vertex weigth.
     // 1 is perfect balance and nparts perfect imbalance. Here 1 for now
-    std::vector<ValueType> ubvec;
+    std::vector<double> ubvec;
 
     //local number of edges; number of node weights; flag about edge and vertex weights 
     IndexType numWeights=0, wgtFlag=0;
@@ -400,6 +400,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::repart
 }
 
 template class parmetisWrapper<IndexType, real_t>;
-//template class parmetisWrapper<IndexType, float>;
+template class parmetisWrapper<IndexType, float>;
+
 
 }//namespace ITI

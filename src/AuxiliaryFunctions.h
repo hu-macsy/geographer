@@ -365,11 +365,11 @@ public:
         std::vector<IndexType>& xadj,
         std::vector<IndexType>& adjncy,
         std::vector<ValueType>& vwgt,
-        std::vector<ValueType>& tpwgts,
+        std::vector<double>& tpwgts,
         IndexType &wgtFlag,
         IndexType &numWeights,
-        std::vector<ValueType>& ubvec,
-        std::vector<ValueType>& xyzLocal,
+        std::vector<double>& ubvec,
+        std::vector<double>& xyzLocal,
         std::vector<IndexType>& options);
 
 

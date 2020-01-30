@@ -35,7 +35,7 @@ public:
      * @param[in] coordinates The coordinates of the mesh. Not always needed by all tools.
      * @param[in] nodeWeights Weights for every node, used only is nodeWeightFlag is true.
      * @param[in] nodeWeightsFlag If true the node weights are used, if false they are ignored.
-     * @param[in] tool One of the supported tools.
+     * @param[in] tool One of the supported tools. 
      * @param[in] settings A Settings structure to pass various settings.
      * @param[out] metrics Structure to store/return timing info.
      *

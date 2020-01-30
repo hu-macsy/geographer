@@ -44,7 +44,7 @@ find_library( PARHIP_LIB libparhip.a "${PARHIP_BASE}" NO_DEFAULT_PATH)
 
 
 ###
-### define libraries and executables
+### define libraries and exectables
 ###
 
 

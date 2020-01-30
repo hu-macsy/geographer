@@ -9,7 +9,7 @@ public:
 
 /** @brief Class for external partitioning parmetis tool.
 */
-
+ 
     /** Given the input (graph, coordinates, node weights) and a partition
     of the input, apply local refinement.
 
