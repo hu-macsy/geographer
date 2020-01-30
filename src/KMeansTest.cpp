@@ -539,6 +539,48 @@ TYPED_TEST(KMeansTest, testMembership){
     }
 }
 
+
+
+TYPED_TEST(KMeansTest, testRefineForBalance) {
+
+using ValueType = TypeParam;
+
+    std::string fileName = "Grid8x8";
+    //std::string fileName = "bubbles-00010.graph";
+    std::string graphFile = KMeansTest<ValueType>::graphPath + fileName;
+    std::string coordFile = graphFile + ".xyz";
+    const IndexType dimensions = 2;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    IndexType N;
+    {
+        CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+        N = graph.getNumRows();
+    }
+    
+
+    //load coords
+    const std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), N, dimensions);
+
+    //const IndexType localN = coordinates[0].getLocalValues().size();
+
+    const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
+    const scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+    const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights}; //, unitNodeWeights, unitNodeWeights };
+
+    //initialize partition with rank
+    DenseVector<IndexType> partition(dist, comm->getRank() );
+
+    Settings settings;
+    settings.numBlocks = comm->getSize();
+
+    const std::vector<std::vector<ValueType>> targetBlockWeights( 1,std::vector<ValueType>( settings.numBlocks, (N+1)/comm->getSize() ) );
+
+    int foo = KMeans<IndexType,ValueType>::refineForBalance( coordinates, nodeWeights, targetBlockWeights, partition, settings);
+    std::cout << foo << std::endl;
+}
+
+
 /*
 TYPED_TEST(KMeansTest, testPartitionWithNodeWeights) {
     using ValueType = TypeParam;

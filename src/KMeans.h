@@ -222,10 +222,31 @@ static std::vector<std::vector<ValueType>> computeMembership(
     Compute the membership values of every local point provided a fuzzy clustering vector.
     Compared to the other version the function, it returns only one value per point.
     First we calculate the membership vector of every point using computeMembership and 
-    the value for each point is the sum of ()
+    the value for each point is the sum of (x_i-1/ctu)^2, where x_i us the membership
+    value for center i and ctu is the size of the membership vector.
+    Higher values mean that the points is close to one center, lower values indicate
+    fuzzier points, points that are between centers.
 */
 static std::vector<ValueType> computeMembershipOneValue(
     const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering);
+
+
+/** Given a partitioned input, move points to other blocks to improve imbalance.
+*/
+static int refineForBalance(
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const std::vector<std::vector<ValueType>> &targetBlockWeights,
+    DenseVector<IndexType>& partition,
+    const Settings settings );
+
+/*
+static DenseVector<IndexType> refineForBalance(
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const std::vector<std::vector<ValueType>> &nodeWeights,
+    DenseVector<IndexType>& partition,
+    const Settings settings );
+*/
 
 
 /** @brief Version for hierarchical version. The returned centers now are a vector of vectors,
@@ -327,6 +348,17 @@ static std::vector< std::vector<ValueType> > findCenters(
  */
 //template<typename ValueType>
 static std::pair<std::vector<ValueType>, std::vector<ValueType> > getGlobalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
+
+
+/** @brief Calculate the global weight of all blocks
+*/
+static std::vector<std::vector<ValueType>> getGlobalBlockWeight(
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const DenseVector<IndexType>& partition);
+
+static std::vector<std::vector<ValueType>> getGlobalBlockWeight(
+    const std::vector<std::vector<ValueType>> &nodeWeights,
+    const DenseVector<IndexType>& partition);
 
 
 /**

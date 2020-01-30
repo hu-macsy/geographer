@@ -2103,6 +2103,209 @@ std::vector<ValueType> KMeans<IndexType,ValueType>::computeMembershipOneValue(
     return result;
 }
 
+//TODO: remove? not sure if it is possible to have a function like that since inside we call
+//other functions that expect node weights as vector<DenseVector>
+/* 
+template<typename IndexType, typename ValueType>
+DenseVector<IndexType> KMeans<IndexType,ValueType>::refineForBalance(
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const DenseVector<IndexType>& partition,
+    const Settings settings ){
+
+    const IndexType numWeights = nodeWeights.size();
+    const IndexType localN = nodeWeights[0].size();
+
+    //
+    // convert to vector<vector> and then use overloaded function
+    //
+
+    std::vector<std::vector<ValueType>> nodeWeightsV( numWeights, localN );
+
+    for(IndexType w=0; w<numWeights; w++){
+        scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[w].getLocalValues());
+        nodeWeightsV[w] = std::vector<ValueType>(rWeights.get(), rWeights.get()+localN);
+    }
+
+    return refineForBalance( coordinates, nodeWeightsV, partition, settings );
+}
+*/
+
+
+template<typename IndexType, typename ValueType>
+int KMeans<IndexType,ValueType>::refineForBalance(
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const std::vector<std::vector<ValueType>> &targetBlockWeights,
+    DenseVector<IndexType>& partition,
+    const Settings settings ){
+
+    const IndexType numWeights = nodeWeights.size();
+    const IndexType localN = coordinates[0].getLocalValues().size();
+    const IndexType numBlocks = settings.numBlocks;
+    assert( targetBlockWeights.size()==numWeights);
+    assert( targetBlockWeights[0].size()==numBlocks);
+
+    const std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzyClustering = fuzzify( coordinates, nodeWeights, partition, settings);
+    assert( fuzzyClustering.size()==localN );
+
+    //the size of its fuzziness vector
+    const IndexType fuzzSize = fuzzyClustering[0].size();
+
+    const std::vector<ValueType> mship = computeMembershipOneValue( fuzzyClustering);
+    assert( mship.size()==localN );
+
+    //
+    // convert weights to vector<vector> 
+    //
+
+    std::vector<std::vector<ValueType>> nodeWeightsV( numWeights );
+    for(IndexType w=0; w<numWeights; w++){
+        scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[w].getLocalValues());
+        nodeWeightsV[w] = std::vector<ValueType>(rWeights.get(), rWeights.get()+localN);
+    }
+
+    //the global weight of each block for each weight
+    std::vector<std::vector<ValueType>> blockWeights = getGlobalBlockWeight( nodeWeightsV, partition );
+    assert( blockWeights.size()==numWeights );
+    //assert( blockWeights[0].size()==numBlocks );
+    SCAI_ASSERT_EQ_ERROR( blockWeights[0].size(), numBlocks, "?" );
+
+    //calculate the imbalance for every block
+    std::vector<std::vector<ValueType>> imbalancesPerBlock(numWeights, std::vector<ValueType>(numBlocks));
+    for (IndexType w=0; w<numWeights; w++) {
+        for (IndexType b=0; b<numBlocks; b++) {
+            ValueType optWeight = targetBlockWeights[w][b];
+            imbalancesPerBlock[w][b] = (ValueType(blockWeights[w][b] - optWeight)/optWeight);
+        }
+    }
+
+
+    //
+    // sort local indices based on their membership value
+    // lower values indicate fuzzier points
+    //
+
+    std::vector<IndexType> indices(localN);
+    std::iota(indices.begin(), indices.end(), 0);
+    std::sort(indices.begin(), indices.end(),
+        [&mship](int i, int j) {
+            return mship[i]<mship[j];
+    });
+
+
+    scai::hmemo::WriteAccess<IndexType> wPart(partition.getLocalValues());
+
+    for(IndexType i=0; i<localN; i++){
+        const IndexType thisInd = indices[i];
+        const IndexType myBlock = wPart[thisInd];
+
+        //the effect that the removal of this point will have to its current block
+
+        //these are this block's (the block this point belongs to) weight and imbalance
+        //after the removal of this point
+        std::vector<ValueType> thisBlockWeights(numWeights);
+        std::vector<ValueType> thisBlockImbalances(numWeights);
+        for (IndexType w=0; w<numWeights; w++) {
+            thisBlockWeights[w] = blockWeights[w][myBlock]-nodeWeightsV[w][thisInd]; //remove point from its current block
+            ValueType optWeight = targetBlockWeights[w][myBlock];
+            thisBlockImbalances[w] = (ValueType(thisBlockWeights[w] - optWeight)/optWeight);
+        }
+
+        
+        //possible centers to move are the ones that the point is closer
+//WARNING/TODO: "closer" depends on which distance function we use. Here we use the euclidean distance
+// but we should use the effective distance for better results with kmeans
+
+//TODO: use the centers based on their membership value by using computeMembership()
+        //std:vector<IndexType> possibleBlocks(fuzzSize);
+        for( IndexType c=0; c<fuzzSize; c++){
+            const IndexType possibleBlock = fuzzyClustering[thisInd][c].second;
+            if( myBlock==possibleBlock){
+                continue;
+            }
+
+            //check if moving to this block will improve the imbalance
+            std::vector<ValueType> newBlockWeights(numWeights);
+            std::vector<ValueType> newBlockImbalances(numWeights);
+            for (IndexType w=0; w<numWeights; w++) {
+                newBlockWeights[w] = blockWeights[w][possibleBlock] + nodeWeightsV[w][thisInd]; //add point to this block
+                ValueType optWeight = targetBlockWeights[w][possibleBlock];
+                newBlockImbalances[w] = (ValueType(thisBlockWeights[w] - optWeight)/optWeight);                
+            }
+
+            //
+            //evaluate if the move was beneficial
+            //
+
+        }
+    }//for(IndexType i=0; i<localN; i++)
+
+
+    //what to return? partition is already changed
+    return 1;
+
+}//refine
+
+
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::getGlobalBlockWeight(
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const DenseVector<IndexType>& partition){
+
+    const IndexType numWeights = nodeWeights.size();
+    const IndexType localN = nodeWeights[0].size();
+
+    //
+    // convert to vector<vector> and then use overloaded function
+    //
+
+    std::vector<std::vector<ValueType>> nodeWeightsV( numWeights );
+
+    for(IndexType w=0; w<numWeights; w++){
+        scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[w].getLocalValues());
+        nodeWeightsV[w] = std::vector<ValueType>(rWeights.get(), rWeights.get()+localN);
+    }
+
+    return getGlobalBlockWeight( nodeWeightsV, partition );
+}
+
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::getGlobalBlockWeight(
+    const std::vector<std::vector<ValueType>> &nodeWeights,
+    const DenseVector<IndexType>& partition){
+
+    const IndexType numWeights = nodeWeights.size();
+    const IndexType localN = nodeWeights[0].size();
+    assert( partition.getLocalValues().size()==localN);
+
+    const IndexType numBlocks = partition.max()+1;
+PRINT( numBlocks );
+    scai::hmemo::ReadAccess<IndexType> rPart(partition.getLocalValues());
+
+    //the global weight of each block for each weight
+    std::vector<std::vector<ValueType>> blockWeights(numWeights, std::vector<ValueType>( numBlocks, 0.0));
+
+    //calculate the local weight first
+    for( IndexType i=0; i<localN; i++){
+        const IndexType myBlock = rPart[i];
+        for(IndexType w=0; w<numWeights; w++){
+            blockWeights[w][myBlock] += nodeWeights[w][i];
+        }
+    }
+
+    //take the global sum
+
+    const scai::dmemo::CommunicatorPtr comm = partition.getDistributionPtr()->getCommunicatorPtr();
+
+    for (IndexType w=0; w<numWeights; w++){
+        comm->sumImpl(blockWeights[w].data(), blockWeights[w].data(), numBlocks, scai::common::TypeTraits<ValueType>::stype);
+    }
+
+    return blockWeights;
+}
+
+
 /* Get local minimum and maximum coordinates
  * TODO: This isn't used any more! Remove?
  */
