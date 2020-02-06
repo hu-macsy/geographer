@@ -230,6 +230,13 @@ static std::vector<std::vector<ValueType>> computeMembership(
 static std::vector<ValueType> computeMembershipOneValue(
     const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering);
 
+/** #brief Normalize membership by the max membership per block.
+*/
+static std::vector<ValueType> computeMembershipOneValueNormalized(
+    const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering,
+    const DenseVector<IndexType>& partition,
+    const IndexType numBlocks);
+
 
 /** Given a partitioned input, move points to other blocks to improve imbalance.
 */
