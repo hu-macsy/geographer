@@ -225,6 +225,8 @@ struct Settings {
     bool freezeBalancedInfluence = false;
     bool erodeInfluence = false;
     bool keepMostBalanced = false;
+    //IndexType batchSize = 100;              ///< after how many moves we calculate the global sum in refineForBalance
+    double batchPercent = 0.05;          ///< calculate the batch size as a percentage of the number of local points
     //bool manhattanDistance = false;
     std::vector<IndexType> hierLevels; 		///< for hierarchial kMeans, the number of blocks per level
     //@}
