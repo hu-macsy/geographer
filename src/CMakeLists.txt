@@ -27,7 +27,7 @@ set(FILES_TEST test_main.cpp quadtree/test/QuadTreeTest.cpp    auxTest.cpp CommT
      
 
 ### find zoltan ###
-FIND_PACKAGE( Zoltan2 PATHS "/home/hpc/pr87si/di36qin/Code/Trilinos/build/packages/zoltan2/")
+FIND_PACKAGE( Zoltan2 PATHS "${ZOLTAN_BASE}")
 
 ### find metis and parmetis
 find_library( PARMETIS_LIB NAMES libparmetis.so libparmetis.a HINTS "${PARMETIS_BASE}/lib" )
@@ -38,9 +38,9 @@ if(PARMETIS_LIB AND NOT DEFINED METIS_INCLUDE)
 endif()
 
 
-
+message(${PARHIP_BASE})
 ### find parhip ###
-find_library( PARHIP_LIB libparhip.a "${PARHIP_BASE}" NO_DEFAULT_PATH)
+find_library( PARHIP_LIB libparhip.a libparhip.so HINTS "${PARHIP_BASE}" "${PARHIP_BASE}/lib" )
 
 
 ###
@@ -53,12 +53,12 @@ find_library( PARHIP_LIB libparhip.a "${PARHIP_BASE}" NO_DEFAULT_PATH)
 
 if(Zoltan2_FOUND OR PARMETIS_LIB OR PARHIP_LIB )
     if(Zoltan2_FOUND)
-        message( "\n\tFound package Zoltan2" )
+        message( "\n\tFound Zoltan2 in " ${Zoltan2_LIBRARY_DIRS} )
         add_definitions(-DZOLTAN_FOUND)
 
         #WARNING: if we use ${Zoltan2_LIBRARIES}, it tries to link to the .a library and this creates an error. We need the .so library
-        find_library( ZOLTAN2_LIB libzoltan2.so ${Zoltan2_LIBRARY_DIRS} )
-        find_library( ZOLTAN_LIB libzoltan.so ${Zoltan_LIBRARY_DIRS} )
+        find_library( ZOLTAN2_LIB libzoltan2.so libzoltan2.a HINTS ${Zoltan2_LIBRARY_DIRS} )
+        #find_library( ZOLTAN_LIB libzoltan.so ${Zoltan_LIBRARY_DIRS} )
 
         #TODO: link_directories is probably not needed; there is a better way to do this; at least, this works for now
         link_directories( ${Zoltan2_LIBRARY_DIRS} ${PARMETIS_BASE}/lib ) 
@@ -66,7 +66,7 @@ if(Zoltan2_FOUND OR PARMETIS_LIB OR PARHIP_LIB )
         set(ZOLTAN_WRAP_CPP zoltanWrapper.cpp)
         set(ZOLTAN_WRAP_H zoltanWrapper.h)
         set(ZOLTAN_INCLUDES ${Zoltan2_INCLUDE_DIRS} ${Zoltan2_TPL_INCLUDE_DIRS})
-        set(ZOLTAN_LIBS  ${Zoltan2_TPL_LIBRARIES} ${ZOLTAN2_LIB}  ${ZOLTAN_LIB} ${Zoltan2_LIBRARIES})
+        set(ZOLTAN_LIBS  ${Zoltan2_TPL_LIBRARIES} ${ZOLTAN2_LIB}  ${Zoltan2_LIBRARIES})
     else()
         message(WARNING "zoltan was not found")
     endif()
