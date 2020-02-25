@@ -254,7 +254,7 @@ std::string getOutFileName( const Settings& settings, const std::string& toolNam
         }
         //we are given both a file name and a directory append toolName
         else{
-            outFile = settings.outDir+ dash+ settings.outFile;
+            outFile = settings.outDir+ "/"+ settings.outFile;
             if(toolName!=""){
                 outFile += ("_"+toolName);
             }

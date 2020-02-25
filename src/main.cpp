@@ -192,7 +192,8 @@ int main(int argc, char** argv) {
 
     std::vector<Metrics<ValueType>> metricsVec;
 
-    std::string outFile = getOutFileName(settings, "", comm);
+    const std::string outFile = getOutFileName(settings, "", comm);
+
     //------------------------------------------------------------
     //
     // partition the graph
