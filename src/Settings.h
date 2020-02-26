@@ -193,6 +193,7 @@ struct Settings {
      */
     //@{
     IndexType minBorderNodes = 1;			///< minimum number of border nodes for the local refinement
+    double minBorderNodesPercent = 0.05;
     IndexType stopAfterNoGainRounds = 0; 	///< number of rounds to stop local refinement if no gain is achieved
     IndexType minGainForNextRound = 1;		///< minimum gain to be achieved so local refinement proceeds to next round
     IndexType numberOfRestarts = 0;

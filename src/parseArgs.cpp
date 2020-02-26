@@ -40,6 +40,7 @@ Options populateOptions() {
     ("noRefinement", "skip local refinement steps")
     ("multiLevelRounds", "Tuning Parameter: How many multi-level rounds with coarsening to perform", value<IndexType>()->default_value(std::to_string(settings.multiLevelRounds)))
     ("minBorderNodes", "Tuning parameter: Minimum number of border nodes used in each refinement step", value<IndexType>())
+    ("minBorderNodesPercent", "Tuning parameter: Percentage of local nodes used in each refinement step. Recommended  are values around 0.05", value<double>())
     ("stopAfterNoGainRounds", "Tuning parameter: Number of rounds without gain after which to abort localFM. 0 means no stopping.", value<IndexType>())
     ("minGainForNextGlobalRound", "Tuning parameter: Minimum Gain above which the next global FM round is started", value<IndexType>())
     ("gainOverBalance", "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance", value<bool>())
@@ -258,6 +259,9 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     }
     if (vm.count("minBorderNodes")) {
         settings.minBorderNodes = vm["minBorderNodes"].as<IndexType>();
+    }
+    if (vm.count("minBorderNodesPercent")) {
+        settings.minBorderNodesPercent = vm["minBorderNodesPercent"].as<double>();
     }
     if (vm.count("stopAfterNoGainRounds")) {
         settings.stopAfterNoGainRounds = vm["stopAfterNoGainRounds"].as<IndexType>();
