@@ -83,7 +83,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
         std::chrono::duration<double> coarseningTime =  std::chrono::steady_clock::now() - beforeCoarse;
         ValueType timeForCoarse = ValueType ( comm->max(coarseningTime.count() ));
-        if (comm->getRank() == 0) std::cout << "Time for coarsening:" << timeForCoarse << std::endl;
+        if (comm->getRank() == 0) std::cout << "Time for coarsening: " << timeForCoarse << std::endl;
 
 
         Settings settingscopy(settings);
@@ -120,7 +120,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
             std::chrono::duration<double> uncoarseningTime =  std::chrono::steady_clock::now() - beforeUnCoarse;
             ValueType time = ValueType ( comm->max(uncoarseningTime.count() ));
-            if (comm->getRank() == 0) std::cout << "Time for uncoarsening:" << time << std::endl;
+            if (comm->getRank() == 0) std::cout << "Time for uncoarsening: " << time << std::endl;
         }
     }
 
@@ -146,7 +146,6 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         }
 
         IndexType numRefinementRounds = 0;
-        //IndexType oldCut = 0;
 
         ValueType gain = 0;
         while (numRefinementRounds == 0 || gain >= settings.minGainForNextRound) {

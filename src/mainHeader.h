@@ -254,7 +254,10 @@ std::string getOutFileName( const Settings& settings, const std::string& toolNam
         }
         //we are given both a file name and a directory append toolName
         else{
-            outFile = settings.outDir+ "/"+ settings.outFile;
+            //outFile = settings.outDir+ "/"+ settings.outFile;
+            std::vector<std::string> strs = aux<IndexType,double>::split( settings.fileName, '/' );
+            std::string graphName = aux<IndexType,double>::split(strs.back(), '.')[0];            
+            outFile = settings.outDir+ "/"+ graphName+ "_k"+ std::to_string(settings.numBlocks)+ settings.outFile+ ".info";
             if(toolName!=""){
                 outFile += ("_"+toolName);
             }
