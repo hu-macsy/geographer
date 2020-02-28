@@ -1249,10 +1249,10 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     // perform sampling
     {
         if (randomInitialization) {
-            ITI::GraphUtils<IndexType, ValueType>::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
+            //ITI::GraphUtils<IndexType, ValueType>::FisherYatesShuffle(localIndices.begin(), localIndices.end(), localN);
             // TODO: the cantor shuffle is more stable; random shuffling can yield better
             // results occasionally but has higher fluctuation/variance
-            // localIndices = GraphUtils<IndexType,ValueType>::indexReorderCantor(localN);
+            localIndices = GraphUtils<IndexType,ValueType>::indexReorderCantor(localN);
 
             SCAI_ASSERT_EQ_ERROR(*std::max_element(localIndices.begin(), localIndices.end()), localN -1, "Error in index reordering");
             SCAI_ASSERT_EQ_ERROR(*std::min_element(localIndices.begin(), localIndices.end()), 0, "Error in index reordering");

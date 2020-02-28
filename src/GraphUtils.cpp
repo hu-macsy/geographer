@@ -2081,7 +2081,7 @@ bool GraphUtils<IndexType, ValueType>::hasSelfLoops(const CSRSparseMatrix<ValueT
     
     const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const IndexType diagonalSumSum = comm->sum( diagonalSum );
-PRINT(diagonalSumSum);
+
     if( diagonalSumSum>0 ){
         return true;
     }
