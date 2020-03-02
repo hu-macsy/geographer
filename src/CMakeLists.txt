@@ -125,13 +125,6 @@ if(Zoltan2_FOUND OR PARMETIS_LIB OR PARHIP_LIB )
     target_include_directories( allCompetitors PUBLIC ${ZOLTAN_INCLUDES} ${PARMETIS_INCLUDES} ${CXXOPTS_DIR} )
     target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES} )
 
-    if( PARMETIS_FOUND )
-        add_executable( testMetisRefine testMetisRefinement.cpp parseArgs.cpp)
-        target_include_directories( testMetisRefine PUBLIC ${ZOLTAN_INCLUDES} ${PARMETIS_INCLUDES} ${CXXOPTS_DIR})
-        target_link_libraries( testMetisRefine geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES} )
-        install(TARGETS testMetisRefine DESTINATION "${BIN_DEST}") # executable
-    endif()
-
     set( EXTRA_LIBRARIES_FOUND "true" )
     set( EXTRA_LIBRARIES ${PARMETIS_LIBS} ${ZOLTAN2_LIB} ${ZOLTAN_LIBS}  PARENT_SCOPE )
     
