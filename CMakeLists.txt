@@ -123,7 +123,9 @@ set(CMAKE_DEST "share/cmake/geographer")
 ### set runtime path ###
 cmake_policy(SET CMP0042 NEW) # using rpath also on Mac OS
 set ( CMAKE_SKIP_BUILD_RPATH FALSE )
-set ( CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${LIB_DEST} ${SCAI_ROOT}/lib/)
+set ( CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+#in case rpath is already initialized
+set ( CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${LIB_DEST} ${SCAI_ROOT}/lib/ ${CMAKE_INSTALL_RPATH})
 set ( CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE )
 
 add_subdirectory(external/KaDiS EXCLUDE_FROM_ALL)
