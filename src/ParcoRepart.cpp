@@ -613,7 +613,10 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
             //WARNING: minGainForNextRound should be same in all PEs because otherwise, in the one-to-one 
             // communication scheme later, only one PE may exit the loop and the other hangs
             // set gain to at least 1% of the average local cut
-            settings.minGainForNextRound = std::max( int(sumLocalCutNodes*0.01/settings.numBlocks), 1); 
+            settings.minGainForNextRound = std::max( int(sumLocalCutNodes*0.01/settings.numBlocks), 1);
+            if(comm->getRank() == 0 ){
+                std::cout << "\tsetting minGainForNextRound to " << settings.minGainForNextRound << std::endl;
+            }
         }
 
     	ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights[0], coordinates, halo, settings, metrics);

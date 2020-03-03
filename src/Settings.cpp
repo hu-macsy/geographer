@@ -182,6 +182,10 @@ ITI::Settings ITI::Settings::setDefault( const scai::lama::CSRSparseMatrix<Value
     const long int localN = dist->getLocalSize();
 
     retSet.minBorderNodes = std::max( int(localN*minBorderNodesPercent), 1); //10% of local nodes
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+    if(comm->getRank() == 0 ){
+        std::cout << "\tsetting (in PE 0) minBorderNodes to " << retSet.minBorderNodes << std::endl;
+    }
 
     retSet.stopAfterNoGainRounds = 2;
 
