@@ -6,6 +6,8 @@
  */
 
 #include "Mapping.h"
+#include "KMeans.h" //needed for findCenters in sfcMapping
+
 
 namespace ITI {
 
