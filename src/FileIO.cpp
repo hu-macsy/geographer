@@ -1121,8 +1121,9 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
         edgeList.push_back( std::make_pair( v1, v2) );
     }
 
-    std::cout << "Process " << comm->getRank() << ": maxFirstNode " << maxFirstNode << std::endl;
-
+    if( settings.debugMode and settings.verbose ){
+        std::cout << "Process " << comm->getRank() << ": maxFirstNode " << maxFirstNode << std::endl;
+    }
 
     maxEncounteredNode = comm->max(maxEncounteredNode);
     if (maxEncounteredNode < globalN/2 && comm->getRank() == 0) {
