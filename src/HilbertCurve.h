@@ -39,19 +39,20 @@ using scai::lama::DenseVector;
 
 /** @cond INTERNAL
 */
+template <typename ValueType>
 struct sort_pair {
-    double value;
+    ValueType value;
     int32_t index;
-    bool operator<(const sort_pair& rhs ) const {
+    bool operator<(const sort_pair<ValueType>& rhs ) const {
         return value < rhs.value || (value == rhs.value && index < rhs.index);
     }
-    bool operator>(const sort_pair& rhs ) const {
+    bool operator>(const sort_pair<ValueType>& rhs ) const {
         return value > rhs.value || (value == rhs.value && index > rhs.index);
     }
-    bool operator<=(const sort_pair& rhs ) const {
+    bool operator<=(const sort_pair<ValueType>& rhs ) const {
         return !operator>(rhs);
     }
-    bool operator>=(const sort_pair& rhs ) const {
+    bool operator>=(const sort_pair<ValueType>& rhs ) const {
         return !operator<(rhs);
     }
 };
@@ -150,7 +151,7 @@ public:
      * @param[in] coordinates The coordinates of all the points
      * @return A sorted vector based on the hilbert index of each point.
      */
-    static std::vector<sort_pair> getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
+    static std::vector<sort_pair<ValueType>> getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates, Settings settings);
 
     /** Redistribute coordinates and weights according to an implicit hilberPartition.
      * Equivalent to (but faster):

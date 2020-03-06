@@ -32,9 +32,9 @@ namespace ITI{
 
 template <typename ValueType>
 IndexType readInput( 
-    const cxxopts::ParseResult vm,
-    const Settings settings,
-    const scai::dmemo::CommunicatorPtr comm,
+    const cxxopts::ParseResult& vm,
+    const Settings& settings,
+    const scai::dmemo::CommunicatorPtr& comm,
     scai::lama::CSRSparseMatrix<ValueType>& graph,
     std::vector<scai::lama::DenseVector<ValueType>>& coords,
     std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights ){
@@ -181,6 +181,96 @@ IndexType readInput(
     }
 
     return N;
+}
+
+
+void printInfo(std::ostream& out, const scai::dmemo::CommunicatorPtr comm, const Settings settings){
+    if (comm->getRank() == 0) {
+        std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
+        std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
+        out << "date and time: " << std::ctime(&timeNow);
+
+        out<< "commit: "<< version << " , machine: " << settings.machine << " , p: "<< comm->getSize();
+
+        auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
+        out <<" seed:" << settings.seed << std::endl;
+        out.precision(oldprecision);
+
+        out << "Calling command:" << std::endl;
+        out << settings.callingCommand << std::endl << std::endl;
+    }
+}
+
+
+Settings initialize( const int argc, char** argv, const cxxopts::ParseResult& vm, const scai::dmemo::CommunicatorPtr& comm){
+
+    if (comm->getType() != scai::dmemo::CommunicatorType::MPI) {
+        std::cout << "The linked lama version was compiled without MPI. Only sequential partitioning is supported." << std::endl;
+    }
+      
+    std::string callingCommand = ITI::getCallingCommand(argc, argv);
+    
+    Settings settings = ITI::interpretSettings(vm);
+    //add the calling command to the setting so it can be extracted later
+    settings.callingCommand = callingCommand;
+    if( !settings.isValid )
+        throw std::runtime_error("Invalid settings");
+
+    return settings;
+}
+
+
+std::string getOutFileName( const Settings& settings, const std::string& toolName, const scai::dmemo::CommunicatorPtr& comm){
+    const IndexType rank = comm->getRank();
+    std::string outFile = settings.outFile;
+
+    //want to store partition but outFile was not provided
+    if( settings.storePartition and outFile=="-"){
+        outFile = toolName+"_k"+ std::to_string(settings.numBlocks);
+        if(rank==0){
+            std::cout << "Option to store partition was given but no filename (--outFile). Created prefix: " << outFile << std::endl;
+        }
+    }
+
+    //we are given a directory 
+    if( settings.outDir!="-" ) {
+        std::string dash = "";
+        if( (settings.outDir.compare(settings.outDir.length()-1, 1, "/")!=0) and (settings.outDir.compare(settings.outDir.length()-1, 1, "\\")!=0) and toolName!="" ){
+            dash= "/";
+        }        
+        //but no outFile
+        if( settings.outFile=="-" ){
+            //set the graphName in order to create the outFile name
+            std::string copyName;
+            if( settings.fileName!="-" ){
+                copyName = settings.fileName;
+            }else{     
+                copyName = "generate_"+ std::to_string(settings.numX)+ "_"+ std::to_string(settings.numY);
+            }
+            std::vector<std::string> strs = aux<IndexType,double>::split( copyName, '/' );
+            std::string graphName = aux<IndexType,double>::split(strs.back(), '.')[0];
+            //add specific folder for each tool
+            outFile = settings.outDir+ dash+ toolName+ "/"+ graphName+ "_k"+ std::to_string(settings.numBlocks)+ ".info";
+        }
+        //we are given both a file name and a directory append toolName
+        else{
+            //outFile = settings.outDir+ "/"+ settings.outFile;
+            std::vector<std::string> strs = aux<IndexType,double>::split( settings.fileName, '/' );
+            std::string graphName = aux<IndexType,double>::split(strs.back(), '.')[0];            
+            outFile = settings.outDir+ "/"+ graphName+ "_k"+ std::to_string(settings.numBlocks)+ settings.outFile+ ".info";
+            if(toolName!=""){
+                outFile += ("_"+toolName);
+            }
+        }
+    }
+
+    //we are given just one file name, not a directory
+    if( settings.outFile!="-" and settings.outDir=="-"){
+        //outFile += ("_" + ITI::to_string(thisTool));
+        //do nothing
+    }
+
+    return outFile;
 }
 
 }

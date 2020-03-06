@@ -83,7 +83,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
         std::chrono::duration<double> coarseningTime =  std::chrono::steady_clock::now() - beforeCoarse;
         ValueType timeForCoarse = ValueType ( comm->max(coarseningTime.count() ));
-        if (comm->getRank() == 0) std::cout << "Time for coarsening:" << timeForCoarse << std::endl;
+        if (comm->getRank() == 0) std::cout << "Time for coarsening: " << timeForCoarse << std::endl;
 
 
         Settings settingscopy(settings);
@@ -120,7 +120,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
 
             std::chrono::duration<double> uncoarseningTime =  std::chrono::steady_clock::now() - beforeUnCoarse;
             ValueType time = ValueType ( comm->max(uncoarseningTime.count() ));
-            if (comm->getRank() == 0) std::cout << "Time for uncoarsening:" << time << std::endl;
+            if (comm->getRank() == 0) std::cout << "Time for uncoarsening: " << time << std::endl;
         }
     }
 
@@ -128,22 +128,6 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
     {
         SCAI_REGION( "MultiLevel.multiLevelStep.localRefinement" )
         scai::lama::CSRSparseMatrix<ValueType> processGraph = GraphUtils<IndexType, ValueType>::getPEGraph(input);
-
-        //TODO: remove from final version?
-        // write the PE graph for further experiments
-        if(settings.writePEgraph) { //write PE graph for further experiments
-            //TODO: this workos only for 12 rounds
-            PRINT0( "thisRound= " << settings.thisRound << " , multiLevelRounds= " << settings.multiLevelRounds);
-            if( settings.thisRound==0) {
-                std::chrono::time_point<std::chrono::steady_clock> before =  std::chrono::steady_clock::now();
-                std::string filename = settings.fileName+ "_k"+ std::to_string(settings.numBlocks)+ ".PEgraph";
-                if( not FileIO<IndexType,ValueType>::fileExists(filename) ) {
-                    FileIO<IndexType,ValueType>::writeGraph(processGraph, filename, 1);
-                }
-                std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - before;
-                PRINT0("time to write PE graph: :" << elapTime.count() );
-            }
-        }
 
         std::chrono::time_point<std::chrono::steady_clock> before =  std::chrono::steady_clock::now();
 
@@ -162,7 +146,6 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         }
 
         IndexType numRefinementRounds = 0;
-        //IndexType oldCut = 0;
 
         ValueType gain = 0;
         while (numRefinementRounds == 0 || gain >= settings.minGainForNextRound) {

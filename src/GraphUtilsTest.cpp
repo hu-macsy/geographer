@@ -132,21 +132,28 @@ TYPED_TEST(GraphUtilsTest, testReindexCut) {
 TYPED_TEST(GraphUtilsTest, testConstructLaplacian) {
     using ValueType = TypeParam;
 
-    std::string fileName = "bubbles-00010.graph";
+    std::string fileName = "rotation-00000.graph";
     std::string file = GraphUtilsTest<ValueType>::graphPath + fileName;
     const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType n = graph.getNumRows();
     scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
 
-    scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
-    scai::dmemo::DistributionPtr cyclidCist(new scai::dmemo::CyclicDistribution(n, 10, comm));
+    scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(n));
     ASSERT_TRUE(graph.isConsistent());
 
     CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
 
     ASSERT_EQ(L.getRowDistribution(), graph.getRowDistribution());
     ASSERT_TRUE(L.isConsistent());
+{
+//PRINT( (GraphUtils<IndexType, ValueType>::hasSelfLoops(graph)) );
 
+// scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph ); 
+// copyGraph.redistribute(graph.getRowDistributionPtr(), graph.getRowDistributionPtr());
+// PRINT( (GraphUtils<IndexType, ValueType>::hasSelfLoops(copyGraph)) );
+// CSRSparseMatrix<ValueType> lolo = GraphUtils<IndexType, ValueType>::constructLaplacian(copyGraph);
+// PRINT("\n\n");
+}
     //test that L*1 = 0
     DenseVector<ValueType> x( L.getRowDistributionPtr(), 1 );
     DenseVector<ValueType> y = scai::lama::eval<DenseVector<ValueType>>( L * x );
@@ -155,7 +162,7 @@ TYPED_TEST(GraphUtilsTest, testConstructLaplacian) {
     EXPECT_EQ(norm,0);
 
     //test consistency under distributions
-    const CSRSparseMatrix<ValueType> replicatedGraph = scai::lama::distribute<CSRSparseMatrix<ValueType>>(graph, noDist, noDist);
+    const CSRSparseMatrix<ValueType> replicatedGraph = scai::lama::distribute<CSRSparseMatrix<ValueType>>(graph, noDistPtr, noDistPtr);
     CSRSparseMatrix<ValueType> LFromReplicated = GraphUtils<IndexType, ValueType>::constructLaplacian(replicatedGraph);
     LFromReplicated.redistribute(L.getRowDistributionPtr(), L.getColDistributionPtr());
     CSRSparseMatrix<ValueType> diff = scai::lama::eval<CSRSparseMatrix<ValueType>> (LFromReplicated - L);

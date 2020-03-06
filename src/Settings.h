@@ -141,6 +141,7 @@ std::string to_string(const ITI::Format& f);
 
 ITI::Tool to_tool(const std::string& s);
 
+std::string getCallingCommand( const int argc, char** argv );
 
 /** @brief A structure that holds several options for partitioning, input, output, metrics e.t.c.
 */
@@ -156,7 +157,8 @@ struct Settings {
     bool repartition = false; 	///< set to true to respect the initial partition
 
     ITI::Tool initialPartition = ITI::Tool::geoKmeans;			///< the tool to use to get the initial partition, \sa Tool
-    static const ITI::Tool initialMigration = ITI::Tool::geoSFC;///< pre-processing step to redistribute/migrate coordinates
+    //static const ITI::Tool initialMigration = ITI::Tool::geoSFC;///< pre-processing step to redistribute/migrate coordinates
+    ITI::Tool initialMigration = ITI::Tool::geoSFC;
     //@}
 
     /** @name Input data and other info
@@ -173,7 +175,9 @@ struct Settings {
     bool useDiffusionCoordinates = false;		///< if not coordinates are provided, we can use artificial coordinates
     IndexType diffusionRounds = 20;				///< number of rounds to create the diffusion coordinates
     IndexType numNodeWeights = -1;		///< number of vertex weights
-    std::string machine;
+    std::string machine;                ///< name of the machine that the executable is running
+    double seed;                        ///< random seed used for some routines
+    std::string callingCommand;         ///< the complete calling command used
     //@}
 
     /** @name Mesh generation settings
@@ -189,6 +193,7 @@ struct Settings {
      */
     //@{
     IndexType minBorderNodes = 1;			///< minimum number of border nodes for the local refinement
+    double minBorderNodesPercent = 0.05;
     IndexType stopAfterNoGainRounds = 0; 	///< number of rounds to stop local refinement if no gain is achieved
     IndexType minGainForNextRound = 1;		///< minimum gain to be achieved so local refinement proceeds to next round
     IndexType numberOfRestarts = 0;
@@ -202,7 +207,7 @@ struct Settings {
     /** @name Space filling curve parameters
     */
     //@{
-    IndexType sfcResolution = 7; 			///<tuning parameters for SFC, the resolution depth for the curve
+    IndexType sfcResolution = 9; 			///<tuning parameters for SFC, the resolution depth for the curve
     //@}
 
 
@@ -250,8 +255,9 @@ struct Settings {
     bool debugMode = false; 				///< even more checks and prints
     bool writeDebugCoordinates = false;		///< store coordinates and block id
     bool writePEgraph = false;				///< store the processor graph
+    //TODO: storeInfo is mostly ignore. remove?
     bool storeInfo = false;					///< store metrics info
-    bool storePartition = false;            ///< store metrics info
+    bool storePartition = false;            ///< store partition info
     IndexType repeatTimes = 1;				///< for benchmarking, how many times is the partition repeated
     IndexType thisRound=-1; //TODO: what is this? This has nothing to do with the settings.
 
@@ -259,6 +265,7 @@ struct Settings {
     //calculate expensive performance metrics?
     bool computeDiameter = false;			///< if the diameter should be computed (can be expensive)
     IndexType maxDiameterRounds = 2;		///< max number of rounds to approximate the diameter
+    IndexType maxCGIterations = 500;        ///< max number of iterations of the CG solver in metrics
     //@}
 
     /** @name Various parameters
@@ -315,17 +322,27 @@ struct Settings {
         }
 
         out<< "initial migration: " << initialMigration << std::endl;
+        out<< "initial partition: " << initialPartition << std::endl;
 
-        if (initialPartition==ITI::Tool::geoSFC) {
-            out<< "initial partition: hilbert curve" << std::endl;
+        if(ITI::to_string(initialPartition).rfind("geoSFC",0)==0 ){
+        //if (initialPartition==ITI::Tool::geoSFC) {
             out<< "\tsfcResolution: " << sfcResolution << std::endl;
         }
-        else if (initialPartition==ITI::Tool::geoKmeans) {
-            out<< "initial partition: K-Means" << std::endl;
+        //else if (initialPartition==ITI::Tool::geoKmeans) {
+        else if(ITI::to_string(initialPartition).rfind("geoKmeans",0)==0 ){
             out<< "\tminSamplingNodes: " << minSamplingNodes << std::endl;
             out<< "\tinfluenceExponent: " << influenceExponent << std::endl;
-        } else if (initialPartition==ITI::Tool::geoMS) {
-            out<< "initial partition: MultiSection" << std::endl;
+        }
+        else if(ITI::to_string(initialPartition).rfind("geoHier",0)==0 ){
+            out<< "\tminSamplingNodes: " << minSamplingNodes << std::endl;
+            out<< "\thier levels: ";
+            for(unsigned int i=0; i<hierLevels.size(); i++) {
+               out<< hierLevels[i] << ", ";
+            }
+            out<< std::endl;
+        }
+        // else if (initialPartition==ITI::Tool::geoMS) {
+        else if(ITI::to_string(initialPartition).rfind("geoMS",0)==0 ){
             out<< "\tbisect: " << bisect << std::endl;
             out<< "\tuseIter "<< useIter << std::endl;
         } else {

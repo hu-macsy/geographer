@@ -528,10 +528,10 @@ TYPED_TEST(HilbertCurveTest, testGetSortedHilbertIndices_Distributed) {
         Settings settings;
         settings.dimensions = dimensions;
         settings.sfcResolution = 15;
-        settings.debugMode = true;
+        settings.debugMode = false;
 
         //get new sorted local indices
-        std::vector<sort_pair> localPairs = HilbertCurve<IndexType, ValueType>::getSortedHilbertIndices( coords, settings);
+        std::vector<sort_pair<ValueType>> localPairs = HilbertCurve<IndexType, ValueType>::getSortedHilbertIndices( coords, settings);
         const scai::dmemo::CommunicatorPtr comm =  coords[0].getDistributionPtr()->getCommunicatorPtr();
 
         const IndexType newLocalN = localPairs.size();
@@ -559,21 +559,21 @@ TYPED_TEST(HilbertCurveTest, testGetSortedHilbertIndices_Distributed) {
         scai::dmemo::DistributionPtr newDistribution = scai::dmemo::generalDistributionUnchecked(globalN, indexTransport, comm);
 
 //TODO: convert those prints into a meaningfull check
-        if( comm->getRank()==1 ) {
-            for( int i=0; i<coords[0].getLocalValues().size(); i++) {
-                std::cout << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl;
+        if( settings.debugMode ){
+            if( comm->getRank()==1 ) {
+                for( int i=0; i<coords[0].getLocalValues().size(); i++) {
+                    std::cout << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl;
+                }
             }
-        }
-        for(int d=0; d<dimensions; d++) {
-            coords[d].redistribute(newDistribution);
-        }
-        // *** till here
+            for(int d=0; d<dimensions; d++) {
+                coords[d].redistribute(newDistribution);
+            }
 
-//TODO: and that one
-        std::cout<<"------ redistribute coords"<< std::endl;
-        if( comm->getRank()==1 ) {
-            for( int i=0; i<coords[0].getLocalValues().size(); i++) {
-                std::cout << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl;
+            std::cout<<"------ redistribute coords"<< std::endl;
+            if( comm->getRank()==1 ) {
+                for( int i=0; i<coords[0].getLocalValues().size(); i++) {
+                    std::cout << coords[0].getLocalValues()[i] << ", " << coords[1].getLocalValues()[i] << std::endl;
+                }
             }
         }
 

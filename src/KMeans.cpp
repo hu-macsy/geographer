@@ -1151,7 +1151,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
             for (ValueType blockSize : targetBlockWeights[i]) {
                 PRINT0(std::to_string(blockSize) + " ");
             }
-            throw std::invalid_argument("Block weight sum " + std::to_string(blockWeightSum) + " too small for node weight sum " + std::to_string(nodeWeightSum[i]) + ". Maybe you should try calling CommTree::adaptWeights().");
+            throw std::invalid_argument("The total weight of the wanted blocks is " + std::to_string(blockWeightSum) + " which is smaller than the total vertex weight which is " + std::to_string(nodeWeightSum[i]) + "; i.e., the given input does not fit into the given block weights. Maybe you should try calling CommTree::adaptWeights().");
         }
     }
 
@@ -1201,7 +1201,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     ValueType localVolume = 1;
     for (IndexType d = 0; d < dim; d++) {
         const ValueType diff = globalMaxCoords[d] - globalMinCoords[d];
-        const ValueType localDiff = maxCoords[d] - minCoords[d];
+        const ValueType localDiff = maxCoords[d] - minCoords[d]; 
         diagonalLength += diff*diff;
         volume *= diff;
         localVolume *= localDiff;
@@ -1559,7 +1559,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
-    std::tie(minCoords, maxCoords) = getLocalMinMaxCoords(coordinates);
+    std::tie(minCoords, maxCoords) = getGlobalMinMaxCoords(coordinates);
 
     std::vector<point<ValueType>> centers = findInitialCentersSFC(coordinates, minCoords, maxCoords, settings);
     SCAI_ASSERT_EQ_ERROR(centers.size(), settings.numBlocks, "Number of centers is not correct");
@@ -1620,7 +1620,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierarchicalPartition
 
     std::vector<ValueType> minCoords(settings.dimensions);
     std::vector<ValueType> maxCoords(settings.dimensions);
-    std::tie(minCoords, maxCoords) = getLocalMinMaxCoords(coordinates);
+    std::tie(minCoords, maxCoords) = getGlobalMinMaxCoords(coordinates);
 
     // used later for debugging and calculating imbalance
     std::vector<ValueType> totalWeightSum(numNodeWeights);
@@ -1770,14 +1770,20 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierPlusRepart(
     PRINT0("Finished hierarchical partition");
 
     // refine using a repartition step
-    return  computeRepartition(coordinates, nodeWeights, blockSizes, result, settings);
+
+    std::chrono::time_point<std::chrono::high_resolution_clock> repartStart = std::chrono::high_resolution_clock::now();
+    DenseVector<IndexType> result2 = computeRepartition(coordinates, nodeWeights, blockSizes, result, settings);
+    std::chrono::duration<ValueType,std::ratio<1>> repartTime = std::chrono::high_resolution_clock::now() - repartStart;
+    metrics.MM["timeKmeans"] += repartTime.count();
+
+    return result2;
 }// computeHierPlusRepart
 
 /* Get local minimum and maximum coordinates
  * TODO: This isn't used any more! Remove?
  */
 template<typename IndexType, typename ValueType>
-std::pair<std::vector<ValueType>,std::vector<ValueType>> KMeans<IndexType,ValueType>::getLocalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates) {
+std::pair<std::vector<ValueType>,std::vector<ValueType>> KMeans<IndexType,ValueType>::getGlobalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates) {
     const int dim = coordinates.size();
     std::vector<ValueType> minCoords(dim);
     std::vector<ValueType> maxCoords(dim);
