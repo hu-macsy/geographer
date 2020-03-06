@@ -1447,16 +1447,10 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     IndexType maxLocalVertex=0;
     IndexType minLocalVertex=std::numeric_limits<IndexType>::max();
 
+    //get min and max first;
     for(IndexType i=0; i<localM; i++) {
         IndexType v1 = edgeList[i].first;
         IndexType v2 = edgeList[i].second;
-        localPairs[2*i].first = v1;
-        localPairs[2*i].second = v2;
-
-        //insert also reversed edge to keep matrix symmetric
-        localPairs[2*i+1].first = v2;
-        localPairs[2*i+1].second = v1;
-
         IndexType minV = std::min(v1,v2);
         IndexType maxV = std::max(v1,v2);
 
@@ -1467,7 +1461,24 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
             maxLocalVertex = maxV;
         }
     }
-    //PRINT(thisPE << ": vertices range from "<< minLocalVertex << " to " << maxLocalVertex);
+    PRINT(thisPE << ": vertices range from "<< minLocalVertex << " to " << maxLocalVertex);
+
+    const IndexType globalMinIndex = comm->min(minLocalVertex);
+    globalMinIndex==0 ? maxLocalVertex : maxLocalVertex-- ;
+
+    //if vertices are numbered starting from 1, subtract 1 by every vertex index
+    const IndexType oneORzero = globalMinIndex==0 ? 0: 1;
+    
+    for(IndexType i=0; i<localM; i++) {
+        IndexType v1 = edgeList[i].first - oneORzero;;
+        IndexType v2 = edgeList[i].second - oneORzero;;
+        localPairs[2*i].first = v1;
+        localPairs[2*i].second = v2;
+
+        //insert also reversed edge to keep matrix symmetric
+        localPairs[2*i+1].first = v2;
+        localPairs[2*i+1].second = v1;
+    }
 
     const IndexType N = comm->max( maxLocalVertex );
     localM *=2 ;	// for the duplicated edges
@@ -1595,8 +1606,8 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     //
     newMaxLocalVertex = localPairs.back().first;
     IndexType newMinLocalVertex = localPairs[0].first;
-    IndexType checkSum = newMaxLocalVertex - newMinLocalVertex;
-    IndexType globCheckSum = comm->sum( checkSum ) + comm->getSize() -1;
+    IndexType checkSum = newMaxLocalVertex - newMinLocalVertex  ;
+    IndexType globCheckSum = comm->sum( checkSum )+ comm->getSize() -1;
 
     //TODO: should we allow isolated vertices?
     //this assertion triggers when the graph has isolated (with no edges) vertices
