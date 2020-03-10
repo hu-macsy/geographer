@@ -1030,11 +1030,6 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 
         globalN = header[0];
         globalM = header[1];
-
-        if (comm->getRank() == 0) {
-            std::cout << " expecting " << globalN << " nodes and " << globalM << " edges." << std::endl;
-        }
-
     } else {
         //skip the first lines that have comments starting with '%'
         std::string line;
@@ -1053,7 +1048,10 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
         std::getline(ss, item, ' ');
         globalM = std::stoll(item);
     }
-
+    
+    if (comm->getRank() == 0) {
+        std::cout << " expecting " << globalN << " nodes and " << globalM << " edges." << std::endl;
+    }
     if( globalN<=0 or globalM<0 ) {
         throw std::runtime_error("Negative input, maybe int value is not big enough: globalN= " + std::to_string(globalN) + " , globalM= " + std::to_string(globalM));
     }

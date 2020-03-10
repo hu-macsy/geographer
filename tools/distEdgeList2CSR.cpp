@@ -50,6 +50,6 @@ int main(int argc, char** argv) {
 
     ITI::FileIO<IndexType,ValueType>::writeGraph( graph, outFile, false);
 
-    return 1;
+    return 0;
 }
 
