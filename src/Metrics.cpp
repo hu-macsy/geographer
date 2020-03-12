@@ -310,7 +310,7 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
     MM["SpMVtime"] = getSPMVtime(copyGraph, repeatTimes);
 
     //TODO: take a percentage of repeatTimes; maybe all repeatTimes are too much for CG
-    MM["CGtime"] = getLinearSolverTime( copyGraph, 10, settings.maxCGIterations); 
+    MM["CGtime"] = getLinearSolverTime( copyGraph, 5, settings.maxCGIterations); 
 
     //TODO: maybe extract this time from the actual SpMV above
     // comm time in SpMV
@@ -572,7 +572,7 @@ ValueType Metrics<ValueType>::getLinearSolverTime(
 
 PRINT( comm->getRank() <<": " << laplacian.getLocalNumValues() << " = " << graph.getLocalNumValues() << " + " << graph.getLocalNumRows());
 
-
+/*
 const scai::lama::CSRStorage<ValueType>& storage = laplacian.getLocalStorage();
 PRINT( comm->getRank() <<": " << storage );
 const scai::hmemo::ReadAccess<ValueType> values(storage.getValues());
@@ -597,9 +597,9 @@ PRINT( comm->getRank() <<": " << localSum );
 
 SCAI_ASSERT_EQ_ERROR( laplacian.getNumValues(), graph.getNumValues()+graph.getNumRows(), "wtf" );
 SCAI_ASSERT_EQ_ERROR( laplacian.l1Norm(), 2*graph.l1Norm(), "Laplacian looks wrong" );
+*/
 
-
-    scai::lama::DenseVector<ValueType> solution( colDist, ValueType(1.0) );
+    
 
 // Allocate a common logger that prints convergenceHistory
 bool isDisabled = comm->getRank() > 0;
@@ -608,32 +608,38 @@ scai::solver::LoggerPtr logger( new scai::solver::CommonLogger( "CGLogger: ", sc
 
     scai::solver::CG<ValueType> solver("CGSolver", logger);
 
-
-    //scai::solver::CriterionPtr<ValueType> criterion( new scai::solver::IterationCount<ValueType>( maxIterations ) );
     scai::lama::NormPtr<ValueType> norm( new scai::lama::L2Norm<ValueType>( ) );
     const ValueType eps = 1E-8;
-    auto criterion = std::make_shared<scai::solver::ResidualThreshold<ValueType>>( norm, eps, scai::solver::ResidualCheck::Absolute );
+    //scai::solver::CriterionPtr<ValueType> criterion1 = std::make_shared<scai::solver::ResidualThreshold<ValueType>>( norm, eps, scai::solver::ResidualCheck::Absolute );
+    scai::solver::CriterionPtr<ValueType> criterion1( new scai::solver::ResidualThreshold<ValueType>( norm, eps, scai::solver::ResidualCheck::Absolute ) );
+    scai::solver::CriterionPtr<ValueType> criterion2( new scai::solver::IterationCount<ValueType>( maxIterations ) );
+    scai::solver::CriterionPtr<ValueType> criterion( new scai::solver::Criterion<ValueType>( criterion1, criterion2, scai::solver::BooleanOp::OR ) );
 
     solver.setStoppingCriterion( criterion );
     ValueType totalTime = 0.0;
+    IndexType totalIterations = 0;
 
     for(IndexType r=0; r<repeatTimes; r++) {
         const scai::lama::DenseVector<ValueType> rhs( colDist, ValueType(1.0) );
 
-
+        scai::lama::DenseVector<ValueType> solution( colDist, ValueType(1.0) );
         solver.initialize( laplacian );
 
         std::chrono::time_point<std::chrono::steady_clock> beforeTime = std::chrono::steady_clock::now();
 PRINT0( r );
         solver.solve(solution, rhs);
+PRINT0( solver.getIterationCount() );
 
         std::chrono::duration<ValueType> elapTime = std::chrono::steady_clock::now() - beforeTime;
         totalTime += elapTime.count();
+        //number of iterations is (should be!) always the same; maybe just get them outside the loop?
+        totalIterations += solver.getIterationCount();
         //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
     }
     ValueType globTime = comm->max(totalTime)/repeatTimes;
     
-    PRINT0("total time for "<< repeatTimes << " calls to CG solver: " << totalTime );
+    PRINT0("total time for "<< repeatTimes << " calls to CG solver: " << totalTime << 
+            " and " << totalIterations/repeatTimes << " average iterations."  );
 
     return globTime;
 }

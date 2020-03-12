@@ -265,7 +265,7 @@ struct Settings {
     //calculate expensive performance metrics?
     bool computeDiameter = false;			///< if the diameter should be computed (can be expensive)
     IndexType maxDiameterRounds = 2;		///< max number of rounds to approximate the diameter
-    IndexType maxCGIterations = 500;        ///< max number of iterations of the CG solver in metrics
+    IndexType maxCGIterations = 2000;        ///< max number of iterations of the CG solver in metrics
     //@}
 
     /** @name Various parameters
