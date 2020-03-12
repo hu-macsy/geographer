@@ -304,6 +304,12 @@ public:
      */
     static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 
+    /** @deprecated Not used anymore, use computeCommVolume().
+    */
+    //TODO: debug and benchmark (it might be faster than the other method) or remove
+    static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian_depr(const scai::lama::CSRSparseMatrix<ValueType>& adjM);
+    
+
     /** @brief Construct a replicated projection matrix for a fast Johnson-Lindenstrauß-Transform
      *
      * @param epsilon Desired accuracy of transform

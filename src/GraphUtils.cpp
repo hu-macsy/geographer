@@ -17,13 +17,14 @@
 #include <scai/dmemo/GenBlockDistribution.hpp>
 #include <scai/lama/matrix/DenseMatrix.hpp>
 #include <scai/lama/matrix/DIASparseMatrix.hpp>
-
+#include <scai/logging.hpp>
 #include <scai/tracing.hpp>
+
 #include <JanusSort.hpp>
 
 #include "GraphUtils.h"
 
-
+SCAI_LOG_DEF_LOGGER( logger, "GraphUtilsLogger" );
 
 using std::vector;
 using std::queue;
@@ -1753,7 +1754,7 @@ std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, Val
             }
             SCAI_ASSERT_LE_ERROR( edgeIndex, numEdges, "Wrong edge index");
             edgeList.push_back( std::make_tuple( v1, v2, values[edgeIndex]) );
-//PRINT0( v1 << " _ " << v2);
+
             if( values[edgeIndex] > maxEdgeWeight ) maxEdgeWeight = values[edgeIndex];
             if( values[edgeIndex] < minEdgeWeight ) minEdgeWeight = values[edgeIndex];
             edgeIndex++;
@@ -1765,12 +1766,68 @@ std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, Val
     SCAI_ASSERT_EQ_ERROR( edgeList.size()*2, numEdges, "Wrong number of edges");
     return edgeList;
 }
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(const CSRSparseMatrix<ValueType>& graph) {
+    using scai::lama::CSRStorage;
+    using scai::hmemo::HArray;
+    using std::vector;
+
+    const IndexType globalN = graph.getNumRows();
+    const IndexType localN = graph.getLocalNumRows();
+
+    if (graph.getNumColumns() != globalN) {
+        throw std::runtime_error("Matrix must be square to be an adjacency matrix");
+    }
+
+    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+
+    vector<ValueType> targetDegree(localN,0);
+    {
+        const CSRStorage<ValueType>& storage = graph.getLocalStorage();
+        const ReadAccess<IndexType> ia(storage.getIA());
+        const ReadAccess<ValueType> values(storage.getValues());
+        assert(ia.size() == localN+1);
+
+        for (IndexType i = 0; i < localN; i++) {
+            for (IndexType j = ia[i]; j < ia[i+1]; j++) {
+                targetDegree[i] += values[j];
+            }
+        }
+    }
+
+    //the degree matrix
+    CSRSparseMatrix<ValueType> degreeM;
+    degreeM.setIdentity(dist);
+
+    SCAI_ASSERT_ERROR( degreeM.isConsistent(), "identity matrix not consistent");
+    scai::hmemo::HArray<ValueType> localDiagValues(targetDegree.size(), targetDegree.data() );
+    scai::lama::DenseVector<ValueType> distDiagonal( dist, localDiagValues);
+
+    degreeM.setDiagonal( distDiagonal );
+    degreeM.redistribute( graph.getRowDistributionPtr(), graph.getColDistributionPtr() );
+
+    SCAI_ASSERT_ERROR( degreeM.isConsistent(), "degree matrix not consistent");
+    SCAI_ASSERT_EQ_ERROR( degreeM.getNumValues(), globalN, "matrix should be diagonal" );
+
+    CSRSparseMatrix<ValueType> L = graph;
+    
+    //TODO: check, this might break the matrix's consistency
+    //L = D-A
+    L.matrixPlusMatrix( 1.0, degreeM, -1.0, graph );
+    //L *= -1.0;
+    //L += degreeM;
+    //SCAI_ASSERT_ERROR(L.isConsistent(), "laplacian matrix not consistent");
+
+    return L;
+}
 
 //---------------------------------------------------------------------------------------
 //TODO: diagonal elements wrongly found when row distribution and column distribution are some general distribution
 //  while it works if both are a block distribution
 template<typename IndexType, typename ValueType>
-CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(const CSRSparseMatrix<ValueType>& graph) {
+CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian_depr(const CSRSparseMatrix<ValueType>& graph) {
     using scai::lama::CSRStorage;
     using scai::hmemo::HArray;
     using std::vector;
@@ -2088,11 +2145,13 @@ bool GraphUtils<IndexType, ValueType>::hasSelfLoops(const CSRSparseMatrix<ValueT
 
     scai::hmemo::HArray<ValueType> diagonal;
     storage.getDiagonal( diagonal );
+//for( int i)
+ //   PRINT(comm->getRank() << ": " << x);
     const IndexType diagonalSum = scai::utilskernel::HArrayUtils::sum(diagonal);
     
     const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const IndexType diagonalSumSum = comm->sum( diagonalSum );
-PRINT(diagonalSumSum);
+
     if( diagonalSumSum>0 ){
         return true;
     }

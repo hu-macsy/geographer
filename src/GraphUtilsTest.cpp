@@ -1,5 +1,3 @@
-#include <scai/lama.hpp>
-
 #include "gtest/gtest.h"
 
 #include "ParcoRepart.h"
@@ -7,12 +5,13 @@
 #include "GraphUtils.h"
 #include "MeshGenerator.h"
 
+#include <scai/logging.hpp>
+#include <scai/lama.hpp>
 #include <scai/dmemo/CyclicDistribution.hpp>
 #include <scai/hmemo/ReadAccess.hpp>
 #include <scai/hmemo/WriteAccess.hpp>
 
-//remove
-#include "HilbertCurve.h"
+SCAI_LOG_DEF_LOGGER( logger, "GraphUtilsTestLogger" );
 
 namespace ITI {
 
@@ -143,23 +142,30 @@ TYPED_TEST(GraphUtilsTest, testConstructLaplacian) {
 
     CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
 
+    //ASSERT_TRUE(L.isConsistent());
     ASSERT_EQ(L.getRowDistribution(), graph.getRowDistribution());
-    ASSERT_TRUE(L.isConsistent());
-{
-//PRINT( (GraphUtils<IndexType, ValueType>::hasSelfLoops(graph)) );
+    ASSERT_EQ( L.l1Norm(), 2*graph.l1Norm());
 
-// scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph ); 
-// copyGraph.redistribute(graph.getRowDistributionPtr(), graph.getRowDistributionPtr());
-// PRINT( (GraphUtils<IndexType, ValueType>::hasSelfLoops(copyGraph)) );
-// CSRSparseMatrix<ValueType> lolo = GraphUtils<IndexType, ValueType>::constructLaplacian(copyGraph);
-// PRINT("\n\n");
-}
+    //get local sum of values because l1Norm returns the sum of the absolute values
+    const CSRStorage<ValueType>& storage = L.getLocalStorage();
+    const scai::hmemo::ReadAccess<ValueType> values(storage.getValues());
+    ValueType localSum = 0.0;
+    for( int i=0; i<values.size(); i++ ){
+        localSum += values[i];
+    }
+
+    //each row of the laplacian matrix has a zero sum
+    ASSERT_EQ( localSum, 0);
+    //ASSERT_EQ( comm->sum(localSum), 0);
+
     //test that L*1 = 0
     DenseVector<ValueType> x( L.getRowDistributionPtr(), 1 );
     DenseVector<ValueType> y = scai::lama::eval<DenseVector<ValueType>>( L * x );
 
     ValueType norm = y.maxNorm();
     EXPECT_EQ(norm,0);
+
+    //EXPECT_TRUE( L.checkSymmetry() ); //too slow for large graphs
 
     //test consistency under distributions
     const CSRSparseMatrix<ValueType> replicatedGraph = scai::lama::distribute<CSRSparseMatrix<ValueType>>(graph, noDistPtr, noDistPtr);
@@ -173,11 +179,14 @@ TYPED_TEST(GraphUtilsTest, testConstructLaplacian) {
 TYPED_TEST(GraphUtilsTest, benchConstructLaplacian) {
     using ValueType = TypeParam;
 
-    std::string fileName = "bubbles-00010.graph";
+    std::string fileName = "bigtrace-00000.graph";
     std::string file = GraphUtilsTest<ValueType>::graphPath + fileName;
     const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 
+    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
     CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
+    std::chrono::duration<double> elapTime =  std::chrono::steady_clock::now() - startTime;
+    PRINT("\t\t elapsed time to construct laplacian: " << elapTime.count());
 }
 
 //TODO: test also with edge weights
