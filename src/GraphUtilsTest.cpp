@@ -131,9 +131,10 @@ TYPED_TEST(GraphUtilsTest, testReindexCut) {
 TYPED_TEST(GraphUtilsTest, testConstructLaplacian) {
     using ValueType = TypeParam;
 
-    std::string fileName = "rotation-00000.graph";
+    //std::string fileName = "rotation-00000.graph";
+    std::string fileName = "Grid8x8";
     std::string file = GraphUtilsTest<ValueType>::graphPath + fileName;
-    const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType n = graph.getNumRows();
     scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
 
@@ -143,8 +144,10 @@ TYPED_TEST(GraphUtilsTest, testConstructLaplacian) {
     CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
 
     //ASSERT_TRUE(L.isConsistent());
-    ASSERT_EQ(L.getRowDistribution(), graph.getRowDistribution());
+    ASSERT_EQ( L.getRowDistribution(), graph.getRowDistribution());
     ASSERT_EQ( L.l1Norm(), 2*graph.l1Norm());
+    ASSERT_EQ( L.getNumValues(), graph.getNumValues()+n);
+    ASSERT_EQ( L.getLocalNumValues(), graph.getLocalNumValues()+graph.getLocalNumRows() );
 
     //get local sum of values because l1Norm returns the sum of the absolute values
     const CSRStorage<ValueType>& storage = L.getLocalStorage();
@@ -173,7 +176,26 @@ TYPED_TEST(GraphUtilsTest, testConstructLaplacian) {
     LFromReplicated.redistribute(L.getRowDistributionPtr(), L.getColDistributionPtr());
     CSRSparseMatrix<ValueType> diff = scai::lama::eval<CSRSparseMatrix<ValueType>> (LFromReplicated - L);
     EXPECT_EQ(0, diff.l2Norm());
+
+    //after graph is partitioned and redistributed
+
+    std::string coordFile = file + ".xyz";
+    const IndexType dimensions = 2;
+    std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
+    Settings settings;
+
+    scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
+
+    CSRSparseMatrix<ValueType> partL = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
+
+    ASSERT_EQ( partL.getRowDistribution(), graph.getRowDistribution());
+    ASSERT_EQ( partL.l1Norm(), 2*graph.l1Norm());
+    ASSERT_EQ( partL.getNumValues(), graph.getNumValues()+n);
+
+    ASSERT_EQ( partL.l1Norm(), L.l1Norm());
+    ASSERT_EQ( partL.getNumValues(), L.getNumValues());
 }
+
 //-----------------------------------------------------------------
 
 TYPED_TEST(GraphUtilsTest, benchConstructLaplacian) {
