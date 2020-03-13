@@ -95,6 +95,9 @@ int main(int argc, char** argv) {
                return -1;
     }
 
+    //get system info
+    getSystemInfo(comm);
+
     //---------------------------------------------------------------
     //
     // read the communication graph or the block sizes if provided
@@ -413,6 +416,8 @@ int main(int argc, char** argv) {
         PRINT0("PE graph stored in " << filename );
     }
 
+    getSystemInfo(comm);
+    
     if (vm.count("callExit")) {
         //this is needed for supermuc
         std::exit(0);
