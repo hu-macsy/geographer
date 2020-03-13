@@ -318,6 +318,7 @@ void getSystemInfo(const scai::dmemo::CommunicatorPtr& comm){
 
 PRINT( rank << ": totalPhysMem: " << (totalPhysMem/mb) << " MB, physMemUsed: " << physMemUsed/mb << " MB, I am using: " << getValue()/kb << " MB" );
 
+    //TODO: how to get CPU speed?
 }
 
-}
+}//namespace ITI
