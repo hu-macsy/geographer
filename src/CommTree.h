@@ -306,6 +306,13 @@ public:
     **/
     IndexType createFlatHeterogeneous( const std::vector<std::vector<ValueType>> &leafSizes );
 
+    /** Overloaded with vector of size equal the number of weights to indicate which 
+    nodes weights are proportional and which are to be taken as absolute values.
+    */
+    IndexType createFlatHeterogeneous( 
+        const std::vector<std::vector<ValueType>> &leafSizes,
+        const std::vector<bool> &isWeightProp);
+
     /** Creates a vector of leaves with only one hierarchy level, i.e., a flat
     tree. There can be multiple weights for each leaf.
 
@@ -433,6 +440,10 @@ private:
 
     scai::lama::CSRSparseMatrix<ValueType> exportAsGraph_local(const std::vector<commNode> leaves) const;
 
+    /** @brief The part of the function that does not set the boolean vector of
+    whether a wight is proportional or not
+    */
+    IndexType createFlatHeterogeneousCore( const std::vector<std::vector<ValueType>> &leafSizes );
 
     /**The root of the communication tree; used for hierarchical partitioning
 

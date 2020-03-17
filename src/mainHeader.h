@@ -28,13 +28,14 @@ namespace ITI{
 template <typename ValueType>
 IndexType readInput( 
     const cxxopts::ParseResult& vm,
-    const Settings& settings,
+    Settings& settings,
     const scai::dmemo::CommunicatorPtr& comm,
     scai::lama::CSRSparseMatrix<ValueType>& graph,
     std::vector<scai::lama::DenseVector<ValueType>>& coords,
     std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights ){
 
     IndexType N;
+
 
     if (vm.count("graphFile")) {
         std::string graphFile =  vm["graphFile"].as<std::string>();
@@ -62,9 +63,21 @@ IndexType readInput(
 
         // set the node weights
         IndexType numReadNodeWeights = nodeWeights.size();
-        if (numReadNodeWeights == 0) {
+
+        //Case where we ask to automatically find cpu and memory. This creates an tree with 2 nodeweights.
+        // If input has less node weights add unit weights
+        if( settings.autoSetCpuMem and numReadNodeWeights!=2){
+            if (comm->getRank() == 0) {
+                std::cout << "WARNING:\n\toption autoSetCpuMem is activated and it will create a tree with two node weights"<< std::endl;
+                std::cout<< "\tbut input has " << numReadNodeWeights << " number of weights. Will adapt (pad or remove) input weights and"<< std::endl;
+                std::cout <<"\twill consider only two weights." << std::endl;
+            }
+            settings.numNodeWeights = 2;
+        }
+
+        if (numReadNodeWeights == 0 and settings.numNodeWeights==0) {
             nodeWeights.resize(1);
-            nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
+            nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1.0);
         }
 
         if (settings.numNodeWeights > 0) {
@@ -77,7 +90,7 @@ IndexType readInput(
             } else if (settings.numNodeWeights > nodeWeights.size()) {
                 nodeWeights.resize(settings.numNodeWeights);
                 for (IndexType i = numReadNodeWeights; i < settings.numNodeWeights; i++) {
-                    nodeWeights[i] = fill<DenseVector<ValueType>>(rowDistPtr, 1);
+                    nodeWeights[i] = fill<DenseVector<ValueType>>(rowDistPtr, 1.0);
                 }
                 if (comm->getRank() == 0) {
                     std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, padding with "
@@ -171,7 +184,7 @@ IndexType readInput(
     }
 
     if( not aux<IndexType,ValueType>::checkConsistency( graph, coords, nodeWeights, settings) ){
-        PRINT0("Input not consistent.\nAborting...");
+        throw std::runtime_error("Input not consistent.\nAborting...");
         return -1;
     }
 
@@ -261,15 +274,15 @@ std::string getOutFileName( const Settings& settings, const std::string& toolNam
 
     //we are given just one file name, not a directory
     if( settings.outFile!="-" and settings.outDir=="-"){
-        //outFile += ("_" + ITI::to_string(thisTool));
         //do nothing
     }
 
     return outFile;
 }
 
-
-void getSystemInfo(const scai::dmemo::CommunicatorPtr& comm){
+//taken from 
+//https://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
+unsigned long getFreeRam(const scai::dmemo::CommunicatorPtr& comm){
 
     struct sysinfo memInfo;
     const IndexType rank = comm->getRank();
@@ -290,6 +303,15 @@ void getSystemInfo(const scai::dmemo::CommunicatorPtr& comm){
     long long physMemUsed = memInfo.totalram - memInfo.freeram;
     //Multiply in next statement to avoid int overflow on right hand side...
     physMemUsed *= memInfo.mem_unit;
+
+    unsigned long long freeRam = memInfo.freeram;
+    freeRam *= memInfo.mem_unit;
+
+    unsigned long long sharedRam = memInfo.sharedram;
+    sharedRam *= memInfo.mem_unit;    
+    
+    unsigned long long buffRam = memInfo.bufferram;
+    buffRam *= memInfo.mem_unit; 
 
     auto parseLine = [](char* line){
         // This assumes that a digit will be found and the line ends in " Kb".
@@ -316,9 +338,87 @@ void getSystemInfo(const scai::dmemo::CommunicatorPtr& comm){
         return result;
     };
 
-PRINT( rank << ": totalPhysMem: " << (totalPhysMem/mb) << " MB, physMemUsed: " << physMemUsed/mb << " MB, I am using: " << getValue()/kb << " MB" );
+    PRINT( rank <<  ": totalPhysMem: " << (totalPhysMem/mb) << 
+                " MB, physMemUsed: " << physMemUsed/mb << 
+                " MB, free ram: " << freeRam/mb <<
+                " MB, shared ram: " << sharedRam/mb <<
+                " MB, buffered   ram: " << buffRam/mb <<
+                " MB, I am using: " << getValue()/kb << " MB" );
 
-    //TODO: how to get CPU speed?
+    return freeRam;
 }
+
+
+IndexType getCpuFreqLinux(const scai::dmemo::CommunicatorPtr& comm, const int nodeSize=24){
+//TODO: how to get CPU speed?
+
+    const IndexType numPEs = comm->getSize();
+    const IndexType rank = comm->getRank();
+
+    const IndexType div = numPEs/nodeSize;
+    SCAI_ASSERT_EQ_ERROR( div*nodeSize, numPEs, "The size of each node is " << nodeSize <<" but it should be a multiple of the number of calling PEs.");
+
+    //rank inside this compute node
+    const int myInternalRank = rank%nodeSize;
+
+    std::string cpuFreqFile = "/sys/devices/system/cpu/cpu"+ std::to_string(myInternalRank)+ "/cpufreq/scaling_cur_freq";
+    std::ifstream file(cpuFreqFile);
+    if (file.fail()) {
+        throw std::runtime_error("Reading CPU frequency from " + cpuFreqFile + " failed for PE " + std::to_string(rank));
+    }
+
+    std::string line;
+    std::getline(file, line);
+    IndexType freq = std::stoll(line);
+
+    SCAI_ASSERT_GT( freq, 0, "Illegal CPU frequency value");
+    
+    return freq;
+}
+
+
+template <typename vType>
+std::vector<std::vector<vType>> calculateLoadRequests(const scai::dmemo::CommunicatorPtr& comm, const int nodeSize=24){
+
+    const IndexType numPEs = comm->getSize();
+    const IndexType rank = comm->getRank();
+
+    //in the version, we have two node weights: cpu frequency and memory size
+    std::vector<std::vector<vType>> retWeights (2, std::vector<vType> (numPEs, 0.0) );
+
+    //start with the cpu frequency
+
+    const double myCpuFreq = getCpuFreqLinux(comm, nodeSize);
+    std::vector<IndexType> allCpuFreq(numPEs, 0);
+    allCpuFreq[rank] = myCpuFreq;
+
+    //replicate all frequencies in all PEs
+    comm->sumImpl( allCpuFreq.data(), allCpuFreq.data(), numPEs, scai::common::TypeTraits<IndexType>::stype );
+
+    const IndexType sumCpuFreq = std::accumulate( allCpuFreq.begin(), allCpuFreq.end(), 0 );
+
+    //set first weight relevant to the CPU frequency
+
+    for( int i=0; i<numPEs; i++){
+        retWeights[0][i] = ((vType) allCpuFreq[i]) /sumCpuFreq;
+    }
+
+    //memory
+
+    const unsigned long myFreeRam = getFreeRam(comm);
+
+    std::vector<vType> allFreeRam(numPEs, 0.0);
+    allFreeRam[rank] = (vType) myFreeRam;
+
+    //replicate all frequencies in all PEs
+    comm->sumImpl( retWeights[1].data(), allFreeRam.data(), numPEs, scai::common::TypeTraits<vType>::stype );
+
+    SCAI_ASSERT_EQ_ERROR( retWeights.size(), 2, "wrong weights vector" );
+    SCAI_ASSERT_EQ_ERROR( retWeights[0].size(), settings.numBlocks, "wrong weights vector");
+
+    return retWeights;
+}
+
+
 
 }//namespace ITI
