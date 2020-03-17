@@ -413,9 +413,6 @@ std::vector<std::vector<vType>> calculateLoadRequests(const scai::dmemo::Communi
     //replicate all frequencies in all PEs
     comm->sumImpl( retWeights[1].data(), allFreeRam.data(), numPEs, scai::common::TypeTraits<vType>::stype );
 
-    SCAI_ASSERT_EQ_ERROR( retWeights.size(), 2, "wrong weights vector" );
-    SCAI_ASSERT_EQ_ERROR( retWeights[0].size(), settings.numBlocks, "wrong weights vector");
-
     return retWeights;
 }
 
