@@ -143,7 +143,7 @@ TYPED_TEST(GraphUtilsTest, testConstructLaplacian) {
 
     CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
 
-    //ASSERT_TRUE(L.isConsistent());
+    ASSERT_TRUE(L.isConsistent());
     ASSERT_EQ( L.getRowDistribution(), graph.getRowDistribution());
     ASSERT_EQ( L.l1Norm(), 2*graph.l1Norm());
     ASSERT_EQ( L.getNumValues(), graph.getNumValues()+n);

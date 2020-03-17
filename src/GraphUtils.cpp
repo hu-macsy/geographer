@@ -1818,7 +1818,7 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(
     L.matrixPlusMatrix( 1.0, degreeM, -1.0, graph );
     //L *= -1.0;
     //L += degreeM;
-    //SCAI_ASSERT_ERROR(L.isConsistent(), "laplacian matrix not consistent");
+    SCAI_ASSERT_ERROR(L.isConsistent(), "laplacian matrix not consistent");
 
     return L;
 }
