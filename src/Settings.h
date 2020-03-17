@@ -174,10 +174,12 @@ struct Settings {
     ITI::Format coordFormat = ITI::Format::AUTO; 	///< the format of the coordinated input file, \sa Format
     bool useDiffusionCoordinates = false;		///< if not coordinates are provided, we can use artificial coordinates
     IndexType diffusionRounds = 20;				///< number of rounds to create the diffusion coordinates
-    IndexType numNodeWeights = -1;		///< number of vertex weights
+    IndexType numNodeWeights = 0;		///< number of vertex weights
     std::string machine;                ///< name of the machine that the executable is running
     double seed;                        ///< random seed used for some routines
     std::string callingCommand;         ///< the complete calling command used
+    bool autoSetCpuMem = false;         ///< if set, geographer will gather cpu and memory info and use them for partitioning
+    IndexType processPerNode = 24;      ///< the number of processes per compute node. Is used with autoSetCpuMem to determine the cpu ID
     //@}
 
     /** @name Mesh generation settings

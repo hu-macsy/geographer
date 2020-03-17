@@ -168,6 +168,7 @@ bool ITI::Settings::checkValidity() {
         return false;
     }
     if( initialPartition==Tool::unknown or initialPartition==Tool::unknown){
+        this->isValid = false;
         return false;
     }
 

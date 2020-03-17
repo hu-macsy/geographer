@@ -31,6 +31,8 @@ Options populateOptions() {
     //mapping
     ("PEgraphFile", "read communication graph from file", value<std::string>())
     ("blockSizesFile", "file to read the block sizes for every block", value<std::string>() )
+    ("autoSetCpuMem", "if set, geographer will gather cpu and memory info and use them to build a heterogeneous communication tree used for partitioning")
+    ("processPerNode", "the number of processes per compute node. Is used with autoSetCpuMem to determine the internal cpu/core ID within a compute node and query the cpu frequency.",  value<IndexType>())
     ("mappingRenumbering", "map blocks to PEs using the SFC index of the block's center. This works better when PUs are numbered consecutively." )
     //repartitioning
     ("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
@@ -194,6 +196,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.writePEgraph = vm.count("writePEgraph");
     settings.setAutoSettings = vm.count("autoSettings");
     settings.mappingRenumbering = vm.count("mappingRenumbering");
+    settings.autoSetCpuMem = vm.count("autoSetCpuMem");
 
     //28/11/19, deprecate storeInfo parameter. Leaving it as an option for backwards compatibility.    
     //if outFile was provided but storeInfo was not given as an argument
@@ -216,9 +219,11 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("PEgraphFile")) {
         settings.PEGraphFile = vm["PEgraphFile"].as<std::string>();
     }
+
     if (vm.count("numNodeWeights")) {
         settings.numNodeWeights = vm["numNodeWeights"].as<IndexType>();
     }
+
     if (vm.count("dimensions")) {
         settings.dimensions = vm["dimensions"].as<IndexType>();
     }
@@ -246,6 +251,9 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("blockSizesFile")) {
         settings.blockSizesFile = vm["blockSizesFile"].as<std::string>();
     }
+    if (vm.count("processPerNode")) {
+        settings.processPerNode = vm["processPerNode"].as<IndexType>();
+    }    
     if ( vm.count("initialMigration") ){
         std::string s = vm["initialMigration"].as<std::string>();
         settings.initialMigration = to_tool(s);        
