@@ -253,7 +253,7 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
                 for( commNode& node : hierLevel ) {
                     node.weights[i] *= scalingFactor;
                     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-                    PRINT0( node.weights[i] );
+                    //PRINT0( node.weights[i] );
                 }
             }
         }
