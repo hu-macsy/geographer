@@ -191,7 +191,7 @@ protected:
 
         @return The time needed to solve the linear system.
     */
-    std::pair<ValueType,ValueType> getLinearSolverTime(
+    std::pair<ValueType,ValueType> getCGTime(
         const scai::lama::CSRSparseMatrix<ValueType>& graph,
         const IndexType repeatTimes,
         const IndexType maxIterations = 100

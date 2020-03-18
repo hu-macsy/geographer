@@ -310,7 +310,7 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
     MM["SpMVtime"] = getSPMVtime(copyGraph, repeatTimes);
 
     //TODO: take a percentage of repeatTimes; maybe all repeatTimes are too much for CG
-    std::tie( MM["CGtime"], MM["CGiterations"] ) = getLinearSolverTime( copyGraph, 5, settings.maxCGIterations); 
+    std::tie( MM["CGtime"], MM["CGiterations"] ) = getCGTime( copyGraph, 5, settings.maxCGIterations); 
 
     //TODO: maybe extract this time from the actual SpMV above
     // comm time in SpMV
@@ -547,7 +547,7 @@ ValueType Metrics<ValueType>::getSPMVtime(
 //High-performance conjugate-gradient benchmark: A new metric for ranking high-performance computing systems
 // Dongarra1, Michael A Heroux2and Piotr Luszczek, section 4
 template<typename ValueType>
-std::pair<ValueType,ValueType> Metrics<ValueType>::getLinearSolverTime( 
+std::pair<ValueType,ValueType> Metrics<ValueType>::getCGTime( 
     const scai::lama::CSRSparseMatrix<ValueType>& graph,
     const IndexType repeatTimes,
     const IndexType maxIterations){
