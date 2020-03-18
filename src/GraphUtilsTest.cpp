@@ -131,8 +131,8 @@ TYPED_TEST(GraphUtilsTest, testReindexCut) {
 TYPED_TEST(GraphUtilsTest, testConstructLaplacian) {
     using ValueType = TypeParam;
 
-    //std::string fileName = "rotation-00000.graph";
-    std::string fileName = "Grid8x8";
+    std::string fileName = "rotation-00000.graph";
+    //std::string fileName = "Grid8x8";
     std::string file = GraphUtilsTest<ValueType>::graphPath + fileName;
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType n = graph.getNumRows();

@@ -310,7 +310,7 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
     MM["SpMVtime"] = getSPMVtime(copyGraph, repeatTimes);
 
     //TODO: take a percentage of repeatTimes; maybe all repeatTimes are too much for CG
-    MM["CGtime"] = getLinearSolverTime( copyGraph, 5, settings.maxCGIterations); 
+    std::tie( MM["CGtime"], MM["CGiterations"] ) = getLinearSolverTime( copyGraph, 5, settings.maxCGIterations); 
 
     //TODO: maybe extract this time from the actual SpMV above
     // comm time in SpMV
@@ -541,8 +541,13 @@ ValueType Metrics<ValueType>::getSPMVtime(
 }
 //---------------------------------------------------------------------------------------
 
+//for the initial values of solution and rhs see papers
+//Parallel Conjugate Gradient: Effects of Ordering Strategies, Programming Paradigms and Architectural Platforms.
+//Oliker, Xi, Heber et al., section 4
+//High-performance conjugate-gradient benchmark: A new metric for ranking high-performance computing systems
+// Dongarra1, Michael A Heroux2and Piotr Luszczek, section 4
 template<typename ValueType>
-ValueType Metrics<ValueType>::getLinearSolverTime( 
+std::pair<ValueType,ValueType> Metrics<ValueType>::getLinearSolverTime( 
     const scai::lama::CSRSparseMatrix<ValueType>& graph,
     const IndexType repeatTimes,
     const IndexType maxIterations){
@@ -551,66 +556,23 @@ ValueType Metrics<ValueType>::getLinearSolverTime(
     const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
     const scai::dmemo::DistributionPtr colDist = graph.getColDistributionPtr();
 
-    //the construction of the laplacian does not work when both rows and columns are distributed
-    //based on a general distribution; TODO:fix
-    //workaround: copy graph to preserve const-ness, redistribute with a block distribution, get
-    //the laplacian, redistribute the laplacian with the same distribution as the input
-    const scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian( graph);
-/*
-    {
-        scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph ); 
-        const IndexType N = graph.getNumRows();
-        const scai::dmemo::DistributionPtr blockDistPtr( new scai::dmemo::BlockDistribution(N, comm) );
-        copyGraph.redistribute( blockDistPtr, blockDistPtr );
-        
-        laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian( copyGraph );
-        laplacian.redistribute( rowDist, colDist);
-    }
-*/
+    //the laplacian
+    const scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian(graph);
 
-//SCAI_ASSERT_ERROR( laplacian.checkSymmetry(), "matrix not symmetric");
+    //this assertion fails because lama does not set up the local data of the matrix correctly
+    //SCAI_ASSERT_EQ_ERROR( laplacian.l1Norm(), 2*graph.l1Norm(), "wrong l1Norm in laplacian");
+    SCAI_ASSERT_EQ_ERROR( laplacian.getNumValues(), graph.getNumValues()+graph.getNumRows(), "wrong numValues in laplacian");
+    SCAI_ASSERT_EQ_ERROR( laplacian.getLocalNumValues(), graph.getLocalNumValues()+graph.getLocalNumRows(), "laplacian is wrong");
 
-PRINT( comm->getRank() <<": " << laplacian.getLocalNumValues() << " = " << graph.getLocalNumValues() << " + " << graph.getLocalNumRows());
+    // Allocate a common logger that prints convergenceHistory
+    //bool isDisabled = comm->getRank() > 0;
+    //scai::solver::LoggerPtr logger( new scai::solver::CommonLogger( "CGLogger: ", scai::solver::LogLevel::convergenceHistory, scai::solver::LoggerWriteBehaviour::toConsoleOnly, isDisabled ) );
 
-/*
-const scai::lama::CSRStorage<ValueType>& storage = laplacian.getLocalStorage();
-PRINT( comm->getRank() <<": " << storage );
-const scai::hmemo::ReadAccess<ValueType> values(storage.getValues());
-PRINT( comm->getRank() <<": " << values.size() << " __ " << laplacian.getLocalNumValues() );
-PRINT( comm->getRank() <<": " << laplacian.getPartitialNumValues() );
-
-const scai::lama::CSRStorage<ValueType>& hstorage = laplacian.getHaloStorage();
-PRINT( comm->getRank() <<": " << (hstorage.getValues()).size() );
-
-SCAI_ASSERT_EQ_ERROR( laplacian.getNumValues(), comm->sum(values.size()), "wtf" );
-
-ValueType localSum = 0.0;
-ValueType localL1Norm = 0.0;
-for( int i=0; i<values.size(); i++ ){
-    localSum += values[i];
-    localL1Norm += std::abs( values[i]);
-//PRINT( comm->getRank() <<": " << i <<" = " << values[i] );
-}
-PRINT( comm->sum( localL1Norm ));
-PRINT( comm->getRank() <<": " << localSum );
-
-
-SCAI_ASSERT_EQ_ERROR( laplacian.getNumValues(), graph.getNumValues()+graph.getNumRows(), "wtf" );
-SCAI_ASSERT_EQ_ERROR( laplacian.l1Norm(), 2*graph.l1Norm(), "Laplacian looks wrong" );
-*/
-
-    
-
-// Allocate a common logger that prints convergenceHistory
-bool isDisabled = comm->getRank() > 0;
-scai::solver::LoggerPtr logger( new scai::solver::CommonLogger( "CGLogger: ", scai::solver::LogLevel::convergenceHistory, scai::solver::LoggerWriteBehaviour::toConsoleOnly, isDisabled ) );
-
-
-    scai::solver::CG<ValueType> solver("CGSolver", logger);
+    scai::solver::CG<ValueType> solver("CGSolver");
 
     scai::lama::NormPtr<ValueType> norm( new scai::lama::L2Norm<ValueType>( ) );
-    const ValueType eps = 1E-8;
-    //scai::solver::CriterionPtr<ValueType> criterion1 = std::make_shared<scai::solver::ResidualThreshold<ValueType>>( norm, eps, scai::solver::ResidualCheck::Absolute );
+    const ValueType eps = 1E-4;
+
     scai::solver::CriterionPtr<ValueType> criterion1( new scai::solver::ResidualThreshold<ValueType>( norm, eps, scai::solver::ResidualCheck::Absolute ) );
     scai::solver::CriterionPtr<ValueType> criterion2( new scai::solver::IterationCount<ValueType>( maxIterations ) );
     scai::solver::CriterionPtr<ValueType> criterion( new scai::solver::Criterion<ValueType>( criterion1, criterion2, scai::solver::BooleanOp::OR ) );
@@ -620,28 +582,28 @@ scai::solver::LoggerPtr logger( new scai::solver::CommonLogger( "CGLogger: ", sc
     IndexType totalIterations = 0;
 
     for(IndexType r=0; r<repeatTimes; r++) {
-        const scai::lama::DenseVector<ValueType> rhs( colDist, ValueType(1.0) );
+        scai::lama::DenseVector<ValueType> rhs( colDist, ValueType(1.0) );
 
-        scai::lama::DenseVector<ValueType> solution( colDist, ValueType(1.0) );
+        scai::lama::DenseVector<ValueType> solution( colDist, ValueType(0.0) );
         solver.initialize( laplacian );
 
         std::chrono::time_point<std::chrono::steady_clock> beforeTime = std::chrono::steady_clock::now();
-PRINT0( r );
         solver.solve(solution, rhs);
-PRINT0( solver.getIterationCount() );
 
         std::chrono::duration<ValueType> elapTime = std::chrono::steady_clock::now() - beforeTime;
         totalTime += elapTime.count();
         //number of iterations is (should be!) always the same; maybe just get them outside the loop?
         totalIterations += solver.getIterationCount();
         //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
+        PRINT( solver.getResidual().l2Norm() );
     }
     ValueType globTime = comm->max(totalTime)/repeatTimes;
+    ValueType avgIterations = ((ValueType) totalIterations)/repeatTimes;
     
     PRINT0("total time for "<< repeatTimes << " calls to CG solver: " << totalTime << 
-            " and " << totalIterations/repeatTimes << " average iterations."  );
+            " and " << avgIterations << " average iterations."  );
 
-    return globTime;
+    return std::make_pair( globTime, avgIterations);
 }
 
 template class Metrics<double>;
