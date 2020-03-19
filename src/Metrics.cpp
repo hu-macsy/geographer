@@ -310,7 +310,7 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
     MM["SpMVtime"] = getSPMVtime(copyGraph, repeatTimes);
 
     //TODO: take a percentage of repeatTimes; maybe all repeatTimes are too much for CG
-    std::tie( MM["CGtime"], MM["CGiterations"] ) = getCGTime( copyGraph, 5, settings.maxCGIterations); 
+    std::tie( MM["CGtime"], MM["CGiterations"], MM["CGresidual"] ) = getCGTime( copyGraph, 5, settings.maxCGIterations, settings.CGResidual); 
 
     //TODO: maybe extract this time from the actual SpMV above
     // comm time in SpMV
@@ -547,10 +547,11 @@ ValueType Metrics<ValueType>::getSPMVtime(
 //High-performance conjugate-gradient benchmark: A new metric for ranking high-performance computing systems
 // Dongarra1, Michael A Heroux2and Piotr Luszczek, section 4
 template<typename ValueType>
-std::pair<ValueType,ValueType> Metrics<ValueType>::getCGTime( 
+std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime( 
     const scai::lama::CSRSparseMatrix<ValueType>& graph,
     const IndexType repeatTimes,
-    const IndexType maxIterations){
+    const IndexType maxIterations,
+    const ValueType residual){
 
     const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
@@ -571,15 +572,15 @@ std::pair<ValueType,ValueType> Metrics<ValueType>::getCGTime(
     scai::solver::CG<ValueType> solver("CGSolver");
 
     scai::lama::NormPtr<ValueType> norm( new scai::lama::L2Norm<ValueType>( ) );
-    const ValueType eps = 1E-4;
 
-    scai::solver::CriterionPtr<ValueType> criterion1( new scai::solver::ResidualThreshold<ValueType>( norm, eps, scai::solver::ResidualCheck::Absolute ) );
+    scai::solver::CriterionPtr<ValueType> criterion1( new scai::solver::ResidualThreshold<ValueType>( norm, residual, scai::solver::ResidualCheck::Absolute ) );
     scai::solver::CriterionPtr<ValueType> criterion2( new scai::solver::IterationCount<ValueType>( maxIterations ) );
     scai::solver::CriterionPtr<ValueType> criterion( new scai::solver::Criterion<ValueType>( criterion1, criterion2, scai::solver::BooleanOp::OR ) );
 
     solver.setStoppingCriterion( criterion );
     ValueType totalTime = 0.0;
     IndexType totalIterations = 0;
+    ValueType retResidual = 0.0;
 
     for(IndexType r=0; r<repeatTimes; r++) {
         scai::lama::DenseVector<ValueType> rhs( colDist, ValueType(1.0) );
@@ -595,15 +596,15 @@ std::pair<ValueType,ValueType> Metrics<ValueType>::getCGTime(
         //number of iterations is (should be!) always the same; maybe just get them outside the loop?
         totalIterations += solver.getIterationCount();
         //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
-        PRINT( solver.getResidual().l2Norm() );
+        retResidual= solver.getResidual().l2Norm();
     }
     ValueType globTime = comm->max(totalTime)/repeatTimes;
     ValueType avgIterations = ((ValueType) totalIterations)/repeatTimes;
     
     PRINT0("total time for "<< repeatTimes << " calls to CG solver: " << totalTime << 
-            " and " << avgIterations << " average iterations."  );
+            " and " << avgIterations << " average iterations and residual reached " << retResidual );
 
-    return std::make_pair( globTime, avgIterations);
+    return std::make_tuple( globTime, avgIterations, retResidual);
 }
 
 template class Metrics<double>;
