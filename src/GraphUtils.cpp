@@ -1838,7 +1838,7 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian_
     if (graph.getNumColumns() != globalN) {
         throw std::runtime_error("Matrix must be square to be an adjacency matrix");
     }
-    SCAI_ASSERT_EQ_ERROR( globalN, graph.getLocalNumColumns(), "Row must not have a distribution" );
+    //SCAI_ASSERT_EQ_ERROR( globalN, graph.getLocalNumColumns(), "Row must not have a distribution" );
 
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 
@@ -1900,9 +1900,11 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian_
 
     const CSRStorage<ValueType> resultStorage(localN, globalN, newIA, newJA, newValues);
 
-    CSRSparseMatrix<ValueType> result(dist, resultStorage);
-    //result.redistribute(dist, dist);
+    CSRSparseMatrix<ValueType> result = graph;
+    result.assignLocal( resultStorage, dist );
+    SCAI_ASSERT_EQ_ERROR( newValues.size(), values.size()+localN, "values size wrong?");
     return result;
+    //return CSRSparseMatrix<ValueType>(dist, resultStorage);
 }
 
 //---------------------------------------------------------------------------------------

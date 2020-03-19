@@ -569,6 +569,7 @@ std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime(
     //bool isDisabled = comm->getRank() > 0;
     //scai::solver::LoggerPtr logger( new scai::solver::CommonLogger( "CGLogger: ", scai::solver::LogLevel::convergenceHistory, scai::solver::LoggerWriteBehaviour::toConsoleOnly, isDisabled ) );
 
+    //scai::solver::CG<ValueType> solver("CGSolver", logger);
     scai::solver::CG<ValueType> solver("CGSolver");
 
     scai::lama::NormPtr<ValueType> norm( new scai::lama::L2Norm<ValueType>( ) );
