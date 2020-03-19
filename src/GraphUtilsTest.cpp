@@ -141,7 +141,7 @@ TYPED_TEST(GraphUtilsTest, testConstructLaplacian) {
     scai::dmemo::DistributionPtr noDistPtr(new scai::dmemo::NoDistribution(n));
     ASSERT_TRUE(graph.isConsistent());
 
-    CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
+    CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian_depr(graph);
 
     ASSERT_TRUE(L.isConsistent());
     ASSERT_EQ( L.getRowDistribution(), graph.getRowDistribution());
@@ -172,7 +172,7 @@ TYPED_TEST(GraphUtilsTest, testConstructLaplacian) {
 
     //test consistency under distributions
     const CSRSparseMatrix<ValueType> replicatedGraph = scai::lama::distribute<CSRSparseMatrix<ValueType>>(graph, noDistPtr, noDistPtr);
-    CSRSparseMatrix<ValueType> LFromReplicated = GraphUtils<IndexType, ValueType>::constructLaplacian(replicatedGraph);
+    CSRSparseMatrix<ValueType> LFromReplicated = GraphUtils<IndexType, ValueType>::constructLaplacian_depr(replicatedGraph);
     LFromReplicated.redistribute(L.getRowDistributionPtr(), L.getColDistributionPtr());
     CSRSparseMatrix<ValueType> diff = scai::lama::eval<CSRSparseMatrix<ValueType>> (LFromReplicated - L);
     EXPECT_EQ(0, diff.l2Norm());
@@ -186,7 +186,7 @@ TYPED_TEST(GraphUtilsTest, testConstructLaplacian) {
 
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
 
-    CSRSparseMatrix<ValueType> partL = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
+    CSRSparseMatrix<ValueType> partL = GraphUtils<IndexType, ValueType>::constructLaplacian_depr(graph);
 
     ASSERT_EQ( partL.getRowDistribution(), graph.getRowDistribution());
     ASSERT_EQ( partL.l1Norm(), 2*graph.l1Norm());
@@ -206,7 +206,7 @@ TYPED_TEST(GraphUtilsTest, benchConstructLaplacian) {
     const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
 
     std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
-    CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
+    CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian_depr(graph);
     std::chrono::duration<double> elapTime =  std::chrono::steady_clock::now() - startTime;
     PRINT("\t\t elapsed time to construct laplacian: " << elapTime.count());
 }
