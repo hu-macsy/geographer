@@ -557,8 +557,13 @@ std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime(
     const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
     const scai::dmemo::DistributionPtr colDist = graph.getColDistributionPtr();
 
+    //identity matrix
+    CSRSparseMatrix<ValueType> identity;
+    identity.setIdentity(rowDist);
     //the laplacian
-    const scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian(graph);
+    scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian(graph);
+    //add the identity matrix to make the laplacian positive definite
+    laplacian += identity;
 
     //this assertion fails because lama does not set up the local data of the matrix correctly
     //SCAI_ASSERT_EQ_ERROR( laplacian.l1Norm(), 2*graph.l1Norm(), "wrong l1Norm in laplacian");
@@ -584,7 +589,8 @@ std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime(
     ValueType retResidual = 0.0;
 
     for(IndexType r=0; r<repeatTimes; r++) {
-        scai::lama::DenseVector<ValueType> rhs( colDist, ValueType(1.0) );
+        scai::lama::DenseVector<ValueType> rhs( colDist, ValueType(10.0) );
+        //rhs.fillRandom(1.0);
 
         scai::lama::DenseVector<ValueType> solution( colDist, ValueType(0.0) );
         solver.initialize( laplacian );
