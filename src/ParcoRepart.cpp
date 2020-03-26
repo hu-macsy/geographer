@@ -809,8 +809,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
                 toInsert.first = neighbours[j];
                 SCAI_ASSERT(neighbours[j] < sumDensity.size(), "Too big index: " + std::to_string(neighbours[j]));
                 SCAI_ASSERT(neighbours[j] >= 0, "Negative index: " + std::to_string(neighbours[j]));
-                geomSpread = 1 + 1/std::log2(sideLen)*( std::abs(sideLen/2 - neighbours[j]/sideLen)/(0.8*sideLen/2) + std::abs(sideLen/2 - neighbours[j]%sideLen)/(0.8*sideLen/2) );
-                //PRINT0( geomSpread );
+                geomSpread = 1 + 1/std::log2(sideLen)*( aux<IndexType,ValueType>::absDiff(sideLen/2, neighbours[j]/sideLen)/(0.8*sideLen/2) + aux<IndexType,ValueType>::absDiff(sideLen/2, neighbours[j]%sideLen)/(0.8*sideLen/2) );
+                
                 // value to pick a border node
                 pixelDistance = aux<IndexType, ValueType>::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);
                 toInsert.second = (1/pixelDistance)* geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[maxDensityPixel], 0.5) );
