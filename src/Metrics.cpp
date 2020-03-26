@@ -310,7 +310,7 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
     MM["SpMVtime"] = getSPMVtime(copyGraph, repeatTimes);
 
     //TODO: take a percentage of repeatTimes; maybe all repeatTimes are too much for CG
-    std::tie( MM["CGtime"], MM["CGiterations"], MM["CGresidual"] ) = getCGTime( copyGraph, 5, settings.maxCGIterations, settings.CGResidual); 
+    std::tie( MM["CGtime"], MM["CGiterations"], MM["CGresidual"] ) = getCGTime( copyGraph, 10, settings.maxCGIterations, settings.CGResidual); 
 
     //TODO: maybe extract this time from the actual SpMV above
     // comm time in SpMV
@@ -589,7 +589,7 @@ std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime(
     ValueType retResidual = 0.0;
 
     for(IndexType r=0; r<repeatTimes; r++) {
-        scai::lama::DenseVector<ValueType> rhs( colDist, ValueType(10.0) );
+        scai::lama::DenseVector<ValueType> rhs( colDist, ValueType(1.0) );
         //rhs.fillRandom(1.0);
 
         scai::lama::DenseVector<ValueType> solution( colDist, ValueType(0.0) );
