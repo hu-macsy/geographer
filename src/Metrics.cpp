@@ -310,7 +310,10 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
     MM["SpMVtime"] = getSPMVtime(copyGraph, repeatTimes);
 
     //TODO: take a percentage of repeatTimes; maybe all repeatTimes are too much for CG
-    std::tie( MM["CGtime"], MM["CGiterations"], MM["CGresidual"] ) = getCGTime( copyGraph, 10, settings.maxCGIterations, settings.CGResidual); 
+    //in rhs: all 1s
+    std::tie( MM["CGtime_a1"], MM["CGiterations_a1"], MM["CGresidual_a1"] ) = getCGTime( copyGraph, 10, settings.maxCGIterations, settings.CGResidual, false); 
+    //in rhs: one 1 and all others 0
+    std::tie( MM["CGtime_o1"], MM["CGiterations_o1"], MM["CGresidual_o1"] ) = getCGTime( copyGraph, 10, settings.maxCGIterations, settings.CGResidual, true); 
 
     //TODO: maybe extract this time from the actual SpMV above
     // comm time in SpMV
@@ -551,7 +554,8 @@ std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime(
     const scai::lama::CSRSparseMatrix<ValueType>& graph,
     const IndexType repeatTimes,
     const IndexType maxIterations,
-    const ValueType residual){
+    const ValueType residual,
+    const bool oneOne){
 
     const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
@@ -589,8 +593,17 @@ std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime(
     ValueType retResidual = 0.0;
 
     for(IndexType r=0; r<repeatTimes; r++) {
-        scai::lama::DenseVector<ValueType> rhs( colDist, ValueType(1.0) );
-        //rhs.fillRandom(1.0);
+        scai::lama::DenseVector<ValueType> rhs;
+        if(oneOne){
+            rhs.setSameValue( colDist, ValueType(0.0) );
+            const IndexType globalN = laplacian.getNumRows();
+            const IndexType globIndex = scai::common::Math::random<IndexType>( globalN );
+            assert( globIndex<= globalN);
+            rhs.setValue( globIndex, 1.0);
+        }else{
+            //just all ones
+            rhs.setSameValue( colDist, ValueType(1.0) );
+        }
 
         scai::lama::DenseVector<ValueType> solution( colDist, ValueType(0.0) );
         solver.initialize( laplacian );
@@ -603,15 +616,16 @@ std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime(
         //number of iterations is (should be!) always the same; maybe just get them outside the loop?
         totalIterations += solver.getIterationCount();
         //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
-        retResidual= solver.getResidual().l2Norm();
+        retResidual += solver.getResidual().l2Norm();
     }
     ValueType globTime = comm->max(totalTime)/repeatTimes;
     ValueType avgIterations = ((ValueType) totalIterations)/repeatTimes;
-    
-    PRINT0("total time for "<< repeatTimes << " calls to CG solver: " << totalTime << 
-            " and " << avgIterations << " average iterations and residual reached " << retResidual );
+    ValueType avgResidual = retResidual/repeatTimes;
 
-    return std::make_tuple( globTime, avgIterations, retResidual);
+    PRINT0("total time for "<< repeatTimes << " calls to CG solver: " << totalTime << 
+            " and " << avgIterations << " average iterations and average residual reached " << avgResidual );
+
+    return std::make_tuple( globTime, avgIterations, avgResidual);
 }
 
 template class Metrics<double>;
