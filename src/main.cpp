@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
     if( settings.setAutoSettings ){
         settings = settings.setDefault( graph );
     }
-    settings.isValid = settings.checkValidity();
+    settings.isValid = settings.checkValidity(comm);
     if( !settings.isValid ){
        throw std::runtime_error("Settings struct is not valid, check the input parameter values.");
     }

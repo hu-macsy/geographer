@@ -147,7 +147,7 @@ std::string getCallingCommand( const int argc, char** argv );
 */
 struct Settings {
     Settings();
-    bool checkValidity();
+    bool checkValidity(const scai::dmemo::CommunicatorPtr comm );
 
     /** @name General partition settings
     */
@@ -267,8 +267,8 @@ struct Settings {
     //calculate expensive performance metrics?
     bool computeDiameter = false;			///< if the diameter should be computed (can be expensive)
     IndexType maxDiameterRounds = 2;		///< max number of rounds to approximate the diameter
-    IndexType maxCGIterations = 3000;        ///< max number of iterations of the CG solver in metrics
-    double CGResidual = 1e-4;
+    IndexType maxCGIterations = 1000;        ///< max number of iterations of the CG solver in metrics
+    double CGResidual = 1e-6;
     //@}
 
     /** @name Various parameters

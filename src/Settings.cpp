@@ -162,17 +162,26 @@ ITI::Settings::Settings() {
     this->machine = std::string(machineChar);
 }
 
-bool ITI::Settings::checkValidity() {
+bool ITI::Settings::checkValidity(const scai::dmemo::CommunicatorPtr comm ) {
     if( this->storeInfo && this->outFile=="-" ) {
         this->isValid = false;
+        if( comm->getRank()==0){
+            std::cout<< "ERROR: storeInfo argument was given but no outFile name" << std::endl;
+        }
         return false;
     }
-    if( initialPartition==Tool::unknown or initialPartition==Tool::unknown){
+    if( initialMigration==Tool::unknown or initialPartition==Tool::unknown){
         this->isValid = false;
+        if( initialMigration==Tool::unknown and comm->getRank()==0){
+            std::cout<< "ERROR: provided tool for initialMigration is not known" << std::endl;
+        }
+        if( initialPartition==Tool::unknown and comm->getRank()==0){
+            std::cout<< "ERROR: provided tool initialPartition is not known" << std::endl;
+        }
         return false;
     }
 
-    return isValid;
+    return true;
 }
 
 template <typename ValueType>
