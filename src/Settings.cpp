@@ -163,10 +163,10 @@ ITI::Settings::Settings() {
 }
 
 bool ITI::Settings::checkValidity(const scai::dmemo::CommunicatorPtr comm ) {
-    if( this->storeInfo && this->outFile=="-" ) {
+    if( this->storeInfo and this->outFile=="-" and this->outDir=="-" ){
         this->isValid = false;
         if( comm->getRank()==0){
-            std::cout<< "ERROR: storeInfo argument was given but no outFile name" << std::endl;
+            std::cout<< "ERROR: storeInfo argument was given but no outFile or outDir was given" << std::endl;
         }
         return false;
     }
