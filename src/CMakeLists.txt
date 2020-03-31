@@ -56,7 +56,7 @@ if(Zoltan2_FOUND OR PARMETIS_LIB OR PARHIP_LIB )
         
         set(ZOLTAN_WRAP_CPP zoltanWrapper.cpp)
         set(ZOLTAN_WRAP_H zoltanWrapper.h)
-        set(ZOLTAN_INCLUDES ${Zoltan2_INCLUDE_DIRS} ${Zoltan2_TPL_INCLUDE_DIRS})
+        set(ZOLTAN_INCLUDES ${Zoltan2_INCLUDE_DIRS} ${Zoltan2_TPL_INCLUDE_DIRS}) 
         set(ZOLTAN_LIBS ${Zoltan2_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} )
     else()
         message(WARNING "zoltan was not found")

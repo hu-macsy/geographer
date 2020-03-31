@@ -109,6 +109,7 @@ int main(int argc, char** argv) {
 
     for( int t=0; t<wantedTools.size(); t++) {
 
+        comm->synchronize();
         ITI::Tool thisTool = wantedTools[t];
         std::cout.precision(5);
 
