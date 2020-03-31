@@ -426,7 +426,7 @@ int main(int argc, char** argv) {
         PRINT0("PE graph stored in " << filename );
     }
 
-getFreeRam(comm);
+    //getFreeRam(comm);
     
     if (vm.count("callExit")) {
         //this is needed for supermuc
