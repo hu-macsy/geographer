@@ -1462,7 +1462,7 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
             maxLocalVertex = maxV;
         }
     }
-    PRINT(thisPE << ": vertices range from "<< minLocalVertex << " to " << maxLocalVertex);
+    //PRINT(thisPE << ": vertices range from "<< minLocalVertex << " to " << maxLocalVertex);
 
     const IndexType globalMinIndex = comm->min(minLocalVertex);
     globalMinIndex==0 ? maxLocalVertex : maxLocalVertex-- ;
