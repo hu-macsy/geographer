@@ -142,9 +142,9 @@ public:
 
 private:
 
-    static IndexType edgeRatingPartner( const IndexType localNode, const scai::hmemo::ReadAccess<IndexType>& ia, const scai::hmemo::ReadAccess<ValueType>& values, const scai::hmemo::ReadAccess<IndexType>& ja, const scai::hmemo::ReadAccess<ValueType>& localNodeWeights, /*const std::vector<DenseVector<ValueType>>& coordinates,*/ const scai::dmemo::DistributionPtr distPtr, const std::vector<bool>& matched);
+    static IndexType edgeRatingPartner( const IndexType localNode, const scai::hmemo::ReadAccess<IndexType>& ia, const scai::hmemo::ReadAccess<ValueType>& values, const scai::hmemo::ReadAccess<IndexType>& ja, const scai::hmemo::ReadAccess<ValueType>& localNodeWeights, const scai::dmemo::DistributionPtr distPtr, const std::vector<bool>& matched);
 
-    static IndexType nnPartner( const IndexType localNode, const scai::hmemo::ReadAccess<IndexType>& ia, const scai::hmemo::ReadAccess<ValueType>& values, const scai::hmemo::ReadAccess<IndexType>& ja, const scai::hmemo::ReadAccess<ValueType>& localNodeWeights, const std::vector<DenseVector<ValueType>>& coordinates, const scai::dmemo::DistributionPtr distPtr, const std::vector<bool>& matched);    
+    static IndexType nnPartner( const IndexType localNode, const scai::hmemo::ReadAccess<IndexType>& ia, const scai::hmemo::ReadAccess<ValueType>& values, const scai::hmemo::ReadAccess<IndexType>& ja, const scai::hmemo::ReadAccess<ValueType>& localNodeWeights, const scai::dmemo::DistributionPtr distPtr, const std::vector<bool>& matched,  const scai::hmemo::ReadAccess<ValueType> &coord0, const scai::hmemo::ReadAccess<ValueType> &coord1, const scai::hmemo::ReadAccess<ValueType> &coord2, const int dim);    
 
 }; // class MultiLevel
 } // namespace ITI
