@@ -688,7 +688,7 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
 
     // keep track of which nodes are already matched
     std::vector<bool> matched(localN, false);
-
+/*
     //use a function pointer to avoid an 'if' statement in the foor loop
     IndexType (*getPartner)( const IndexType localNode, const scai::hmemo::ReadAccess<IndexType>& ia, const scai::hmemo::ReadAccess<ValueType>& values, const scai::hmemo::ReadAccess<IndexType>& ja, const scai::hmemo::ReadAccess<ValueType>& localNodeWeights, const std::vector<DenseVector<ValueType>>& coordinates, const scai::dmemo::DistributionPtr distPtr, const std::vector<bool>& matched);
 
@@ -697,6 +697,8 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
     }else{
         getPartner = edgeRatingPartner;
     }
+*/
+    std::vector<scai::hmemo::ReadAccess<ValueType>> rCoords;
 
     // localNode is the local index of a node
     for(IndexType localNode=0; localNode<localN; localNode++) {
@@ -705,7 +707,13 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
             continue;
         }
 
-        IndexType bestTarget = getPartner( localNode, ia, values, ja, rLocalNodeWeights, coordinates, distPtr, matched);
+        //IndexType bestTarget = getPartner( localNode, ia, values, ja, rLocalNodeWeights, coordinates, distPtr, matched);
+        IndexType bestTarget;
+        if( nnCoarsening ){
+            bestTarget = nnPartner( localNode, ia, values, ja, rLocalNodeWeights, coordinates, distPtr, matched);
+        }else{
+            bestTarget = edgeRatingPartner( localNode, ia, values, ja, rLocalNodeWeights, distPtr, matched);
+        }
 
         if (bestTarget > 0) {
             IndexType globalNgbr = ja[bestTarget];
@@ -731,7 +739,7 @@ std::vector<std::pair<IndexType,IndexType>> MultiLevel<IndexType, ValueType>::ma
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-IndexType MultiLevel<IndexType, ValueType>::edgeRatingPartner(  const IndexType localNode, const scai::hmemo::ReadAccess<IndexType>& ia, const scai::hmemo::ReadAccess<ValueType>& values, const scai::hmemo::ReadAccess<IndexType>& ja, const scai::hmemo::ReadAccess<ValueType>& localNodeWeights, const std::vector<DenseVector<ValueType>>& coordinates, const scai::dmemo::DistributionPtr distPtr, const std::vector<bool>& matched){
+IndexType MultiLevel<IndexType, ValueType>::edgeRatingPartner(  const IndexType localNode, const scai::hmemo::ReadAccess<IndexType>& ia, const scai::hmemo::ReadAccess<ValueType>& values, const scai::hmemo::ReadAccess<IndexType>& ja, const scai::hmemo::ReadAccess<ValueType>& localNodeWeights, /*const std::vector<DenseVector<ValueType>>& coordinates,*/ const scai::dmemo::DistributionPtr distPtr, const std::vector<bool>& matched){
     SCAI_REGION("MultiLevel.edgeRatingPartner");
 
     IndexType bestTarget = -1;
