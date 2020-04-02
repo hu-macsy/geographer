@@ -355,8 +355,8 @@ IndexType getCpuFreqLinux(const scai::dmemo::CommunicatorPtr& comm, const int no
     const IndexType numPEs = comm->getSize();
     const IndexType rank = comm->getRank();
 
-    const IndexType div = numPEs/nodeSize;
-    SCAI_ASSERT_EQ_ERROR( div*nodeSize, numPEs, "The size of each node is " << nodeSize <<" but it should be a multiple of the number of calling PEs.");
+	SCAI_ASSERT_LE_ERROR( nodeSize, numPEs, "The number of processes per node should be less that the number of calling PEs. Set parameter --processPerNode to an appropriate value.");
+    SCAI_ASSERT_EQ_ERROR( nodeSize*(int (numPEs/nodeSize)), numPEs, "The size of each node is " << nodeSize <<" but it should be a multiple of the number of calling PEs. Set parameter --processPerNode to an appropriate value.");
 
     //rank inside this compute node
     const int myInternalRank = rank%nodeSize;
@@ -415,7 +415,5 @@ std::vector<std::vector<vType>> calculateLoadRequests(const scai::dmemo::Communi
 
     return retWeights;
 }
-
-
 
 }//namespace ITI
