@@ -51,6 +51,10 @@ int main(int argc, char** argv) {
     using namespace ITI;
     typedef double ValueType;   //use double
 
+#if ZOLTAN_FOUND
+    Tpetra::ScopeGuard tscope(&argc, &argv);
+#endif   
+
     // timing information
     std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
@@ -90,7 +94,7 @@ int main(int argc, char** argv) {
 
     //WARNING: 1) removed parmetis sfc
     //WARNING: 2) parMetisGraph should be last because it often crashes
-    std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph, ITI::Tool::parhipFastMesh, ITI::Tool::parhipUltraFastMesh, ITI::Tool::parhipEcoMesh  };
+    std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanXPulp, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph, ITI::Tool::parhipFastMesh, ITI::Tool::parhipUltraFastMesh, ITI::Tool::parhipEcoMesh  };
 
     std::vector<ITI::Tool> wantedTools;
     std::vector<std::string> tools = settings.tools; //not really needed

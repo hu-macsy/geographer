@@ -120,8 +120,8 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
         std::cout << "Imbalance tolerance is " << tolerance << std::endl;
 
     Teuchos::ParameterList params("test params");
-    //params.set("debug_level", "basic_status");
-    params.set("debug_level", "detailed_status");
+    params.set("debug_level", "basic_status");
+    //params.set("debug_level", "verbose_detailed_status");
     params.set("debug_procs", "0");
     params.set("error_check_level", "debug_mode_assertions");
 
@@ -137,6 +137,9 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     } else {
         params.set("partitioning_approach", "partition");
     }
+    //params.print();
+
+    comm->synchronize();
 
     //TODO: params.set("partitioning_objective", "minimize_cut_edge_count");
     //      or something else, check at
@@ -154,11 +157,12 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     //see also: Trilinos/packages/zoltan2/test/partition/MultiJaggedTest.cpp, ~line 590
     const IndexType numWeights = nodeWeights.size();
     std::vector<std::vector<ValueType>> localWeights( numWeights, std::vector<ValueType>( localN, 1.0) );
-    //localWeights[i][j] is the j-th weight of the i-th vertex (i is local ID)
+    //localWeights[j][i] is the j-th weight of the i-th vertex (i is local ID)
 
     if( nodeWeightsFlag ) {
         for( unsigned int w=0; w<numWeights; w++ ) {
             scai::hmemo::ReadAccess<ValueType> rLocalWeights( nodeWeights[w].getLocalValues() );
+            assert( rLocalWeights.size()==localN);
             for(unsigned int i=0; i<localN; i++) {
                 localWeights[w][i] = rLocalWeights[i];
             }
@@ -253,10 +257,12 @@ std::string zoltanWrapper<IndexType, ValueType>::tool2String( ITI::Tool tool){
         algo="rcb";
     else if (tool==Tool::zoltanMJ)
         algo="multijagged";
+    else if (tool==Tool::zoltanXPulp)
+        algo="pulp";
     else if (tool==Tool::zoltanSFC)
         algo="hsfc";
     else{
-        std::cout << "***Error, given tool " << tool << " does not exist." << std::endl;
+        throw std::runtime_error("ERROR:, given tool " + ITI::to_string(tool) + " does not exist.");
     }
     return algo;
 }

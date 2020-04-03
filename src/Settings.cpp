@@ -49,6 +49,9 @@ std::ostream& ITI::operator<<( std::ostream& out, const ITI::Tool tool) {
     case Tool::zoltanMJ:
         token = "zoltanMJ";
         break;
+    case Tool::zoltanXPulp:
+        token = "zoltanXPulp";
+        break;
     case Tool::zoltanSFC:
         token = "zoltanSFC";
         break;
@@ -121,6 +124,8 @@ std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool) {
         tool = ITI::Tool::zoltanRCB;
     else if( token=="zoltanMJ" or tokenLower=="zoltanmj")
         tool = ITI::Tool::zoltanMJ;
+    else if( token=="zoltanXPulp" or tokenLower=="zoltanxpulp")
+        tool = ITI::Tool::zoltanXPulp;
     else if( token=="zoltanSFC" or tokenLower=="zoltansfc")
         tool = ITI::Tool::zoltanSFC;
     else if( token=="parhipFastMesh" or tokenLower=="parhipfastmesh" )

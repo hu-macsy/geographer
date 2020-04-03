@@ -128,7 +128,7 @@ inline std::ostream& operator<<(std::ostream& out, Format method) {
 - zoltanMJ Partition a point set (no graph is needed) using the Multijagged algorithm of zoltan2.
 - zoltanMJ Partition a point set (no graph is needed) using the space filling curves algorithm of zoltan2.
 */
-enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, parMetisRefine, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, parhipFastMesh, parhipUltraFastMesh, parhipEcoMesh, myAlgo, none, unknown};
+enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, parMetisRefine, zoltanRIB, zoltanRCB, zoltanMJ, zoltanXPulp, zoltanSFC, parhipFastMesh, parhipUltraFastMesh, parhipEcoMesh, myAlgo, none, unknown};
 
 
 std::istream& operator>>(std::istream& in, ITI::Tool& tool);

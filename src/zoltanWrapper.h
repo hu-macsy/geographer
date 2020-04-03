@@ -1,6 +1,9 @@
 #pragma once
 #include "Wrappers.h"
 
+//needed in main. Added it here so no new dependencies are needed.
+#include <Tpetra_Core.hpp> 
+
 namespace ITI {
 
 /** @brief Class for external partitioning tools like zoltan.
