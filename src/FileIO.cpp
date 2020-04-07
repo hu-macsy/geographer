@@ -1153,7 +1153,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 
     if (file.fail()) {
         PRINT("Read from multiple files, one file per PE");
-        throw std::runtime_error("Reading graph from " + prefix + " failed for PE" + std::to_string(thisPE) );
+        throw std::runtime_error("Reading graph from " + thisFileName + " failed for PE" + std::to_string(thisPE) );
     } else {
         if( comm->getRank()==0 ) {
             std::cout<< "Reading from file "<< prefix << std::endl;

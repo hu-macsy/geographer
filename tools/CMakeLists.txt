@@ -19,8 +19,13 @@ add_executable(distEdgeList2CSR ${FILES_CORE} distEdgeList2CSR.cpp)
 target_include_directories(distEdgeList2CSR PUBLIC "../src/")
 target_link_libraries(distEdgeList2CSR ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 
+add_executable(distEdgeList2nonDist ${FILES_CORE} distEdgeList2nonDist.cpp)
+target_include_directories(distEdgeList2nonDist PUBLIC "../src/")
+target_link_libraries(distEdgeList2nonDist ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
+
 set(TOOLS_DIR "../tools")
 install(TARGETS analyze DESTINATION ${TOOLS_DIR})
 install(TARGETS heatMap DESTINATION ${TOOLS_DIR})
 install(TARGETS coords2binary DESTINATION ${TOOLS_DIR})
 install(TARGETS distEdgeList2CSR DESTINATION ${TOOLS_DIR})
+install(TARGETS distEdgeList2nonDist DESTINATION ${TOOLS_DIR})
