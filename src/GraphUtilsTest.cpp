@@ -74,6 +74,8 @@ TYPED_TEST(GraphUtilsTest, testReindexCut) {
         IndexType blockId = (rand() % k);
         partition.getLocalValues()[i] = blockId;
     }
+    partition[0]=0; //some times no vertex get 0 and triggers an assertion
+    partition[1]=k-1; //or max
 
     //redistribute based on the partition to simulate a real scenario
     aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings );    
