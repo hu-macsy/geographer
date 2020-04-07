@@ -1706,7 +1706,7 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
 // given a non-distributed csr undirected matrix converts it to an edge list
 // two first numbers are the vertex IDs and the third one is the edge weight
 template<typename IndexType, typename ValueType>
-std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, ValueType>::CSR2EdgeList_local(const CSRSparseMatrix<ValueType> &graph, IndexType &maxDegree) {
+std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, ValueType>::CSR2EdgeList_repl(const CSRSparseMatrix<ValueType> &graph, IndexType &maxDegree) {
 
     scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     CSRSparseMatrix<ValueType> tmpGraph(graph);
@@ -1714,58 +1714,70 @@ std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, Val
 
     // TODO: maybe handle differently? with an error message?
     if (!tmpGraph.getRowDistributionPtr()->isReplicated()) {
-        PRINT0("***WARNING: In CSR2EdgeList_local: given graph is not replicated; will replicate now");
+        PRINT0("***WARNING: In CSR2EdgeList_repl: given graph is not replicated; will replicate now");
         const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N) );
         tmpGraph.redistribute(noDist, noDist);
         PRINT0("Graph replicated");
     }
 
-    const CSRStorage<ValueType>& localStorage = tmpGraph.getLocalStorage();
+    std::vector<std::tuple<IndexType,IndexType,ValueType>> edgeList = localCSR2GlobalEdgeList(graph,  maxDegree );
+
+    return edgeList;
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, ValueType>::localCSR2GlobalEdgeList(
+    const CSRSparseMatrix<ValueType> &graph,
+    IndexType &maxDegree){
+
+    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
     const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
     const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+    
+    const IndexType numLocalEdges = values.size();
+    const IndexType localN = localStorage.getNumRows();
 
     //not needed assertion
     SCAI_ASSERT_EQ_ERROR( ja.size(), values.size(), "Size mismatch for csr sparse matrix" );
-    SCAI_ASSERT_EQ_ERROR( ia.size(), N+1, "Wrong ia size?" );
+    SCAI_ASSERT_EQ_ERROR( ia.size(), localN+1, "Wrong ia size?" );
 
-    const IndexType numEdges = values.size();
     std::vector<std::tuple<IndexType,IndexType,ValueType>> edgeList;//( numEdges/2 );
     IndexType edgeIndex = 0;
-    IndexType maxEdgeWeight = 0;
-    IndexType minEdgeWeight = std::numeric_limits<int>::max();
 
     //WARNING: we only need the upper, left part of the matrix values since
-    //		matrix is symmetric
-    for(IndexType i=0; i<N; i++) {
-        const IndexType v1 = i;	//first vertex
+    //      matrix is symmetric
+    for(IndexType i=0; i<localN; i++) {
+        const IndexType v1 = dist->local2Global(i); //first vertex
         SCAI_ASSERT_LE_ERROR( i+1, ia.size(), "Wrong index for ia[i+1]" );
         IndexType thisDegree = ia[i+1]-ia[i];
         if(thisDegree>maxDegree) {
             maxDegree = thisDegree;
         }
         for (IndexType j = ia[i]; j < ia[i+1]; j++) {
-            const IndexType v2 = ja[j]; //second vertex
+            const IndexType v2 =  dist->local2Global(ja[j]); //second vertex
             // so we do not enter every edge twice
             //WARNING: here, we assume graph is undirected
-            if ( v2<v1 ) {
+//TODO: should we add all edge or not?
+/*            if ( v2<v1 ) {
                 edgeIndex++;
                 continue;
             }
-            SCAI_ASSERT_LE_ERROR( edgeIndex, numEdges, "Wrong edge index");
+*/
+            SCAI_ASSERT_LE_ERROR( edgeIndex, numLocalEdges, "Wrong edge index");
             edgeList.push_back( std::make_tuple( v1, v2, values[edgeIndex]) );
 
-            if( values[edgeIndex] > maxEdgeWeight ) maxEdgeWeight = values[edgeIndex];
-            if( values[edgeIndex] < minEdgeWeight ) minEdgeWeight = values[edgeIndex];
             edgeIndex++;
         }
     }
-
-    //PRINT0("min edge weight: " <<minEdgeWeight << ", max edge weight: " << maxEdgeWeight);
-
-    SCAI_ASSERT_EQ_ERROR( edgeList.size()*2, numEdges, "Wrong number of edges");
+//TODO: assertion when not adding all
+//SCAI_ASSERT_EQ_ERROR( edgeList.size()*2, numLocalEdges, "Wrong number of edges");
+    SCAI_ASSERT_EQ_ERROR( edgeList.size(), numLocalEdges, "Wrong number of edges");
     return edgeList;
 }
+
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
@@ -2014,7 +2026,7 @@ std::vector< std::vector<IndexType>> GraphUtils<IndexType, ValueType>::mecGraphC
 
     //edgeList[i] = a tuple (v1,v2,w) describing an edges. v1 and v2 are the two
     // edge IDs and w is the edge weight
-    std::vector<edge> edgeList = CSR2EdgeList_local(graph, maxDegree);
+    std::vector<edge> edgeList = CSR2EdgeList_repl(graph, maxDegree);
 
     //
     // 2 - sort adjacency list based on edge weights

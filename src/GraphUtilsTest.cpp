@@ -396,7 +396,25 @@ TYPED_TEST (GraphUtilsTest,testEdgeList2CSR) {
     SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
     EXPECT_TRUE( graph.checkSymmetry() );
 }
+//---------------------------------------------------------------------------------------
 
+TYPED_TEST(GraphUtilsTest, testLocalCSR2EdgeList) {
+    using ValueType = TypeParam;
+
+    const std::string file = GraphUtilsTest<ValueType>::graphPath + "Grid8x8";
+    const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    IndexType localMaxDegree=0;
+
+    std::vector<std::tuple<IndexType,IndexType,ValueType>> edgeList = GraphUtils<IndexType,ValueType>::localCSR2GlobalEdgeList(
+        graph, localMaxDegree );
+
+    IndexType globalMaxDegree = comm->max(localMaxDegree);
+
+    EXPECT_LE(localMaxDegree, globalMaxDegree);
+    EXPECT_EQ(globalMaxDegree, 4);
+}
 //---------------------------------------------------------------------------------------
 // trancated function
 /*

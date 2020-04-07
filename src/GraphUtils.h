@@ -294,7 +294,13 @@ public:
     	@param[out] maxDegree The maximum degree of the graph
     	@return The local part of an edge list representation. return.size()==adjM.getLocalNumValues()/2. Global size==graph.getNumValues()/2.
     */
-    static std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local(const scai::lama::CSRSparseMatrix<ValueType>& adjM, IndexType& maxDegree=0);
+    static std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_repl(const scai::lama::CSRSparseMatrix<ValueType>& adjM, IndexType& maxDegree=0);
+
+
+    static std::vector<std::tuple<IndexType,IndexType,ValueType>> localCSR2GlobalEdgeList(
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        IndexType &maxDegree);
+
 
     /** @brief Construct the Laplacian of the input matrix. May contain parallel communication.
      *
