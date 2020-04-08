@@ -1,3 +1,8 @@
+get_directory_property(hasParent PARENT_DIRECTORY)
+if(NOT hasParent)
+  message(FATAL_ERROR "Do not call this CMakeLists.txt directly. Instead, call the one in the parent directory.")
+endif(NOT hasParent)
+
 add_definitions(--openmp -pthread)
 link_libraries(--openmp)
 
@@ -23,7 +28,7 @@ add_executable(distEdgeList2nonDist ${FILES_CORE} distEdgeList2nonDist.cpp)
 target_include_directories(distEdgeList2nonDist PUBLIC "../src/")
 target_link_libraries(distEdgeList2nonDist ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES})
 
-set(TOOLS_DIR "../tools")
+set(TOOLS_DIR "${BIN_DEST}/tools")
 install(TARGETS analyze DESTINATION ${TOOLS_DIR})
 install(TARGETS heatMap DESTINATION ${TOOLS_DIR})
 install(TARGETS coords2binary DESTINATION ${TOOLS_DIR})
