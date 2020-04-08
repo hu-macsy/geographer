@@ -1757,7 +1757,7 @@ std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, Val
             maxDegree = thisDegree;
         }
         for (IndexType j = ia[i]; j < ia[i+1]; j++) {
-            const IndexType v2 =  dist->local2Global(ja[j]); //second vertex
+            const IndexType v2 =  ja[j]; //second vertex
             // so we do not enter every edge twice
             //WARNING: here, we assume graph is undirected
 //TODO: should we add all edge or not?

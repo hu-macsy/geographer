@@ -401,19 +401,52 @@ TYPED_TEST (GraphUtilsTest,testEdgeList2CSR) {
 TYPED_TEST(GraphUtilsTest, testLocalCSR2EdgeList) {
     using ValueType = TypeParam;
 
-    const std::string file = GraphUtilsTest<ValueType>::graphPath + "Grid8x8";
+    //const std::string file = GraphUtilsTest<ValueType>::graphPath + "Grid8x8";
+    const std::string file = GraphUtilsTest<ValueType>::graphPath + "rotation-00000.graph";
     const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 
     IndexType localMaxDegree=0;
 
     std::vector<std::tuple<IndexType,IndexType,ValueType>> edgeList = GraphUtils<IndexType,ValueType>::localCSR2GlobalEdgeList(
         graph, localMaxDegree );
 
-    IndexType globalMaxDegree = comm->max(localMaxDegree);
+    const IndexType globalMaxDegree = comm->max(localMaxDegree);
 
     EXPECT_LE(localMaxDegree, globalMaxDegree);
-    EXPECT_EQ(globalMaxDegree, 4);
+    EXPECT_LE(globalMaxDegree, 4);
+
+    const IndexType numNodes = graph.getNumRows();
+
+    //check number of edges
+
+    const IndexType localNumEdges = graph.getLocalNumValues();
+    EXPECT_EQ(localNumEdges, edgeList.size() );
+
+    const IndexType numEdges = graph.getNumValues();
+    const IndexType globalEsgeListSize = comm->sum( edgeList.size()  );
+    EXPECT_EQ( numEdges, globalEsgeListSize );
+
+    //check if all node ID are present
+    std::set<IndexType> nodeIDs;
+    for( auto edge : edgeList ){
+        const IndexType v1 = std::get<0>(edge);
+        EXPECT_LE( v1, numNodes );
+        nodeIDs.insert(v1);
+        const IndexType v2 = std::get<1>(edge);
+        EXPECT_LE( v2, numNodes );
+        nodeIDs.insert(v2);
+    }
+
+    for(int i=0; i<numNodes; i++){
+        auto it = nodeIDs.find( i );
+        bool found = false;
+        //element was found in some PE
+        if( it!=nodeIDs.end() )
+            found = true;
+        EXPECT_TRUE(comm->any(found));
+    }
 }
 //---------------------------------------------------------------------------------------
 // trancated function
