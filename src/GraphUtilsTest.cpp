@@ -429,7 +429,7 @@ TYPED_TEST(GraphUtilsTest, testLocalCSR2EdgeList) {
     EXPECT_EQ( numEdges, globalEsgeListSize );
 
     //check if all node ID are present
-    std::set<IndexType> nodeIDs;
+    std::set<IndexType> nodeIDs; //set of local node IDs
     for( auto edge : edgeList ){
         const IndexType v1 = std::get<0>(edge);
         EXPECT_LE( v1, numNodes );
