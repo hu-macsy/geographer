@@ -1587,20 +1587,20 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     }
 
     PRINT0("rebuild local edge list");
-
-    //IndexType numEdges = localPairs.size() ;
-
     SCAI_ASSERT_ERROR(std::is_sorted(localPairs.begin(), localPairs.end()), "Disorder after insertion of received edges." );
 
     //
     //remove duplicates
     //
-    localPairs.erase(unique(localPairs.begin(), localPairs.end(), [](int_pair p1, int_pair p2) {
-        return ( (p1.second==p2.second) and (p1.first==p2.first));
-    }), localPairs.end() );
-    //PRINT( thisPE <<": removed " << numEdges - localPairs.size() << " duplicate edges" );
-
-    PRINT0("removed duplicates");
+    {
+        const IndexType numEdges = localPairs.size() ;
+        localPairs.erase(unique(localPairs.begin(), localPairs.end(), [](int_pair p1, int_pair p2) {
+            return ( (p1.second==p2.second) and (p1.first==p2.first));
+        }), localPairs.end() );
+        const IndexType numRemoved = numEdges - localPairs.size();
+        const IndexType totalNumRemoved = comm->sum(numRemoved);
+        PRINT0("removed duplicates, total removed edges: " << totalNumRemoved);
+    }
 
     //
     // check that all is correct
@@ -1692,14 +1692,12 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
             scai::hmemo::HArray<IndexType>(ja.size(), ja.data()),
             scai::hmemo::HArray<ValueType>(values.size(), values.data()));//no longer allowed. TODO: change
 
-    //const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
-    const auto genDist = scai::dmemo::generalDistributionUnchecked(globalN, localIndices, comm);//this could be a GenBlockDistribution, right?
-
+    const scai::dmemo::DistributionPtr blockDist = scai::dmemo::genBlockDistributionBySize(globalN, localN, comm);
     PRINT0("assembled CSR storage");
 
-    return scai::lama::CSRSparseMatrix<ValueType>(genDist, std::move(myStorage));
+    return scai::lama::CSRSparseMatrix<ValueType>(blockDist, std::move(myStorage));
 
-}
+}//edgeList2CSR
 
 //---------------------------------------------------------------------------------------
 //WARNING,TODO: Assumes the graph is undirected

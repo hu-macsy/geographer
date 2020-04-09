@@ -394,8 +394,14 @@ TYPED_TEST (GraphUtilsTest,testEdgeList2CSR) {
 
     scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils<IndexType,ValueType>::edgeList2CSR( localEdgeList, comm );
 
-    SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
+    EXPECT_TRUE( graph.isConsistent());
     EXPECT_TRUE( graph.checkSymmetry() );
+    EXPECT_EQ( graph.getNumRows(), N );
+    const IndexType globalM = comm->sum( localM );
+    EXPECT_LE( graph.getNumValues(), 2*globalM ); //some edges are duplicates and are removed
+    EXPECT_GE( graph.getNumValues(), N );
+    EXPECT_GE( graph.l1Norm(), N );
+    EXPECT_TRUE( graph.getRowDistributionPtr()->isBlockDistributed(comm) );
 }
 //---------------------------------------------------------------------------------------
 
