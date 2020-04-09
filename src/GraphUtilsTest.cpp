@@ -312,6 +312,7 @@ TYPED_TEST (GraphUtilsTest, testComputeCommVolumeAndBoundaryNodes) {
     settings.dimensions = dimensions;
     settings.minGainForNextRound = 10;
     settings.storeInfo = false;
+    //settings.verbose = true;
 
     Metrics<ValueType> metrics(settings);
 

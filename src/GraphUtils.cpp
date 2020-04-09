@@ -1758,22 +1758,21 @@ std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, Val
         }
         for (IndexType j = ia[i]; j < ia[i+1]; j++) {
             const IndexType v2 =  ja[j]; //second vertex
-            // so we do not enter every edge twice
-            //WARNING: here, we assume graph is undirected
-//TODO: should we add all edge or not?
-/*            if ( v2<v1 ) {
-                edgeIndex++;
-                continue;
-            }
-*/
+            //WARNING: here, we assume graph is directed
+            // so we DO enter every edge twice as (u,v) and (v,u)
+            //if ( v2<v1 ) {
+            //    edgeIndex++;
+            //    continue;
+            //}
+
             SCAI_ASSERT_LE_ERROR( edgeIndex, numLocalEdges, "Wrong edge index");
             edgeList.push_back( std::make_tuple( v1, v2, values[edgeIndex]) );
 
             edgeIndex++;
         }
     }
-//TODO: assertion when not adding all
-//SCAI_ASSERT_EQ_ERROR( edgeList.size()*2, numLocalEdges, "Wrong number of edges");
+
+    //SCAI_ASSERT_EQ_ERROR( edgeList.size()*2, numLocalEdges, "Wrong number of edges");// assertion when NOT adding all edges
     SCAI_ASSERT_EQ_ERROR( edgeList.size(), numLocalEdges, "Wrong number of edges");
     return edgeList;
 }

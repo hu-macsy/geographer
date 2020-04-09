@@ -66,6 +66,9 @@ public:
      */
     static void writeGraphDistributed (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
 
+
+    static void writeGraphAsEdgeList (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
+
     /** @brief Write graph and partition into a .vtk file; this can be opened by paraview.
      *
      * @param[in] adjM The graph with N vertices given as an NxN adjacency matrix.
@@ -93,7 +96,10 @@ public:
      * @param[in] coordinates The coordinates of the points.
      * @param[in] filename The file's name to write to
     */
-    static void writeCoordsParallel(const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
+    static void writeCoordsParallel(
+        const std::vector<DenseVector<ValueType>> &coords,
+        const std::string filename,
+        const bool overwriteExisting=true);
 
     /** Each PE writes its own part of the coordinates in a separate file called filename_X.xyz where X is the rank of the PE,
      * i.e., a number from 0 until the total number of PEs-1.
@@ -101,7 +107,10 @@ public:
      * @param[in] dimensions Number of dimensions of coordinates.
      * @param[in] filename The file's name to write to.
      * */
-    static void writeCoordsDistributed (const std::vector<DenseVector<ValueType>> &coords,  const IndexType dimensions, const std::string filename);
+    static void writeCoordsDistributed (
+        const std::vector<DenseVector<ValueType>> &coords,
+        const IndexType dimensions,
+        const std::string filename);
 
     /** Given the vector of the coordinates and the nodeWeights, writes them both in a file in the form:
     *

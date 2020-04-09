@@ -12,6 +12,7 @@
 #include <scai/lama/matrix/all.hpp>
 #include <scai/lama/Vector.hpp>
 #include <scai/dmemo/BlockDistribution.hpp>
+#include <scai/dmemo/GenBlockDistribution.hpp>
 #include <scai/common/Math.hpp>
 #include <scai/common/Settings.hpp>
 #include <scai/lama/storage/MatrixStorage.hpp>
@@ -141,6 +142,84 @@ void FileIO<IndexType, ValueType>::writeGraphDistributed (const CSRSparseMatrix<
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
+void FileIO<IndexType, ValueType>::writeGraphAsEdgeList (const CSRSparseMatrix<ValueType> &graph, const std::string filename) {
+    SCAI_REGION("FileIO.writeAsEdgeList");
+
+    const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
+
+    //edgeList contains the local part of the edges, indexed by the global indices for each node ID
+    [[maybe_unused]] IndexType maxDegree;
+    const std::vector<std::tuple<IndexType,IndexType,ValueType>> edgeList = 
+        GraphUtils<IndexType,ValueType>::localCSR2GlobalEdgeList(graph,  maxDegree );
+
+     //sanity checks
+    const IndexType localNumEdges = edgeList.size();
+    //see GraphUtils::localCSR2GlobalEdgeList(
+    SCAI_ASSERT_EQ_ERROR(localNumEdges, graph.getLocalNumValues(), "Local number of edges seems wrong" );
+
+    const IndexType numEdges = graph.getNumValues()/2;
+    const IndexType globalEsgeListSize = comm->sum( edgeList.size() );
+    SCAI_ASSERT_EQ_ERROR( numEdges, globalEsgeListSize, "Global number of edges seems wrong" );
+
+    typedef unsigned long int ULONG;
+    //TODO: we can also directly use the edgeList...
+    std::vector<std::vector<ULONG>> nodeList(2, std::vector<ULONG>(localNumEdges));
+
+    for( int v=0; v<localNumEdges; v++){
+        nodeList[0][v] = (ULONG) std::get<0>(edgeList[v]);
+        nodeList[1][v] = (ULONG) std::get<1>(edgeList[v]);
+    }
+
+    //get prefix sum of local ranges.
+    const IndexType numPEs = comm->getSize();
+    const IndexType thisPE = comm->getRank();
+    std::vector<IndexType> localRanges(numPEs+1,0);
+    localRanges[thisPE+1] = localNumEdges;
+    comm->sumImpl( localRanges.data(), localRanges.data(), numPEs+1, scai::common::TypeTraits<IndexType>::stype );
+    for( int p=1; p<=numPEs; p++){
+        localRanges[p] += localRanges[p-1];
+    }
+
+    //
+    //write into file
+    //
+
+    std::ofstream outfile;
+    
+    const ULONG numNodes = graph.getNumRows();
+    const ULONG numEdgesUL = (ULONG) numEdges;
+
+    for(IndexType p=0; p<numPEs; p++) { // numPE rounds, in each round only one PE writes its part
+        if(thisPE==p ) {
+            if( p==0 ) {
+                outfile.open(filename.c_str(), std::ios::binary | std::ios::out);
+                //write header
+                const ULONG fileTypeVersionNumber = 3; //not sure why 4...
+                outfile.write((char*)(&fileTypeVersionNumber), sizeof( ULONG ));
+                outfile.write((char*)(&numNodes), sizeof( ULONG ));
+                outfile.write((char*)(&numEdgesUL), sizeof( ULONG ));
+            } else {
+                // if not the first PE then append to file
+                outfile.open(filename.c_str(), std::ios::binary | std::ios::app);
+            }
+
+            for( IndexType i=0; i<localNumEdges; i++) {
+                outfile.write( (char *)(&nodeList[0][i]), sizeof(ULONG) );
+                outfile.write( (char *)(&nodeList[1][i]), sizeof(ULONG) );
+            }
+
+            SCAI_ASSERT_EQ_ERROR( outfile.tellp(), (localRanges[thisPE+1]*2+3)*sizeof(ULONG) , "While writing edge list in parallel: Position in file " << filename << " for PE " << thisPE << " is not correct." );
+            outfile.close();
+            std::cout<< "PE " << thisPE << " wrote its part " << std::endl;
+        }
+        comm->synchronize();
+    }
+
+}//writeGraphAsEdgeList
+
+//-------------------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writeVTKCentral (const CSRSparseMatrix<ValueType> &adjM, const std::vector<DenseVector<ValueType>> &coords, const DenseVector<IndexType> &part, const std::string filename) {
     SCAI_REGION( "FileIO.writeVTKCentral" )
 
@@ -238,7 +317,10 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
 /*
  */
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVector<ValueType>> &coords, const std::string outFilename) {
+void FileIO<IndexType, ValueType>::writeCoordsParallel(
+    const std::vector<DenseVector<ValueType>> &coords,
+    const std::string outFilename,
+    const bool overwriteExisting) {
 
     const IndexType dimension = coords.size();
 
@@ -276,7 +358,11 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(const std::vector<DenseVe
     for(IndexType p=0; p<numPEs; p++) { // numPE rounds, in each round only one PE writes its part
         if( comm->getRank()==p ) {
             if( p==0 ) {
-                outfile.open(outFilename.c_str(), std::ios::binary | std::ios::out);
+                if( overwriteExisting ){
+                    outfile.open(outFilename.c_str(), std::ios::binary | std::ios::out);
+                }else{
+                    outfile.open(outFilename.c_str(), std::ios::binary | std::ios::app);
+                }
             } else {
                 // if not the first PE then append to file
                 outfile.open(outFilename.c_str(), std::ios::binary | std::ios::app);
@@ -853,7 +939,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             std::ifstream file;
             file.open(filename.c_str(), std::ios::binary | std::ios::in);
 
-            //std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
+std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
 
             ia.resize( localN +1);
             ia[0]=0;
@@ -1768,8 +1854,6 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
                 assert(v>0);
             }
 
-            //std::pair<std::set<IndexType>::iterator,bool> ret;
-
             for(IndexType v1=0; v1<face.size()-1; v1++) {
                 SCAI_ASSERT_LE_ERROR( face[v1], N, "Found vertex with too big index.");
                 auto ret = adjList[face[v1]-1].insert(face[v1+1]-1);		//TODO: check if correct: abstract 1 to start from 0
@@ -1786,7 +1870,6 @@ void  FileIO<IndexType, ValueType>::readAlyaCentral( scai::lama::CSRSparseMatrix
                 ++edgeCnt;
             }
 
-            //if(lala>10) break;
             numElems++;
             //if( numElems>9800300) std::cout<<"Current element=" <<  currElem << std::endl;
         }
@@ -2397,5 +2480,6 @@ void FileIO<IndexType, ValueType>::trim(std::string &s) {
 
 template class FileIO<IndexType, double>;
 template class FileIO<IndexType, float>;
+//template class FileIO<IndexType, IndexType>;
 
 } /* namespace ITI */
