@@ -27,12 +27,12 @@ template <typename IndexType, typename ValueType>
 class GraphUtils {
 public:
     /**
-     * Reindexes the nodes of the input graph to form a BlockDistribution. No redistribution of the graph happens, only the indices are changed.
-     * After this method is run, the input graph has a BlockDistribution.
+     * Redistributes the nodes of the input graph to form a GenBlockDistribution.
+     * After this method is finished, the input graph has a GenBlockDistribution.
      *
      * @param[in,out] the graph
      *
-     * @return A block-distributed vector containing the old local indices
+     * @return A  general block-distributed vector containing the old local indices
      of this PE
      */
     static scai::dmemo::DistributionPtr genBlockRedist(scai::lama::CSRSparseMatrix<ValueType> &graph);

@@ -161,7 +161,7 @@ TYPED_TEST(FileIOTest, testWriteGraphWithEdgeWeights) {
     std::string filename = "./meshes/noEdgeWeights.graph";
     FileIO<IndexType, ValueType>::writeGraph( graph, filename );
 
-    filename = "./meshes/dgeWeights.graph";
+    filename = "./meshes/edgeWeights.graph";
     FileIO<IndexType, ValueType>::writeGraph( graph, filename, true );
 
 }

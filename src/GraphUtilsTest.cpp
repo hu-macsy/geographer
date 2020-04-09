@@ -107,13 +107,13 @@ TYPED_TEST(GraphUtilsTest, testReindexCut) {
     //graph.checkSettings();
     EXPECT_TRUE( graph.isConsistent() );
     EXPECT_TRUE( graph.checkSymmetry() );
+    EXPECT_TRUE( graph.getRowDistributionPtr()->isBlockDistributed(comm) );
     EXPECT_NEAR( l2Norm, graph.l2Norm(), 1e-5 );
 
     partition.redistribute( newGenBlockDist );
     DenseVector<IndexType> reIndexedPartition = partition;
 
     ASSERT_TRUE(reIndexedPartition.getDistributionPtr()->isEqual(*newGenBlockDist));
-
 
     ValueType secondCut = GraphUtils<IndexType, ValueType>::computeCut(graph, reIndexedPartition, true);
     ValueType secondImbalance = GraphUtils<IndexType, ValueType>::computeImbalance( reIndexedPartition, k );
@@ -394,8 +394,14 @@ TYPED_TEST (GraphUtilsTest,testEdgeList2CSR) {
 
     scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils<IndexType,ValueType>::edgeList2CSR( localEdgeList, comm );
 
-    SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
+    EXPECT_TRUE( graph.isConsistent());
     EXPECT_TRUE( graph.checkSymmetry() );
+    EXPECT_EQ( graph.getNumRows(), N );
+    const IndexType globalM = comm->sum( localM );
+    EXPECT_LE( graph.getNumValues(), 2*globalM ); //some edges are duplicates and are removed
+    EXPECT_GE( graph.getNumValues(), N );
+    EXPECT_GE( graph.l1Norm(), N );
+    EXPECT_TRUE( graph.getRowDistributionPtr()->isBlockDistributed(comm) );
 }
 //---------------------------------------------------------------------------------------
 
