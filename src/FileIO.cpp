@@ -45,65 +45,100 @@ const IndexType fileTypeVersionNumber= 3;
  * (i, e1), (i, e2), (i, e3), ....
  *
  */
+
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename, const bool edgeWeights) {
     SCAI_REGION( "FileIO.writeGraph" )
 
     const scai::dmemo::CommunicatorPtr comm = adjM.getRowDistributionPtr()->getCommunicatorPtr();
+    const IndexType thisPE = comm->getRank();
+    const IndexType numPEs = comm->getSize();
 
     const IndexType root =0;
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
-
     const IndexType globalN = distPtr->getGlobalSize();
+    const IndexType globalM = adjM.getNumValues();
+    assert(globalN==adjM.getNumRows());
 
-    // Create a noDistribution and redistribute adjM. This way adjM is replicated in every PE
-    // TODO: use gather (or something) to gather in root PE and print there, not replicate everywhere
-    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
-
-    // in order to keep input array unchanged, create new tmp array by coping
-    CSRSparseMatrix<ValueType> tmpAdjM( adjM );
-    tmpAdjM.replicate();
+    SCAI_ASSERT_ERROR( distPtr->isBlockDistributed(comm), 
+        "Graph must have a block or general block distribution for this version of writeGraph" );
 
     std::ofstream fNew;
     std::string newFile = filename;
-    fNew.open(newFile);
+    fNew.open(newFile, std::ios::out);
 
     if(not fNew.is_open()){
         throw std::runtime_error("File "+ newFile+ " could not be opened");
     }
 
+    //write header
     if(comm->getRank()==root) {
-        SCAI_REGION("FileIO.writeGraph.writeInFile");
-
-        const scai::lama::CSRStorage<ValueType>& localAdjM = tmpAdjM.getLocalStorage();
-        const scai::hmemo::ReadAccess<IndexType> rGlobalIA( localAdjM.getIA() );
-        const scai::hmemo::ReadAccess<IndexType> rGlobalJA( localAdjM.getJA() );
-        const scai::hmemo::ReadAccess<ValueType> rGlobalVal( localAdjM.getValues() );
-
-        // first line is number of nodes and edges
-        IndexType cols= tmpAdjM.getNumColumns();
-        fNew << cols <<" "<< tmpAdjM.getNumValues()/2;
+        // first line is the number of nodes and edges
+        fNew << globalN <<" "<< globalM/2; //graph is undirected
         if(edgeWeights) {
             fNew << " 001";
         }
         fNew<< std::endl;
-
-        // globlaIA.size() = globalN+1
-        SCAI_ASSERT_EQ_ERROR( rGlobalIA.size(), globalN+1, "Wrong globalIA size.");
-        for(IndexType i=0; i< globalN; i++) {       // for all local nodes
-            for(IndexType j= rGlobalIA[i]; j<rGlobalIA[i+1]; j++) {            // for all the edges of a node
-                SCAI_ASSERT_LE_ERROR( rGlobalJA[j], globalN, rGlobalJA[j] << " must be < "<< globalN );
-                if(!edgeWeights) {
-                    fNew << rGlobalJA[j]+1 << " ";
-                } else {
-                    fNew << rGlobalJA[j]+1 << " "<< rGlobalVal[j]<< " ";
-                }
-            }
-            fNew << std::endl;
-        }
     }
+
+    //wait root to write header
+    comm->synchronize();
     fNew.close();
 
+    //find in which order are the rows distributed.
+    //We may have a general block distribution but that does not necessarily mean that
+    //the first rows are in PE 0, the next in PE 1 etc. It can be that rows from 0 to X 
+    //are in  PE 5, rows X+1 till Y in PE 2 etc.
+
+    const IndexType myFirstGlobalIndex = distPtr->local2Global(0);
+
+    std::vector<IndexType> allFirstIndices(numPEs,0);
+    allFirstIndices[thisPE] = myFirstGlobalIndex;
+    comm->sumImpl(allFirstIndices.data(), allFirstIndices.data(), numPEs, scai::common::TypeTraits<IndexType>::stype);
+
+    std::vector<IndexType> peIndices(numPEs);
+    std::iota( peIndices.begin(), peIndices.end(), 0);
+    // sort PE indices according to their starting global index
+    std::sort(peIndices.begin(), peIndices.end(), [&allFirstIndices](IndexType a, IndexType b) {
+        return allFirstIndices[a] < allFirstIndices[b];
+    });
+
+    const IndexType myTurn = peIndices[thisPE];
+
+    IndexType globalCurrentLine = 1;// 0 is the header
+
+    for(IndexType p=0; p<numPEs; p++){
+        SCAI_REGION("FileIO.writeGraph.writeInFile");
+        if( myTurn==p){
+            fNew.open(newFile, std::ios::app); //append
+
+            const scai::lama::CSRStorage<ValueType>& localAdjM = adjM.getLocalStorage();
+            const scai::hmemo::ReadAccess<IndexType> rLocalIA( localAdjM.getIA() );
+            const scai::hmemo::ReadAccess<IndexType> rLocalJA( localAdjM.getJA() );
+            const scai::hmemo::ReadAccess<ValueType> rLocalVal( localAdjM.getValues() );
+
+            SCAI_ASSERT_EQ_ERROR( globalCurrentLine-1, myFirstGlobalIndex, "Wrong line number for PE " << thisPE );
+
+            for(IndexType i=0; i<rLocalIA.size()-1; i++) {       // for all local nodes
+                for(IndexType j= rLocalIA[i]; j<rLocalIA[i+1]; j++) {    // for all the edges of a node
+                    //SCAI_ASSERT_LE_ERROR( rGlobalJA[j], globalN, rGlobalJA[j] << " must be < "<< globalN );
+                    if(!edgeWeights) {
+                        fNew << rLocalJA[j]+1 << " ";
+                    } else {
+                        fNew << rLocalJA[j]+1 << " "<< rLocalVal[j]<< " ";
+                    }
+                }
+                fNew << std::endl;
+                globalCurrentLine++;
+            }
+        }else{
+            //all non-writing PEs
+            //globalCurrentLine=0;
+        }
+        globalCurrentLine = comm->max(globalCurrentLine); //could also do a broadcast
+        //^^ also works as a barrier
+    }
+    fNew.close();
 }
 //-------------------------------------------------------------------------------------------------
 
