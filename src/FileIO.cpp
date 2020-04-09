@@ -64,15 +64,16 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     CSRSparseMatrix<ValueType> tmpAdjM( adjM );
     tmpAdjM.replicate();
 
+    std::ofstream fNew;
+    std::string newFile = filename;
+    fNew.open(newFile);
+
+    if(not fNew.is_open()){
+        throw std::runtime_error("File "+ newFile+ " could not be opened");
+    }
+
     if(comm->getRank()==root) {
         SCAI_REGION("FileIO.writeGraph.writeInFile");
-        std::ofstream fNew;
-        std::string newFile = filename;
-        fNew.open(newFile);
-
-        if(not fNew.is_open()){
-            throw std::runtime_error("File "+ newFile+ " could not be opened");
-        }
 
         const scai::lama::CSRStorage<ValueType>& localAdjM = tmpAdjM.getLocalStorage();
         const scai::hmemo::ReadAccess<IndexType> rGlobalIA( localAdjM.getIA() );
@@ -100,9 +101,9 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
             }
             fNew << std::endl;
         }
- 
-        fNew.close();
     }
+    fNew.close();
+
 }
 //-------------------------------------------------------------------------------------------------
 

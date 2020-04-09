@@ -107,13 +107,13 @@ TYPED_TEST(GraphUtilsTest, testReindexCut) {
     //graph.checkSettings();
     EXPECT_TRUE( graph.isConsistent() );
     EXPECT_TRUE( graph.checkSymmetry() );
+    EXPECT_TRUE( graph.getRowDistributionPtr()->isBlockDistributed(comm) );
     EXPECT_NEAR( l2Norm, graph.l2Norm(), 1e-5 );
 
     partition.redistribute( newGenBlockDist );
     DenseVector<IndexType> reIndexedPartition = partition;
 
     ASSERT_TRUE(reIndexedPartition.getDistributionPtr()->isEqual(*newGenBlockDist));
-
 
     ValueType secondCut = GraphUtils<IndexType, ValueType>::computeCut(graph, reIndexedPartition, true);
     ValueType secondImbalance = GraphUtils<IndexType, ValueType>::computeImbalance( reIndexedPartition, k );
