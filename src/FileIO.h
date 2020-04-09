@@ -57,7 +57,11 @@ public:
      * @param[in] adjM The graph's adjacency matrix.
      * @param[in] filename The file's name to write to.
      */
-    static void writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename, const bool edgeWeights = false);
+    static void writeGraph (
+        const CSRSparseMatrix<ValueType> &adjM,
+        const std::string filename,
+        const bool edgeWeights = false,
+        const bool binary = false);
 
     /** Given an adjacency matrix and a filename writes the local part of matrix in the file using the METIS format.
      * Every PE writes its local data in a separate file by adding its rank in the end of the file name.
