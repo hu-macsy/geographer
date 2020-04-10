@@ -40,9 +40,21 @@ int main(int argc, char** argv) {
     std::string inFilename = argv[3];
     std::string outFilename = argv[4];
 
+	std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
+	
     std::vector<scai::lama::DenseVector<ValueType>> coordsOrig = ITI::FileIO<IndexType, ValueType>::readCoords( inFilename, globalN, dimensions);
 
+	std::chrono::duration<double> readTime = std::chrono::steady_clock::now() - startTime;
+    if( thisPE==0 ) {
+        std::cout<< "Read coords in time " << readTime.count() << std::endl;
+    }
+	
     ITI::FileIO<IndexType, ValueType>::writeCoordsParallel( coordsOrig, outFilename);
 
+	std::chrono::duration<double> totalTime = std::chrono::steady_clock::now() - startTime;
+    if( thisPE==0 ) {
+        std::cout<< "Wrote binary coords in time " << totalTime.count() - readTime.count() << std::endl;
+		std::cout<< "Coords stored in file " << outFilename << std::endl;
+    }
 }
 
