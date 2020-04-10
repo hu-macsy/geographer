@@ -60,8 +60,8 @@ public:
     static void writeGraph (
         const CSRSparseMatrix<ValueType> &adjM,
         const std::string filename,
-        const bool edgeWeights = false,
-        const bool binary = false);
+        const bool binary = false,
+        const bool edgeWeights = false);
 
     /** Given an adjacency matrix and a filename writes the local part of matrix in the file using the METIS format.
      * Every PE writes its local data in a separate file by adding its rank in the end of the file name.
@@ -102,8 +102,7 @@ public:
     */
     static void writeCoordsParallel(
         const std::vector<DenseVector<ValueType>> &coords,
-        const std::string filename,
-        const bool overwriteExisting=true);
+        const std::string filename);
 
     /** Each PE writes its own part of the coordinates in a separate file called filename_X.xyz where X is the rank of the PE,
      * i.e., a number from 0 until the total number of PEs-1.
