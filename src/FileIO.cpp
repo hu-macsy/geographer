@@ -26,6 +26,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <iterator>
 #include <map>
 #include <tuple>
@@ -47,7 +48,11 @@ const IndexType fileTypeVersionNumber= 3;
  */
 
 template<typename IndexType, typename ValueType>
-void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename, const bool edgeWeights) {
+void FileIO<IndexType, ValueType>::writeGraph (
+    const CSRSparseMatrix<ValueType> &adjM,
+    const std::string filename,
+    const bool edgeWeights,
+    const bool binary) {
     SCAI_REGION( "FileIO.writeGraph" )
 
     const scai::dmemo::CommunicatorPtr comm = adjM.getRowDistributionPtr()->getCommunicatorPtr();
@@ -57,6 +62,7 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
     const IndexType root =0;
     const scai::dmemo::DistributionPtr distPtr = adjM.getRowDistributionPtr();
     const IndexType globalN = distPtr->getGlobalSize();
+    const IndexType localN = distPtr->getLocalSize();
     const IndexType globalM = adjM.getNumValues();
     assert(globalN==adjM.getNumRows());
 
@@ -65,20 +71,34 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
 
     std::ofstream fNew;
     std::string newFile = filename;
-    fNew.open(newFile, std::ios::out);
-
+    if( binary ){
+        fNew.open(newFile, std::ios::binary | std::ios::out);
+    }else{
+        fNew.open(newFile, std::ios::out);
+    }
     if(not fNew.is_open()){
         throw std::runtime_error("File "+ newFile+ " could not be opened");
     }
 
+    //used only for binary
+    typedef unsigned long int ULONG;
+
     //write header
     if(comm->getRank()==root) {
-        // first line is the number of nodes and edges
-        fNew << globalN <<" "<< globalM/2; //graph is undirected
-        if(edgeWeights) {
-            fNew << " 001";
+        if( binary){
+            const ULONG fileTypeVersionNumber = 3; //not sure why 4...
+            fNew.write((char*)(&fileTypeVersionNumber), sizeof( ULONG ));
+            fNew.write((char*)(&globalN), sizeof( ULONG ));
+            ULONG M = globalM/2;
+            fNew.write((char*)(&M), sizeof( ULONG ));
+        }else{
+            // first line is the number of nodes and edges
+            fNew << globalN <<" "<< globalM/2; //graph is undirected
+            if(edgeWeights) {
+                fNew << " 001";
+            }
+            fNew<< std::endl;
         }
-        fNew<< std::endl;
     }
 
     //wait root to write header
@@ -105,38 +125,75 @@ void FileIO<IndexType, ValueType>::writeGraph (const CSRSparseMatrix<ValueType> 
 
     const IndexType myTurn = peIndices[thisPE];
 
-    IndexType globalCurrentLine = 1;// 0 is the header
+    //write the node degrees for binary format
+    if(binary){
+        std::vector<ULONG> localNodeDegrees(localN);
+        const scai::lama::CSRStorage<ValueType>& localAdjM = adjM.getLocalStorage();
+        const scai::hmemo::ReadAccess<IndexType> rLocalIA( localAdjM.getIA() );
+        for( IndexType i=0; i<rLocalIA.size()-1; i++){
+            localNodeDegrees[i] = (ULONG) (rLocalIA[i+1]-rLocalIA[i]);
+        }
+        fNew.open(newFile, std::ios::binary | std::ios::app);
+        for(IndexType p=0; p<numPEs; p++){
+            if( myTurn==p){
+                fNew.write( (char*)(localNodeDegrees.data()), localN*sizeof(ULONG));
+            }
+            comm->synchronize();
+        }
+        PRINT0("node degrees written");
+    }
+
+    //
+    //prepare the actual edges
+    //
+
+    std::stringstream ssBuffer;
+    std::vector<ULONG> binaryBuffer();
+
+    {
+        const scai::lama::CSRStorage<ValueType>& localAdjM = adjM.getLocalStorage();
+        const scai::hmemo::ReadAccess<IndexType> rLocalIA( localAdjM.getIA() );
+        const scai::hmemo::ReadAccess<IndexType> rLocalJA( localAdjM.getJA() );
+        const scai::hmemo::ReadAccess<ValueType> rLocalVal( localAdjM.getValues() );
+
+        if(binary){
+
+        }else{
+            for(IndexType i=0; i<rLocalIA.size()-1; i++) {       // for all local nodes
+                for(IndexType j= rLocalIA[i]; j<rLocalIA[i+1]; j++) {    // for all the edges of a node
+                    if(!edgeWeights) {
+                        ssBuffer << rLocalJA[j]+1 << " ";
+                    } else {
+                        ssBuffer << rLocalJA[j]+1 << " "<< rLocalVal[j]<< " ";
+                    }
+                }
+                ssBuffer << std::endl;
+            }
+        }
+    }
+
+    //
+    //write in file per PE
+    //
+
+    IndexType globalCurrentLine = 0;
 
     for(IndexType p=0; p<numPEs; p++){
         SCAI_REGION("FileIO.writeGraph.writeInFile");
         if( myTurn==p){
+            SCAI_ASSERT_EQ_ERROR( globalCurrentLine, myFirstGlobalIndex, "Wrong line number for PE " << thisPE );
             fNew.open(newFile, std::ios::app); //append
-
-            const scai::lama::CSRStorage<ValueType>& localAdjM = adjM.getLocalStorage();
-            const scai::hmemo::ReadAccess<IndexType> rLocalIA( localAdjM.getIA() );
-            const scai::hmemo::ReadAccess<IndexType> rLocalJA( localAdjM.getJA() );
-            const scai::hmemo::ReadAccess<ValueType> rLocalVal( localAdjM.getValues() );
-
-            SCAI_ASSERT_EQ_ERROR( globalCurrentLine-1, myFirstGlobalIndex, "Wrong line number for PE " << thisPE );
-
-            for(IndexType i=0; i<rLocalIA.size()-1; i++) {       // for all local nodes
-                for(IndexType j= rLocalIA[i]; j<rLocalIA[i+1]; j++) {    // for all the edges of a node
-                    //SCAI_ASSERT_LE_ERROR( rGlobalJA[j], globalN, rGlobalJA[j] << " must be < "<< globalN );
-                    if(!edgeWeights) {
-                        fNew << rLocalJA[j]+1 << " ";
-                    } else {
-                        fNew << rLocalJA[j]+1 << " "<< rLocalVal[j]<< " ";
-                    }
-                }
-                fNew << std::endl;
-                globalCurrentLine++;
-            }
+            fNew << ssBuffer.str();
+            fNew.close();
         }else{
-            //all non-writing PEs
-            //globalCurrentLine=0;
+            //all non-writing PEs do nothing
         }
-        globalCurrentLine = comm->max(globalCurrentLine); //could also do a broadcast
-        //^^ also works as a barrier
+
+        globalCurrentLine += localN;
+        comm->bcast( &globalCurrentLine, 1, thisPE ); //just for the assertion
+        //^^ should also works as a barrier?
+        //without this, the file is not created properly; bcast does not act as a barrier?
+        comm->synchronize();
     }
     fNew.close();
 }

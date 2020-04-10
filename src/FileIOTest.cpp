@@ -85,8 +85,8 @@ TYPED_TEST(FileIOTest, testWriteMetis_Dist_3D) {
 TYPED_TEST(FileIOTest, testReadAndWriteGraphFromFile) {
     using ValueType = TypeParam;
 
-    //std::string file = "Grid8x8";
-    std::string file = "slowrot-00000.graph";
+    std::string file = "Grid8x8";
+    //std::string file = "slowrot-00000.graph";
     std::string filename= FileIOTest<ValueType>::graphPath + file;
     CSRSparseMatrix<ValueType> Graph;
 
