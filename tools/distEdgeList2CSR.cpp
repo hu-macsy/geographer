@@ -44,7 +44,6 @@ int main(int argc, char** argv) {
         std::cout<< "Read distributed edge list in time " << readListTime.count() << std::endl;
     }
 	
-	
     if( not graph.isConsistent() ){
         throw std::runtime_error("Graph is not consistent; maybe corrupted edge list files?"); 
     }

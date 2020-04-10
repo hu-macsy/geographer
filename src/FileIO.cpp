@@ -67,6 +67,7 @@ void FileIO<IndexType, ValueType>::writeGraph (
     const IndexType localN = distPtr->getLocalSize();
     const IndexType globalM = adjM.getNumValues();
     assert(globalN==adjM.getNumRows());
+    assert(localN==adjM.getLocalNumRows());
 
     SCAI_ASSERT_ERROR( distPtr->isBlockDistributed(comm), 
         "Graph must have a block or general block distribution for this version of writeGraph" );
@@ -186,6 +187,7 @@ std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { 
         const scai::hmemo::ReadAccess<IndexType> rLocalIA( localAdjM.getIA() );
         const scai::hmemo::ReadAccess<IndexType> rLocalJA( localAdjM.getJA() );
         const scai::hmemo::ReadAccess<ValueType> rLocalVal( localAdjM.getValues() );
+        assert( localN==rLocalIA.size()-1 );
 
         if(binary){
             IndexType edgeInd =0;
@@ -229,16 +231,13 @@ std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { 
                 fNew.open(newFile, std::ios::app); //append
                 fNew << ssBuffer.str();
                 fNew.close();
+                globalCurrentLine += localN;
             }
         }else{
             //all non-writing PEs do nothing
         }
-
-        globalCurrentLine += localN;
-        comm->bcast( &globalCurrentLine, 1, thisPE ); //just for the assertion
-        //^^ should also works as a barrier?
-        //without this, the file is not created properly; bcast does not act as a barrier?
-        comm->synchronize();
+        globalCurrentLine = comm->max(globalCurrentLine); //just for the assertion
+        //^^ also works as a barrier
     }
     fNew.close();
 }
