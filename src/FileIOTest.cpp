@@ -144,6 +144,71 @@ TYPED_TEST(FileIOTest, testReadAndWriteGraphFromFile) {
 }
 //-----------------------------------------------------------------
 
+TYPED_TEST(FileIOTest, testReadAndWriteBinaryGraphFromFile) {
+    using ValueType = TypeParam;
+
+    std::string file = "Grid8x8";
+    //std::string file = "slowrot-00000.graph";
+    std::string filename= FileIOTest<ValueType>::graphPath + file;
+    CSRSparseMatrix<ValueType> Graph;
+
+    std::ifstream f(filename);
+    IndexType nodes, edges;
+    //In the METIS format the two first number in the file are the number of nodes and edges
+    f >>nodes >> edges;
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist( new scai::dmemo::NoDistribution( nodes ));
+
+    // read graph from file
+    {
+        SCAI_REGION("testReadAndWriteGraphFromFile.readGraphFromFile");
+        Graph = FileIO<IndexType, ValueType>::readGraph(filename);
+    }
+    EXPECT_EQ(Graph.getNumColumns(), Graph.getNumRows());
+    EXPECT_EQ(nodes, Graph.getNumColumns());
+    EXPECT_EQ(edges, (Graph.getNumValues())/2 );
+
+    std::string fileTo= FileIOTest<ValueType>::graphPath + std::string("MY_") + file+".bgf";
+
+    // write the graph you read in a new file
+    FileIO<IndexType, ValueType>::writeGraph(Graph, fileTo, true, false );
+
+    if(comm->getRank()==0 ) {
+        std::cout<< "Output written in file: "<< fileTo<< std::endl;
+    }
+
+    comm->synchronize();
+
+    // read new graph from the new file we just wrote
+    ITI::Format format = ITI::Format::BINARY;
+    CSRSparseMatrix<ValueType> Graph2 = FileIO<IndexType, ValueType>::readGraph( fileTo, comm, format );
+
+    // check that the two graphs are identical
+
+    EXPECT_EQ(Graph.getNumValues(), Graph2.getNumValues() );
+    EXPECT_EQ(Graph.l2Norm(), Graph2.l2Norm() );
+    EXPECT_EQ(Graph2.getNumValues(), Graph2.l1Norm() );
+    EXPECT_EQ( Graph.getNumRows(), Graph2.getNumColumns() );
+
+    // check every element of the  graphs
+    {
+        SCAI_REGION("testReadAndWriteGraphFromFile.checkArray");
+        const CSRStorage<ValueType>& localStorage = Graph.getLocalStorage();
+        scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+
+        const CSRStorage<ValueType>& localStorage2 = Graph2.getLocalStorage();
+        scai::hmemo::ReadAccess<ValueType> values2(localStorage2.getValues());
+
+        EXPECT_EQ( values.size(), values2.size() );
+
+        for(IndexType i=0; i< values.size(); i++) {
+            EXPECT_EQ( values[i], values2[i] );
+        }
+    }
+}
+//-----------------------------------------------------------------
+
 TYPED_TEST(FileIOTest, testWriteGraphWithEdgeWeights) {
     using ValueType = TypeParam;
     const IndexType N = 10;

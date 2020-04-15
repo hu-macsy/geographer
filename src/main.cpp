@@ -366,10 +366,11 @@ int main(int argc, char** argv) {
                 //
 
                 //printVectorMetrics( metricsVec, outF );
-                std::cout<< "Output information written to file " << outFile << " in total time " << totalT << std::endl;
-            }	else	{
+                std::cout<< "Output information written to file " << outFile  << std::endl;
+            }else{
                 std::cout<< "Could not open file " << outFile << " information not stored"<< std::endl;
             }
+            std::cout<< "Total time " << totalT << std::endl;
         }
     }
 
