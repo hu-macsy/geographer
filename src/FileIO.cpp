@@ -1175,7 +1175,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMa
     scai::common::Settings::putEnvironment( "SCAI_IO_TYPE_DATA", "_Pattern" );
 
     if(file.fail())
-        throw std::runtime_error("Could not open file "+ filename + ".");
+        throw std::runtime_error("Could not open file "+ filename);
 
     //skip the first lines that have comments starting with '%'
     std::string line;
@@ -1215,7 +1215,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
     std::ifstream file(filename, flags);
 
     if(file.fail())
-        throw std::runtime_error("Could not open file "+ filename + ".");
+        throw std::runtime_error("Could not open file "+ filename);
 
     ULLI globalM, globalN;
 
@@ -1400,12 +1400,12 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
     std::ifstream file(filename);
 
     if(file.fail())
-        throw std::runtime_error("Could not open file "+ filename + ".");
+        throw std::runtime_error("Could not open file "+ filename);
 
     std::string line;
     bool read = !std::getline(file, line).fail();
     if (!read) {
-        throw std::runtime_error("Could not read first line of " + filename + ".");
+        throw std::runtime_error("Could not read first line of " + filename);
     }
 
     std::stringstream ss( line );
