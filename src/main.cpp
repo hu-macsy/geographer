@@ -81,6 +81,8 @@ int main(int argc, char** argv) {
     //
     // generate or read graph and coordinates
     //
+    
+    std::chrono::time_point<std::chrono::steady_clock> beforeRead = std::chrono::steady_clock::now();
 
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<scai::lama::DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
@@ -95,6 +97,11 @@ int main(int argc, char** argv) {
     settings.isValid = settings.checkValidity(comm);
     if( !settings.isValid ){
        throw std::runtime_error("Settings struct is not valid, check the input parameter values.");
+    }
+
+    std::chrono::duration<double> readTime =  std::chrono::steady_clock::now() - beforeRead;
+    if( comm->getRank()==0) {
+        std::cout << "Time to read/create input: " << readTime.count() << std::endl;
     }
     
     //---------------------------------------------------------------
