@@ -27,12 +27,12 @@ template <typename IndexType, typename ValueType>
 class GraphUtils {
 public:
     /**
-     * Reindexes the nodes of the input graph to form a BlockDistribution. No redistribution of the graph happens, only the indices are changed.
-     * After this method is run, the input graph has a BlockDistribution.
+     * Redistributes the nodes of the input graph to form a GenBlockDistribution.
+     * After this method is finished, the input graph has a GenBlockDistribution.
      *
      * @param[in,out] the graph
      *
-     * @return A block-distributed vector containing the old local indices
+     * @return A  general block-distributed vector containing the old local indices
      of this PE
      */
     static scai::dmemo::DistributionPtr genBlockRedist(scai::lama::CSRSparseMatrix<ValueType> &graph);
@@ -292,9 +292,20 @@ public:
 
     	@param[in] adjM The input graph (ignores direction)
     	@param[out] maxDegree The maximum degree of the graph
-    	@return The local part of an edge list representation. return.size()==adjM.getLocalNumValues()/2. Global size==graph.getNumValues()/2.
+    	@return The local part of an edge list representation. return.size()==adjM.getLocalNumValues(). Global size==graph.getNumValues().
     */
-    static std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local(const scai::lama::CSRSparseMatrix<ValueType>& adjM, IndexType& maxDegree=0);
+    static std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_repl(const scai::lama::CSRSparseMatrix<ValueType>& adjM, IndexType& maxDegree=0);
+
+    /** Converts the local part of the CSR matrix to an edge list  where node IDs are global.
+
+        @param[in] adjM The input graph (ignores direction)
+        @param[out] maxDegree The maximum degree of the graph
+        @return The local part of an edge list representation. return.size()==adjM.getLocalNumValues(). Global size==graph.getNumValues().
+    */
+    static std::vector<std::tuple<IndexType,IndexType,ValueType>> localCSR2GlobalEdgeList(
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        IndexType &maxDegree);
+
 
     /** @brief Construct the Laplacian of the input matrix. May contain parallel communication.
      *

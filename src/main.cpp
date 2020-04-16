@@ -81,6 +81,8 @@ int main(int argc, char** argv) {
     //
     // generate or read graph and coordinates
     //
+    
+    std::chrono::time_point<std::chrono::steady_clock> beforeRead = std::chrono::steady_clock::now();
 
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<scai::lama::DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
@@ -92,9 +94,14 @@ int main(int argc, char** argv) {
     if( settings.setAutoSettings ){
         settings = settings.setDefault( graph );
     }
-    settings.isValid = settings.checkValidity();
+    settings.isValid = settings.checkValidity(comm);
     if( !settings.isValid ){
        throw std::runtime_error("Settings struct is not valid, check the input parameter values.");
+    }
+
+    std::chrono::duration<double> readTime =  std::chrono::steady_clock::now() - beforeRead;
+    if( comm->getRank()==0) {
+        std::cout << "Time to read/create input: " << readTime.count() << std::endl;
     }
     
     //---------------------------------------------------------------
@@ -366,10 +373,11 @@ int main(int argc, char** argv) {
                 //
 
                 //printVectorMetrics( metricsVec, outF );
-                std::cout<< "Output information written to file " << outFile << " in total time " << totalT << std::endl;
-            }	else	{
+                std::cout<< "Output information written to file " << outFile  << std::endl;
+            }else{
                 std::cout<< "Could not open file " << outFile << " information not stored"<< std::endl;
             }
+            std::cout<< "Total time " << totalT << std::endl;
         }
     }
 
@@ -426,7 +434,7 @@ int main(int argc, char** argv) {
         PRINT0("PE graph stored in " << filename );
     }
 
-getFreeRam(comm);
+    //getFreeRam(comm);
     
     if (vm.count("callExit")) {
         //this is needed for supermuc

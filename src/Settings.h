@@ -128,7 +128,7 @@ inline std::ostream& operator<<(std::ostream& out, Format method) {
 - zoltanMJ Partition a point set (no graph is needed) using the Multijagged algorithm of zoltan2.
 - zoltanMJ Partition a point set (no graph is needed) using the space filling curves algorithm of zoltan2.
 */
-enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, parMetisRefine, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, parhipFastMesh, parhipUltraFastMesh, parhipEcoMesh, myAlgo, none, unknown};
+enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, parMetisRefine, zoltanRIB, zoltanRCB, zoltanMJ, zoltanXPulp, zoltanSFC, parhipFastMesh, parhipUltraFastMesh, parhipEcoMesh, myAlgo, none, unknown};
 
 
 std::istream& operator>>(std::istream& in, ITI::Tool& tool);
@@ -147,7 +147,7 @@ std::string getCallingCommand( const int argc, char** argv );
 */
 struct Settings {
     Settings();
-    bool checkValidity();
+    bool checkValidity(const scai::dmemo::CommunicatorPtr comm );
 
     /** @name General partition settings
     */
@@ -267,8 +267,8 @@ struct Settings {
     //calculate expensive performance metrics?
     bool computeDiameter = false;			///< if the diameter should be computed (can be expensive)
     IndexType maxDiameterRounds = 2;		///< max number of rounds to approximate the diameter
-    IndexType maxCGIterations = 3000;        ///< max number of iterations of the CG solver in metrics
-    double CGResidual = 1e-4;
+    IndexType maxCGIterations = 300;        ///< max number of iterations of the CG solver in metrics
+    double CGResidual = 1e-6;
     //@}
 
     /** @name Various parameters
