@@ -38,6 +38,8 @@ using scai::hmemo::HArray;
 namespace ITI {
 
 const IndexType fileTypeVersionNumber= 3;
+typedef unsigned long int ULONG;
+typedef unsigned long long int ULLI;
 
 //-------------------------------------------------------------------------------------------------
 /*Given the adjacency matrix it writes it in the file "filename" using the METIS format. In the
@@ -51,9 +53,9 @@ template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writeGraph (
     const CSRSparseMatrix<ValueType> &adjM,
     const std::string filename,
-    const bool edgeWeights,
-    const bool binary) {
-    SCAI_REGION( "FileIO.writeGraph" )
+    const bool binary,
+    const bool edgeWeights) {
+    SCAI_REGION( "FileIO.writeGraph" );
 
     const scai::dmemo::CommunicatorPtr comm = adjM.getRowDistributionPtr()->getCommunicatorPtr();
     const IndexType thisPE = comm->getRank();
@@ -65,33 +67,27 @@ void FileIO<IndexType, ValueType>::writeGraph (
     const IndexType localN = distPtr->getLocalSize();
     const IndexType globalM = adjM.getNumValues();
     assert(globalN==adjM.getNumRows());
+    assert(localN==adjM.getLocalNumRows());
 
     SCAI_ASSERT_ERROR( distPtr->isBlockDistributed(comm), 
         "Graph must have a block or general block distribution for this version of writeGraph" );
 
     std::ofstream fNew;
     std::string newFile = filename;
-    if( binary ){
-        fNew.open(newFile, std::ios::binary | std::ios::out);
-    }else{
-        fNew.open(newFile, std::ios::out);
-    }
-    if(not fNew.is_open()){
-        throw std::runtime_error("File "+ newFile+ " could not be opened");
-    }
-
-    //used only for binary
-    typedef unsigned long int ULONG;
 
     //write header
     if(comm->getRank()==root) {
-        if( binary){
-            const ULONG fileTypeVersionNumber = 3; //not sure why 4...
+        if( binary ){
+            fNew.open(newFile, std::ios::binary | std::ios::out);
+            //const ULONG N = distPtr->getGlobalSize();
+            //const ULONG M = adjM.getNumValues()/2;
+            //fNew.write((char*)(&M), sizeof( ULONG ));
             fNew.write((char*)(&fileTypeVersionNumber), sizeof( ULONG ));
             fNew.write((char*)(&globalN), sizeof( ULONG ));
             ULONG M = globalM/2;
             fNew.write((char*)(&M), sizeof( ULONG ));
         }else{
+            fNew.open(newFile, std::ios::out);
             // first line is the number of nodes and edges
             fNew << globalN <<" "<< globalM/2; //graph is undirected
             if(edgeWeights) {
@@ -100,7 +96,11 @@ void FileIO<IndexType, ValueType>::writeGraph (
             fNew<< std::endl;
         }
     }
-
+/*
+    if(not fNew.is_open()){
+        throw std::runtime_error("File "+ newFile+ " could not be opened");
+    }
+*/
     //wait root to write header
     comm->synchronize();
     fNew.close();
@@ -126,13 +126,45 @@ void FileIO<IndexType, ValueType>::writeGraph (
     const IndexType myTurn = peIndices[thisPE];
 
     //write the node degrees for binary format
+    std::vector<ULONG> localNodeDegrees; //used later for assertions
     if(binary){
-        std::vector<ULONG> localNodeDegrees(localN);
+        /* first 3 numbers is the header (already written) and then, there are n number,
+            where number i indicate where the edges of the vertex i begin in the file 
+            (this number is used in the binary reader to do an fseek())
+            For example, for vertex 0, the edges start at position n+3,
+            for vertex 1 start at n+3+deg(0),
+            for vertex v start at position n+3+"the sum of the degrees of all v-1 vertices"
+            (where v is the global id)
+        */
+        
+        //ULONG headerSize = 3;
+
+        localNodeDegrees.resize(localN);
         const scai::lama::CSRStorage<ValueType>& localAdjM = adjM.getLocalStorage();
         const scai::hmemo::ReadAccess<IndexType> rLocalIA( localAdjM.getIA() );
         for( IndexType i=0; i<rLocalIA.size()-1; i++){
-            localNodeDegrees[i] = (ULONG) (rLocalIA[i+1]-rLocalIA[i]);
+            localNodeDegrees[i] = (ULONG) rLocalIA[i+1];
         }
+
+        const IndexType localM = adjM.getLocalNumValues();
+        SCAI_ASSERT_EQ_ERROR( localNodeDegrees.back(), localM, "Wrong degrees prefix sum");
+
+        //get a prefix sum of the local number of edges of each PE
+        std::vector<ULONG> localMPrefixSum(numPEs+1, 0);
+        localMPrefixSum[thisPE+1] = localM;
+        comm->sumImpl(localMPrefixSum.data(), localMPrefixSum.data(), numPEs+1, scai::common::TypeTraits<ULONG>::stype);
+        for(IndexType i=0; i<numPEs; i++){
+            localMPrefixSum[i+1] += localMPrefixSum[i];
+        }
+        SCAI_ASSERT_EQ_ERROR( localMPrefixSum.back(), globalM, "Wrong degrees prefix sum in PE " << thisPE);
+//
+//add the localM prefix sum to the degrees
+//
+const ULONG myOffset = localMPrefixSum[thisPE];
+std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { d+=myOffset;});
+//is this needed?
+
+        //add the size of the header and all the previous
         fNew.open(newFile, std::ios::binary | std::ios::app);
         for(IndexType p=0; p<numPEs; p++){
             if( myTurn==p){
@@ -148,16 +180,23 @@ void FileIO<IndexType, ValueType>::writeGraph (
     //
 
     std::stringstream ssBuffer;
-    std::vector<ULONG> binaryBuffer();
+    std::vector<ULONG> binaryBuffer(adjM.getLocalNumValues());
 
     {
         const scai::lama::CSRStorage<ValueType>& localAdjM = adjM.getLocalStorage();
         const scai::hmemo::ReadAccess<IndexType> rLocalIA( localAdjM.getIA() );
         const scai::hmemo::ReadAccess<IndexType> rLocalJA( localAdjM.getJA() );
         const scai::hmemo::ReadAccess<ValueType> rLocalVal( localAdjM.getValues() );
+        assert( localN==rLocalIA.size()-1 );
 
         if(binary){
-
+            IndexType edgeInd =0;
+            for(IndexType i=0; i<rLocalIA.size()-1; i++) {       // for all local nodes
+                for(IndexType j= rLocalIA[i]; j<rLocalIA[i+1]; j++) {    // for all the edges of a node
+                    binaryBuffer[edgeInd++] = (ULONG) (rLocalJA[j]+1);
+                }
+            }
+            SCAI_ASSERT_EQ_ERROR( edgeInd, adjM.getLocalNumValues(), "fix edge index" );
         }else{
             for(IndexType i=0; i<rLocalIA.size()-1; i++) {       // for all local nodes
                 for(IndexType j= rLocalIA[i]; j<rLocalIA[i+1]; j++) {    // for all the edges of a node
@@ -181,19 +220,24 @@ void FileIO<IndexType, ValueType>::writeGraph (
     for(IndexType p=0; p<numPEs; p++){
         SCAI_REGION("FileIO.writeGraph.writeInFile");
         if( myTurn==p){
-            SCAI_ASSERT_EQ_ERROR( globalCurrentLine, myFirstGlobalIndex, "Wrong line number for PE " << thisPE );
-            fNew.open(newFile, std::ios::app); //append
-            fNew << ssBuffer.str();
-            fNew.close();
+            if( binary ){
+                fNew.open(newFile, std::ios::binary | std::ios::app); //append
+                fNew.write((char*) binaryBuffer.data(), binaryBuffer.size()*sizeof(ULONG) );
+                SCAI_ASSERT_EQ_ERROR( fNew.tellp(), (localNodeDegrees[thisPE+1]*2+3)*sizeof(ULONG) , "While writing edge list in parallel: Position in file " << filename << " for PE " << thisPE << " is not correct." );
+                fNew.close();
+            }
+            else{
+                SCAI_ASSERT_EQ_ERROR( globalCurrentLine, myFirstGlobalIndex, "Wrong line number for PE " << thisPE );
+                fNew.open(newFile, std::ios::app); //append
+                fNew << ssBuffer.str();
+                fNew.close();
+                globalCurrentLine += localN;
+            }
         }else{
             //all non-writing PEs do nothing
         }
-
-        globalCurrentLine += localN;
-        comm->bcast( &globalCurrentLine, 1, thisPE ); //just for the assertion
-        //^^ should also works as a barrier?
-        //without this, the file is not created properly; bcast does not act as a barrier?
-        comm->synchronize();
+        globalCurrentLine = comm->max(globalCurrentLine); //just for the assertion
+        //^^ also works as a barrier
     }
     fNew.close();
 }
@@ -254,7 +298,6 @@ void FileIO<IndexType, ValueType>::writeGraphAsEdgeList (const CSRSparseMatrix<V
     const IndexType globalEsgeListSize = comm->sum( edgeList.size() );
     SCAI_ASSERT_EQ_ERROR( numEdges, globalEsgeListSize, "Global number of edges seems wrong" );
 
-    typedef unsigned long int ULONG;
     //TODO: we can also directly use the edgeList...
     std::vector<std::vector<ULONG>> nodeList(2, std::vector<ULONG>(localNumEdges));
 
@@ -287,7 +330,6 @@ void FileIO<IndexType, ValueType>::writeGraphAsEdgeList (const CSRSparseMatrix<V
             if( p==0 ) {
                 outfile.open(filename.c_str(), std::ios::binary | std::ios::out);
                 //write header
-                const ULONG fileTypeVersionNumber = 3; //not sure why 4...
                 outfile.write((char*)(&fileTypeVersionNumber), sizeof( ULONG ));
                 outfile.write((char*)(&numNodes), sizeof( ULONG ));
                 outfile.write((char*)(&numEdgesUL), sizeof( ULONG ));
@@ -412,8 +454,7 @@ void FileIO<IndexType, ValueType>::writeCoords (const std::vector<DenseVector<Va
 template<typename IndexType, typename ValueType>
 void FileIO<IndexType, ValueType>::writeCoordsParallel(
     const std::vector<DenseVector<ValueType>> &coords,
-    const std::string outFilename,
-    const bool overwriteExisting) {
+    const std::string outFilename) {
 
     const IndexType dimension = coords.size();
 
@@ -451,11 +492,7 @@ void FileIO<IndexType, ValueType>::writeCoordsParallel(
     for(IndexType p=0; p<numPEs; p++) { // numPE rounds, in each round only one PE writes its part
         if( comm->getRank()==p ) {
             if( p==0 ) {
-                if( overwriteExisting ){
-                    outfile.open(outFilename.c_str(), std::ios::binary | std::ios::out);
-                }else{
-                    outfile.open(outFilename.c_str(), std::ios::binary | std::ios::app);
-                }
+                outfile.open(outFilename.c_str(), std::ios::binary | std::ios::out);
             } else {
                 // if not the first PE then append to file
                 outfile.open(outFilename.c_str(), std::ios::binary | std::ios::app);
@@ -752,8 +789,6 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     std::ifstream file(filename);
 
-    typedef unsigned long long int ULLI;
-
     if (file.fail()) {
         throw std::runtime_error("Reading graph from " + filename + " failed.");
     } else {
@@ -970,8 +1005,6 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBinary(const std::string filename, const scai::dmemo::CommunicatorPtr comm) {
     SCAI_REGION("FileIO.readGraphBinary")
 
-    typedef unsigned long int ULONG;
-
     // root PE reads header and broadcasts information to the other PEs
     IndexType headerSize = 3;   // as used in KaHiP::parallel_graph_io.cpp
     std::vector<ULONG> header(headerSize, 0);
@@ -1142,7 +1175,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphMa
     scai::common::Settings::putEnvironment( "SCAI_IO_TYPE_DATA", "_Pattern" );
 
     if(file.fail())
-        throw std::runtime_error("Could not open file "+ filename + ".");
+        throw std::runtime_error("Could not open file "+ filename);
 
     //skip the first lines that have comments starting with '%'
     std::string line;
@@ -1177,14 +1210,12 @@ template<typename IndexType, typename ValueType>
 scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeList(const std::string filename, const scai::dmemo::CommunicatorPtr comm, const bool binary) {
     SCAI_REGION( "FileIO.readEdgeList" );
 
-    typedef unsigned long long int ULLI;
-
     const auto flags = binary ? std::ios::in | std::ios::binary : std::ios::in;
     const IndexType headerSize = 2;
     std::ifstream file(filename, flags);
 
     if(file.fail())
-        throw std::runtime_error("Could not open file "+ filename + ".");
+        throw std::runtime_error("Could not open file "+ filename);
 
     ULLI globalM, globalN;
 
@@ -1331,7 +1362,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
     std::vector< std::pair<IndexType, IndexType>> edgeList;
 
     if (file.fail()) {
-        PRINT("Read from multiple files, one file per PE");
+        PRINT0("Read from multiple files, one file per PE");
         throw std::runtime_error("Reading graph from " + thisFileName + " failed for PE" + std::to_string(thisPE) );
     } else {
         if( comm->getRank()==0 ) {
@@ -1369,12 +1400,12 @@ std::vector<DenseVector<ValueType> > FileIO<IndexType, ValueType>::readCoordsOce
     std::ifstream file(filename);
 
     if(file.fail())
-        throw std::runtime_error("Could not open file "+ filename + ".");
+        throw std::runtime_error("Could not open file "+ filename);
 
     std::string line;
     bool read = !std::getline(file, line).fail();
     if (!read) {
-        throw std::runtime_error("Could not read first line of " + filename + ".");
+        throw std::runtime_error("Could not read first line of " + filename);
     }
 
     std::stringstream ss( line );
@@ -1584,8 +1615,6 @@ template<typename IndexType, typename ValueType>
 std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBinary( std::string filename, const IndexType numberOfPoints, const IndexType dimension, const scai::dmemo::CommunicatorPtr comm) {
     SCAI_REGION( "FileIO.readCoordsBinary" );
 
-    typedef unsigned long int UINT; // maybe IndexType is not big enough for file position
-
     const IndexType globalN= numberOfPoints;
     std::ifstream file(filename);
 
@@ -1615,9 +1644,8 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
         throw std::runtime_error("Number of dimensions not supported.");
     }
 
-    const UINT beginLocalCoords = beginLocalRange*maxDimension;
-    //const UINT endLocalCoords = endLocalRange*maxDimension;
-    const UINT localTotalNumOfCoords = localN*maxDimension;
+    const ULONG beginLocalCoords = beginLocalRange*maxDimension;
+    const ULONG localTotalNumOfCoords = localN*maxDimension;
 
     SCAI_ASSERT_EQ_ERROR( globalN, comm->sum(localN), "Mismatch in total number of coordinates" );
     SCAI_ASSERT_EQ_ERROR( globalN, comm->sum(localTotalNumOfCoords)/maxDimension, "Mismatch in total number of coordinates" );
@@ -1643,7 +1671,7 @@ std::vector<DenseVector<ValueType>> FileIO<IndexType, ValueType>::readCoordsBina
             //std::cout << "Process " << thisPE << " reading from " << beginLocalCoords << " to " << endLocalCoords << ", in total, localNumCoords= " << localTotalNumOfCoords << " coordinates and " << (localTotalNumOfCoords)*sizeof(ValueType) << " bytes." << std::endl;
 
             SCAI_REGION_START("FileIO.readCoordsBinary.fileRead" );
-            const UINT startPos = beginLocalCoords*sizeof(double);
+            const ULONG startPos = beginLocalCoords*sizeof(double);
             double* localPartOfCoords = new double[localTotalNumOfCoords];
             file.seekg(startPos);
             file.read( (char *)(localPartOfCoords), (localTotalNumOfCoords)*sizeof(double) );

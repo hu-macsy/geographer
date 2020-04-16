@@ -35,8 +35,15 @@ int main(int argc, char** argv) {
         std::cout<< "Will read from file" << filename << std::endl;
     }
 
+	std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
+	
     const scai::lama::CSRSparseMatrix<ValueType> graph = ITI::FileIO<IndexType,ValueType>::readEdgeListDistributed( filename, comm );
 
+	std::chrono::duration<double> readListTime = std::chrono::steady_clock::now() - startTime;
+    if( thisPE==0 ) {
+        std::cout<< "Read distributed edge list in time " << readListTime.count() << std::endl;
+    }
+	
     if( not graph.isConsistent() ){
         throw std::runtime_error("Graph is not consistent; maybe corrupted edge list files?"); 
     }
@@ -50,6 +57,11 @@ int main(int argc, char** argv) {
 
     ITI::FileIO<IndexType,ValueType>::writeGraph( graph, outFile, false);
 
+	std::chrono::duration<double> totalTime = std::chrono::steady_clock::now() - startTime;
+    if( thisPE==0 ) {
+        std::cout<< "Wrote csr file in time " << totalTime.count() - readListTime.count() << std::endl;
+    }
+	
     return 0;
 }
 
