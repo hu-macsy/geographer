@@ -377,8 +377,11 @@ int main(int argc, char** argv) {
             }else{
                 std::cout<< "Could not open file " << outFile << " information not stored"<< std::endl;
             }
-            std::cout<< "Total time " << totalT << std::endl;
         }
+    }
+
+    if( comm->getRank()==0) {
+        std::cout<< "Total time " << totalT << std::endl;
     }
 
 

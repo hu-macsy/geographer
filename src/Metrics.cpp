@@ -565,7 +565,17 @@ std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime(
     CSRSparseMatrix<ValueType> identity;
     identity.setIdentity(rowDist);
     //the laplacian
+
+std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
+
     scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian(graph);
+
+std::chrono::duration<double> endTime = std::chrono::steady_clock::now() - startTime;
+double totalTimeLapl= comm->max(endTime.count() );
+if( comm->getRank()==0 ) {
+    std::cout<< " time to construct laplacian in " << totalTimeLapl << " seconds " << std::endl;
+}
+
     //add the identity matrix to make the laplacian positive definite
     laplacian += identity;
 
