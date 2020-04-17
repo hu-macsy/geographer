@@ -109,7 +109,10 @@ endif()
 
 
 ### get git commit ###
-execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND git rev-parse --short HEAD 
+    OUTPUT_VARIABLE GIT_COMMIT 
+    OUTPUT_STRIP_TRAILING_WHITESPACE 
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 add_definitions("-DBUILD_COMMIT=${GIT_COMMIT}")
 message("\n\tgit commit is " ${GIT_COMMIT} "\n")
 add_definitions("-Wall -Wno-sign-compare")
