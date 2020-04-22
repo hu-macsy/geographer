@@ -516,8 +516,14 @@ TYPED_TEST(FileIOTest, testReadBlockSizes) {
     std::string blocksFile = path + "blockSizes.txt";
 
     std::vector<std::vector<ValueType>> blockSizes = FileIO<IndexType,ValueType>::readBlockSizes(blocksFile, 16);
-
+	SCAI_ASSERT( blockSizes.size()==1, "Wrong number of weights, should be 1 but is " << blockSizes.size() );
     SCAI_ASSERT( blockSizes[0].size()==16, "Wrong number of blocks, should be 16 but is " << blockSizes.size() );
+	
+	blocksFile = path + "blockSizes_2w.txt";
+	
+	std::vector<std::vector<ValueType>> blockSizes2 = FileIO<IndexType,ValueType>::readBlockSizes(blocksFile, 16, 2);
+	SCAI_ASSERT( blockSizes2.size()==2, "Wrong number of weights, should be 2 but is " << blockSizes2.size() );
+    SCAI_ASSERT( blockSizes2[0].size()==16, "Wrong number of blocks, should be 16 but is " << blockSizes2.size() );
 
 }
 //-------------------------------------------------------------------------------------------------

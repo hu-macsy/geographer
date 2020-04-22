@@ -1065,7 +1065,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             std::ifstream file;
             file.open(filename.c_str(), std::ios::binary | std::ios::in);
 
-std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
+			//std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
 
             ia.resize( localN +1);
             ia[0]=0;

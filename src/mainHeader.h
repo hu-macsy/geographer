@@ -404,15 +404,20 @@ std::vector<std::vector<vType>> calculateLoadRequests(const scai::dmemo::Communi
     }
 
     //memory
-
-    const unsigned long myFreeRam = getFreeRam(comm);
+	//TODO: remove hardcoded long int size
+    const unsigned long myFreeRam = getFreeRam(comm)/sizeof(long int); //value returned in bytes; convert to vertex size 
 
     std::vector<vType> allFreeRam(numPEs, 0.0);
     allFreeRam[rank] = (vType) myFreeRam;
 
-    //replicate all frequencies in all PEs
+    //replicate all memory capacities in all PEs
     comm->sumImpl( retWeights[1].data(), allFreeRam.data(), numPEs, scai::common::TypeTraits<vType>::stype );
-
+	
+	
+	for( int i=0; i<numPEs; i++){
+	PRINT0( i << ": cpu " << retWeights[0][i] << ", free ram " << retWeights[1][i] );	
+	}
+	
     return retWeights;
 }
 

@@ -122,8 +122,9 @@ int main(int argc, char** argv) {
     } else if( vm.count("blockSizesFile") ) {
         //blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
         blockSizesFile = vm["blockSizesFile"].as<std::string>();
-        std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
-
+        std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks, settings.numNodeWeights );
+		SCAI_ASSERT( blockSizes.size()==settings.numNodeWeights, "Wrong number of weights, should be " << settings.numNodeWeights << " but is " << blockSizes.size() );
+		
         if (blockSizes.size() < nodeWeights.size()) {
             throw std::invalid_argument("Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
                                         + "but nodes have " + std::to_string(nodeWeights.size()) + " weights.");
