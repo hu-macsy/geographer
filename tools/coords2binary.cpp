@@ -23,14 +23,20 @@ int main(int argc, char** argv) {
 
     if( argc!=5 ) {
         if( thisPE==0 ) {
-            std::cout<< "Wrong number of parameter given: " << argc << std::endl;
+            //std::cout<< "Wrong number of parameter given: " << argc << std::endl;
+            std::cout << "params are: ";
+            for(int i=0; i<argc; i++){
+                std::cout << std::string( argv[i]) << ", ";
+            }
+             std::cout << std::endl;
+             throw std::runtime_error("Wrong number of parameter given: " + std::to_string(argc) );
         }
         return 0;
     }
 
     IndexType dimensions = std::stoi( argv[1] );
     if( dimensions<=0 ) {
-        PRINT0("wrong number of dimensions: " << dimensions);
+        throw std::runtime_error("wrong number of dimensions: " + std::to_string(dimensions) );
     }
 
     //IndexType globalN = std::strtol( argv[2] );
@@ -43,6 +49,12 @@ int main(int argc, char** argv) {
 	std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 	
     std::vector<scai::lama::DenseVector<ValueType>> coordsOrig = ITI::FileIO<IndexType, ValueType>::readCoords( inFilename, globalN, dimensions);
+
+    if(dimensions==2){
+        auto distPtr = coordsOrig[0].getDistributionPtr();
+        coordsOrig.push_back( 
+            scai::lama::DenseVector<ValueType>( distPtr, 0.0) );
+    }
 
 	std::chrono::duration<double> readTime = std::chrono::steady_clock::now() - startTime;
     if( thisPE==0 ) {
