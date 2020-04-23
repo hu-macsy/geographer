@@ -1713,6 +1713,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierarchicalPartition
     const CommTree<IndexType,ValueType> &commTree,
     Settings settings,
     Metrics<ValueType>& metrics) {
+    SCAI_REGION("KMeans.computeHierarchicalPartition");
 
     typedef cNode<IndexType,ValueType> cNode;
 
@@ -1890,6 +1891,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierPlusRepart(
     const CommTree<IndexType,ValueType> &commTree,
     Settings settings,
     Metrics<ValueType>& metrics) {
+    SCAI_REGION("KMeans.computeHierPlusRepart");
 
     // get a hierarchical partition
     DenseVector<IndexType> result = computeHierarchicalPartition(coordinates, nodeWeights, commTree, settings, metrics);
@@ -1917,6 +1919,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
     const std::vector<std::vector<ValueType>> &blockSizes,
     const Settings settings,
     Metrics<ValueType>& metrics){
+    SCAI_REGION("KMeans.computePartition_targetBalance");
 
     const scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
     std::vector<DenseVector<ValueType>> nodeWeightCopy(1);
@@ -2058,6 +2061,7 @@ template<typename IndexType, typename ValueType>
 std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::computeMembership(
     const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering){
 
+    SCAI_REGION("KMeans.computeMembership");
     const IndexType localN = fuzzyClustering.size();
     const IndexType vectorSize = fuzzyClustering[0].size();
     
@@ -2108,6 +2112,7 @@ std::vector<ValueType> KMeans<IndexType,ValueType>::computeMembershipOneValueNor
     const DenseVector<IndexType>& partition,
     const IndexType numBlocks){
 
+    SCAI_REGION("KMeans.computeMembershipOneValueNormalized");
     const scai::dmemo::CommunicatorPtr comm = partition.getDistributionPtr()->getCommunicatorPtr();
     const IndexType localN = partition.getLocalValues().size();
 
@@ -2144,7 +2149,7 @@ std::vector<ValueType> KMeans<IndexType,ValueType>::computeMembershipOneValueNor
 
 
 //TODOs: consider the "local imbalance" of each block? If a PE has 20% of a block
-//  it should not make many moves/changes. Less than a PE that has 60% of the
+//  it should not make many moves/changes; less than a PE that has 60% of the
 //  same block
 
 template<typename IndexType, typename ValueType>
@@ -2155,19 +2160,22 @@ int KMeans<IndexType,ValueType>::refineForBalance(
     DenseVector<IndexType>& partition,
     const Settings settings){
 
+    SCAI_REGION("KMeans.refineForBalance");
     const scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
-
     const IndexType numWeights = nodeWeights.size();
     const IndexType localN = coordinates[0].getLocalValues().size();
     const IndexType numBlocks = settings.numBlocks;
+    const IndexType centersToUse = 6; //TODO: turn that to an user parameter?
     assert( targetBlockWeights.size()==numWeights);
     assert( targetBlockWeights[0].size()==numBlocks);
 
-    const std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzyClustering = fuzzify( coordinates, nodeWeights, partition, settings);
+    //get a fuzzy clustering, a vector for each local point with length centersToUse
+    const std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzyClustering = fuzzify( coordinates, nodeWeights, partition, settings, centersToUse);
     assert( fuzzyClustering.size()==localN );
 
     //the size of its fuzziness vector
     const IndexType fuzzSize = fuzzyClustering[0].size();
+    assert( fuzzSize==centersToUse );
 
     const std::vector<ValueType> mship = computeMembershipOneValueNormalized( fuzzyClustering, partition, numBlocks);
     assert( mship.size()==localN );
@@ -2257,15 +2265,12 @@ int KMeans<IndexType,ValueType>::refineForBalance(
 
     const IndexType numPointsToCheck = comm->min(localN);
 
-
     //here we store the difference to the block weight caused y each move
     std::vector<std::vector<ValueType>> blockWeightDifference(numWeights, std::vector<ValueType>(numBlocks, 0.0));
     
     const IndexType batchSize = localN*settings.batchPercent + 1;
     bool meDone = false;
     IndexType i=0;
-
-    
 
     IndexType numRound = 0;
     IndexType maxRounds = 3;
@@ -2292,9 +2297,6 @@ int KMeans<IndexType,ValueType>::refineForBalance(
         }
         const ValueType thisBlockNewMaxImbalance = *std::max_element( thisBlockNewImbalances.begin(), thisBlockNewImbalances.end());
         SCAI_ASSERT_LE_ERROR( thisBlockNewMaxImbalance, maxImbalancePerBlock[myBlock], "Since we remove, imbalance value should be reduced");
-
-//PRINT(comm->getRank() << ": removing point "<< thisInd << " from block " << myBlock << " changes the imbalance from " << maxImbalancePerBlock[myBlock] << " to " << thisBlockNewMaxImbalance );
-
 
         //TODO: check what happens if we forbid moves from under-weighted blocks
 
@@ -2426,7 +2428,8 @@ PRINT0( comm->getRank() << " +++ " << w <<", "<< b << ": " << blockWeights[w][b]
                 //reset local block weight differences
                 std::fill( blockWeightDifference[w].begin(), blockWeightDifference[w].end(), 0.0);    
             }
-for (IndexType b=0; b<numBlocks; b++) {                
+            
+for (IndexType b=0; b<numBlocks; b++) {
     PRINT0(b <<": max imbalance " << maxImbalancePerBlock[b]);
 }            
 
@@ -2490,6 +2493,7 @@ std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::getGlobalBlockW
     const std::vector<std::vector<ValueType>> &nodeWeights,
     const DenseVector<IndexType>& partition){
 
+    SCAI_REGION("KMeans.getGlobalBlockWeight");
     const IndexType numWeights = nodeWeights.size();
     const IndexType localN = nodeWeights[0].size();
     assert( partition.getLocalValues().size()==localN);

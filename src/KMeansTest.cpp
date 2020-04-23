@@ -604,10 +604,7 @@ using ValueType = TypeParam;
         ValueType imba = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks, nodeWeights[w], targetBlockWeights[w]);
     PRINT0( w << ": " << imba );
     }
-
-
 }
-
 
 
 TYPED_TEST(KMeansTest, testSortingForRefineForBalance) {
