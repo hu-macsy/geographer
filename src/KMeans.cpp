@@ -1972,7 +1972,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
     DenseVector<IndexType> bestResult = result;
     
     for(int i=0; i<numTries; i++){
-        PRINT0("\tRepartition for epsilon= " << settingsCopy.epsilon << " and sampling nodes= " << settingsCopy.minSamplingNodes );
+        PRINT0("\tRepartition for epsilon= " << settingsCopy.epsilon );
         //result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinates, nodeWeights, blockSizes, result, settingsCopy); 
 
         ITI::KMeans<IndexType,ValueType>::rebalance(coordinates, nodeWeights, blockSizes, result, settingsCopy); 
@@ -2303,9 +2303,6 @@ void KMeans<IndexType,ValueType>::rebalance(
     bool allDone = false;
     IndexType localI=0;
 
-    IndexType numRound = 0;
-    IndexType maxRounds = 3;
-
     //for all local nodes until all points are checked
     while( not allDone ){
         const IndexType thisInd = indices[localI];
@@ -2396,7 +2393,6 @@ void KMeans<IndexType,ValueType>::rebalance(
 
             //if this candidate block offers a better imbalance
             if( bestBlockMaxNewImbalance>maxNewImbalanceNewBlock ){
-//PRINT0(comm->getRank() << ": moving "<< thisInd << " from " << myBlock << " to " << candidateBlock<< " and new min imbalance= " << maxNewImbalanceNewBlock );
                 //from all the moves that improve the imbalance, keep the one that improves it the most
                 //check also if the change in this possible block is less
                 bestBlockMaxNewImbalance = maxNewImbalanceNewBlock;
@@ -2461,23 +2457,14 @@ void KMeans<IndexType,ValueType>::rebalance(
                     if( imbalancesPerBlock[w][b]>maxImbalancePerBlock[b] ) {
                         maxImbalancePerBlock[b] = imbalancesPerBlock[w][b];
                     }
-//PRINT0( comm->getRank() << " +++ " << w <<", "<< b << ": " << blockWeights[w][b] << " __  diff= " << blockWeightDifference[w][b] << " imbalance= " << maxImbalancePerBlock[b]);
-                }    
+                }
 
                 //reset local block weight differences
                 std::fill( blockWeightDifference[w].begin(), blockWeightDifference[w].end(), 0.0);
             }
 
-for (IndexType b=0; b<numBlocks; b++) {
-    //PRINT0(b <<": max imbalance " << maxImbalancePerBlock[b]);
-}            
-
-            //TODO: check if the following works better
-            //resort local points based on new global weights
-            //recalculate and re-sort local points???
-            //std::sort(indices.begin(), indices.end(), sortFunction );
-            //i=0; //restart
-            //numRound++;
+            //TODO: check if resorting local points based on new global weights
+            //and restarting would benefit
         }
 
         //exit condition
