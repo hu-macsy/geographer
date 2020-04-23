@@ -606,7 +606,9 @@ using ValueType = TypeParam;
     }
 }
 
-
+/* Calculate a partition and its fuzyness. Store to files and use
+the tools/visualizeMship.ipynb notebook to visualize them
+*/
 TYPED_TEST(KMeansTest, testSortingForRefineForBalance) {
 
 using ValueType = TypeParam;
@@ -646,7 +648,7 @@ using ValueType = TypeParam;
     }
     DenseVector<IndexType> partition = KMeans<IndexType,ValueType>::computePartition(coordinates, nodeWeights, targetBlockWeights, settings, metrics);
 
-    std::string partOutFile = "/home/harry/geographer/tools/mshipSort.part";
+    std::string partOutFile = "./testing/mshipSort.part";
     ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
 
     //KMeans<IndexType,ValueType>::refineForBalance( coordinates, nodeWeights, targetBlockWeights, partition, settings);
@@ -659,9 +661,8 @@ using ValueType = TypeParam;
 
     std::vector<IndexType> mshipInt( mship.size(), 0.0 );
     std::transform( mship.begin(), mship.end(), mshipInt.begin(), std::bind(std::multiplies<ValueType>(), std::placeholders::_1, 100) );
-    //DenseVector<ValueType> allMships( partition.getDistributionPtr(), scai::hmemo::HArray<ValueType>( localN, mship.data()) );
     DenseVector<IndexType> allMships( partition.getDistributionPtr(), scai::hmemo::HArray<IndexType>( localN, mshipInt.data()) );
-    FileIO<IndexType,ValueType>::writeDenseVectorCentral( allMships, "/home/harry/geographer/tools/mships.txt");
+    FileIO<IndexType,ValueType>::writeDenseVectorCentral( allMships, "./testing/mships.txt");
 
 }
 

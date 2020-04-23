@@ -2274,7 +2274,7 @@ int KMeans<IndexType,ValueType>::refineForBalance(
         return fI>fJ;
     };
     
-    auto sortFunction = lexSort;
+    auto sortFunction = squaredImbaSort;
 
     std::vector<IndexType> indices(localN);
     std::iota(indices.begin(), indices.end(), 0);
