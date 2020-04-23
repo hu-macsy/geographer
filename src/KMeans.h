@@ -187,6 +187,9 @@ static DenseVector<IndexType> computePartition_targetBalance(
     @param[in] centerInfluence The weight/influence of each center that is used to calculate
     the effective distance as: effDist = dist(p,c)*influence(c). centerInfluence.size()= the number
     of node weights and centerInfluence[i]=number of blocks
+
+    @return One entry for every local point. each entry has size centerToUse and stores a pair:
+    first is the distance value, second is the center that realizes this distance
 */
 
 static std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzify( 
@@ -195,14 +198,14 @@ static std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzify(
     const DenseVector<IndexType>& partition,
     const std::vector<ValueType>& centerInfluence,
     const Settings settings,
-    const IndexType centerToUse=4);
+    const IndexType centersToUse=6);
 
 static std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzify( 
     const std::vector<DenseVector<ValueType>>& coordinates,
     const std::vector<DenseVector<ValueType>>& nodeWeights,
     const DenseVector<IndexType>& partition,
     const Settings settings,
-    const IndexType centerToUse=4);
+    const IndexType centersToUse=6);
 
 /**
     Compute the membership values of every local point provided a fuzzy clustering vector.

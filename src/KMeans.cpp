@@ -669,9 +669,9 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
         IndexType balancedBlocks = 0;
 
         scai::hmemo::ReadAccess<IndexType> rOldBlock(oldBlock.getLocalValues());
-        scai::hmemo::WriteAccess<IndexType> wAssignment(assignment.getLocalValues());
         {
             SCAI_REGION("KMeans.assignBlocks.balanceLoop.assign");
+            scai::hmemo::WriteAccess<IndexType> wAssignment(assignment.getLocalValues());
             // for the sampled range
             for (Iterator it = firstIndex; it != lastIndex; it++) {
                 const IndexType i = *it;
@@ -875,9 +875,10 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
         // update bounds
         {
             SCAI_REGION("KMeans.assignBlocks.balanceLoop.updateBounds");
+            scai::hmemo::ReadAccess<IndexType> rAssignement(assignment.getLocalValues());
             for (Iterator it = firstIndex; it != lastIndex; it++) {
                 const IndexType i = *it;
-                const IndexType cluster = wAssignment[i];
+                const IndexType cluster = rAssignement[i];
                 const IndexType veryLocalI = std::distance(firstIndex, it);// maybe optimize?
                 ValueType newInfluenceEffect = 0;
                 for (IndexType j = 0; j < numNodeWeights; j++) {
@@ -930,23 +931,22 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
 
         iter++;
 
-        if (settings.verbose) {
-            const IndexType takenLoops = currentLocalN - skippedLoops;
-            const ValueType averageComps = ValueType(totalComps) / currentLocalN;
+        if (settings.verbose ) {
+
             std::vector<ValueType> influenceSpread(numNodeWeights);
             for (IndexType i = 0; i < numNodeWeights; i++) {
                 const auto pair = std::minmax_element(influence[i].begin(), influence[i].end());
                 influenceSpread[i] = *pair.second / *pair.first;
-if (comm->getRank() == 0) { 
-    std:: cout<< "max influence= " << *pair.second << ", min influence= " << *pair.first << std::endl;
-    std::cout << "all influences and block sizes:"<< std::endl;
-    assert( influence.size()==blockWeights.size() );
-    ValueType optWeight = targetBlockWeights[i][0];
-    std::cout<< "opt weight " << optWeight << std::endl;
-    for( unsigned int ii=0; ii<influence[i].size(); ii++ ){
-        std::cout << ii << ": " << influence[i][ii] << ", " << blockWeights[i][ii] << std::endl;
-    }
-}
+                if (comm->getRank() == 0 and settings.debugMode) { 
+                    std:: cout<< "max influence= " << *pair.second << ", min influence= " << *pair.first << std::endl;
+                    std::cout << "all influences and block sizes:"<< std::endl;
+                    assert( influence.size()==blockWeights.size() );
+                    ValueType optWeight = targetBlockWeights[i][0];
+                    std::cout<< "opt weight " << optWeight << std::endl;
+                    for( unsigned int ii=0; ii<influence[i].size(); ii++ ){
+                        std::cout << ii << ": " << influence[i][ii] << ", " << blockWeights[i][ii] << std::endl;
+                    }
+                }
             }
 
             std::vector<ValueType> weightSpread(numNodeWeights);
@@ -957,6 +957,8 @@ if (comm->getRank() == 0) {
 
             std::chrono::duration<ValueType,std::ratio<1>> balanceTime = std::chrono::high_resolution_clock::now() - balanceStart;
             totalBalanceTime += balanceTime.count();
+            const IndexType takenLoops = currentLocalN - skippedLoops;
+            const ValueType averageComps = ValueType(totalComps) / currentLocalN;
 
             auto oldprecision = std::cout.precision(3);
             if (comm->getRank() == 0) {
@@ -1213,7 +1215,6 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
         }
     }
 
-
     //
     // copy coordinates
     //
@@ -1332,8 +1333,6 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     std::vector<ValueType> imbalances(numNodeWeights, 1);
     std::vector<ValueType> imbalancesOld(numNodeWeights, 0);
 
-//std::vector<std::vector<ValueType>> influence(numNodeWeights, std::vector<ValueType>(totalNumNewBlocks, 1));
-
     // result[i]=b, means that point i belongs to cluster/block b
     DenseVector<IndexType> result(coordinates[0].getDistributionPtr(), 0);
     DenseVector<IndexType> mostBalancedResult(coordinates[0].getDistributionPtr(), 0);
@@ -1358,7 +1357,6 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
             std::sort(localIndices.begin(), lastIndex);// sorting not really necessary, but increases locality
             [[maybe_unused]] ValueType ratio = ValueType(comm->sum(samples[iter])) / globalN;
             assert(ratio <= 1);
-
         } else {
             SCAI_ASSERT_EQ_ERROR(lastIndex - firstIndex, localN, "invalid iterators");
             assert(lastIndex == localIndices.end());
@@ -1382,11 +1380,10 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
 
             //TODO: merge to one assertion; or not...
             if( std::is_same<ValueType,float>::value ){
-                //SCAI_ASSERT_LE_ERROR(totalSampledWeightSum, nodeWeightSum[i]*(1+1e-4), "Error in sampled weight sum.");
+                //  SCAI_ASSERT_LE_ERROR(totalSampledWeightSum, nodeWeightSum[i]*(1+1e-4), "Error in sampled weight sum.");
             }else{  //double
                 SCAI_ASSERT_LE_ERROR(totalSampledWeightSum, nodeWeightSum[i]*(1+1e-8), "Error in sampled weight sum.");
             }
-
 
             for (IndexType j = 0; j < targetBlockWeights[i].size(); j++) {
                 adjustedBlockSizes[i][j] = ValueType(targetBlockWeights[i][j]) * ratio;
@@ -1401,8 +1398,6 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
         std::vector<ValueType> timePerPE(comm->getSize(), 0.0);
 
         result = assignBlocks(convertedCoords, centers1DVector, blockSizesPrefixSum, firstIndex, lastIndex, convertedNodeWeights, normalizedNodeWeights, result, partition, adjustedBlockSizes, boundingBox, upperBoundOwnCenter, lowerBoundNextCenter, influence, imbalances, settings, metrics);
-
-        scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
 
         // TODO: too much info? remove?
         if (settings.verbose and settings.debugMode) {
@@ -1475,6 +1470,8 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
 
         {
             SCAI_REGION("KMeans.computePartition.updateBounds");
+            scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
+
             for (auto it = firstIndex; it != lastIndex; it++) {
                 const IndexType i = *it;
                 IndexType cluster = rResult[i];
@@ -1515,12 +1512,15 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
 
         // find local weight of each block
         std::vector<std::vector<ValueType>> currentBlockWeights(numNodeWeights, std::vector<ValueType>(totalNumNewBlocks,0.0));
-        for (IndexType j = 0; j < numNodeWeights; j++) {
-            scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[j].getLocalValues());
-            for (auto it = firstIndex; it != lastIndex; it++) {
-                const IndexType i = *it;
-                IndexType cluster = rResult[i];
-                currentBlockWeights[j][cluster] += rWeights[i];
+        {
+            scai::hmemo::ReadAccess<IndexType> rResult(result.getLocalValues());
+            for (IndexType j = 0; j < numNodeWeights; j++) {
+                scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[j].getLocalValues());
+                for (auto it = firstIndex; it != lastIndex; it++) {
+                    const IndexType i = *it;
+                    IndexType cluster = rResult[i];
+                    currentBlockWeights[j][cluster] += rWeights[i];
+                }
             }
         }
 
@@ -1577,9 +1577,12 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
         }
         imbalancesOld = imbalances;
         
-        if(settings.keepMostBalanced){
-            ValueType currMinImbalance = *std::min_element( imbalances.begin(), imbalances.end() );
-            ValueType currMaxImbalance = *std::max_element( imbalances.begin(), imbalances.end() );
+        //we must have sampled all indices, otherwise a solution will be a partial
+        //assignment as the not sampled indices will belong to block 0 (from the initialization)
+
+        if(settings.keepMostBalanced  and lastIndex == localIndices.end() ){
+            const ValueType currMinImbalance = *std::min_element( imbalances.begin(), imbalances.end() );
+            const ValueType currMaxImbalance = *std::max_element( imbalances.begin(), imbalances.end() );
 
             //if only one weight, keep the solution with minimum imbalance
             if( numNodeWeights<2 and currMinImbalance<minImbalance ){
@@ -1587,7 +1590,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
                     std::cout <<"Storing most balanced solution with minimum imbalance " << currMinImbalance << std::endl;
                 }
                 mostBalancedResult.assign(result);
-                minImbalance = currMinImbalance;               
+                minImbalance = currMinImbalance;
             }
 
             //for more weights, try to keep solution that fulfills all balance constrains first
@@ -1611,8 +1614,8 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
                 }
             }
         }
-        //metrics.kmeansProfiling.push_back(std::make_tuple(delta, maxTime, imbalances[0]));
 
+        //metrics.kmeansProfiling.push_back(std::make_tuple(delta, maxTime, imbalances[0]));
         iter++;
 
     } while (iter < samplingRounds or (iter < maxIterations && (delta > threshold || !balanced)));
@@ -1931,41 +1934,57 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
     result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinates, nodeWeightCopy, blockSizes, settingsCopy, metrics);
 
     PRINT0( std::endl<< "Repartitioning"<< std::endl );
-    //settingsCopy.numNodeWeights = 2;
-    //nodeWeightCopy.push_back(nodeWeights[1] );
     
-    //result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinates, nodeWeightCopy, blockSizes, result, settingsCopy);  
-    //PRINT0( std::endl<< "Repartitioning"<< std::endl );
-
     settingsCopy.minSamplingNodes = -1;
-    //result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinates, nodeWeights, blockSizes, result, settingsCopy);  
-    
     //settingsCopy.minSamplingNodes = 200;
 
-    DenseVector<IndexType> bestResult = result;
-    std::vector<ValueType> imbalances(1, settingsCopy.numNodeWeights);
-    ValueType maxMinImbalance = 1;
-    IndexType numTries = 5;
-    IndexType currWeights = 2;
-    settingsCopy.epsilon =  settings.epsilon + numTries*0.01;
+    //
+    //calculate max imbalance of the input,  maybe the initial partition is balanced enough
+    //
 
+
+    std::vector<ValueType> imbalances(1, settingsCopy.numNodeWeights);
+    for(int w=0; w<settingsCopy.numNodeWeights; w++){
+        imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, settingsCopy.numBlocks, nodeWeightCopy[w], blockSizes[w] );
+    }
+    ValueType maxCurrImbalance = *std::max_element( imbalances.begin(), imbalances.end() );
+    const ValueType targetImbalance = settings.epsilon;
+    ValueType imbalanceDiff = maxCurrImbalance - targetImbalance;
+
+    if( imbalanceDiff<0){
+        PRINT0("Partition is already balanced enough; will try to lower imbalance further");
+        //TODO: maybe return directly?
+        imbalanceDiff *= -1; //improve further
+    }else if(imbalanceDiff==0){
+        imbalanceDiff = 0.00001;
+    }else{
+        imbalanceDiff *= 1.2; // add 20% to give some slack
+    }
+    IndexType numTries = 5;
+    const ValueType imbaDelta = imbalanceDiff/numTries; //how much to reduce epsilon
+
+    ValueType maxMinImbalance = maxCurrImbalance;
+    IndexType currWeights = 2; //in the beginning, consider this many weights and add the other later
+    settingsCopy.epsilon =  maxCurrImbalance; //settings.epsilon + numTries*0.01;
+
+    DenseVector<IndexType> bestResult = result;
+    
     for(int i=0; i<numTries; i++){
-        //settingsCopy.minSamplingNodes *= 2;
         PRINT0("\tRepartition for epsilon= " << settingsCopy.epsilon << " and sampling nodes= " << settingsCopy.minSamplingNodes );
         result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinates, nodeWeights, blockSizes, result, settingsCopy); 
 
-        std::vector<ValueType> imbalances(settingsCopy.numNodeWeights);
         for(int w=0; w<settingsCopy.numNodeWeights; w++){
             imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, settingsCopy.numBlocks, nodeWeightCopy[w], blockSizes[w] );
         }
-        ValueType maxCurrImbalance = *std::max_element( imbalances.begin(), imbalances.end() );
+         maxCurrImbalance = *std::max_element( imbalances.begin(), imbalances.end() );
+
         if( maxCurrImbalance<maxMinImbalance){
             PRINT0("\tStoring solution with maximum imbalance " << maxCurrImbalance );
             bestResult = result;
             maxMinImbalance = maxCurrImbalance;
         }
-        
-        settingsCopy.epsilon -= 0.01;
+
+        settingsCopy.epsilon -= imbaDelta;
         if(currWeights<nodeWeights.size()){
             //TODO: this copies the weights every time, use pointers?
             nodeWeightCopy.push_back( nodeWeights[currWeights] );
@@ -1973,6 +1992,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
         }
     }
 
+    PRINT0("Returning partition with imbalance " << maxMinImbalance );
     return bestResult;
     
 }//computePartition_targetBalance
@@ -2544,7 +2564,6 @@ std::pair<std::vector<ValueType>,std::vector<ValueType>> KMeans<IndexType,ValueT
 //
 // instantiations
 //
-
 
 template class KMeans<IndexType, double>;
 template class KMeans<IndexType, float>;
