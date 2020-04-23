@@ -242,21 +242,15 @@ static std::vector<ValueType> computeMembershipOneValueNormalized(
 
 
 /** Given a partitioned input, move points to other blocks to improve imbalance.
+
+@param[in/out] partition The partition of the points to be refined
 */
-static int refineForBalance(
+static void rebalance(
     const std::vector<DenseVector<ValueType>> &coordinates,
     const std::vector<DenseVector<ValueType>> &nodeWeights,
     const std::vector<std::vector<ValueType>> &targetBlockWeights,
     DenseVector<IndexType>& partition,
     const Settings settings );
-
-/*
-static DenseVector<IndexType> refineForBalance(
-    const std::vector<DenseVector<ValueType>> &coordinates,
-    const std::vector<std::vector<ValueType>> &nodeWeights,
-    DenseVector<IndexType>& partition,
-    const Settings settings );
-*/
 
 
 /** @brief Version for hierarchical version. The returned centers now are a vector of vectors,

@@ -543,7 +543,7 @@ TYPED_TEST(KMeansTest, testMembership){
 
 
 
-TYPED_TEST(KMeansTest, testRefineForBalance) {
+TYPED_TEST(KMeansTest, testRebalance) {
 
 using ValueType = TypeParam;
 
@@ -597,7 +597,7 @@ using ValueType = TypeParam;
     }
 
 
-    KMeans<IndexType,ValueType>::refineForBalance( coordinates, nodeWeights, targetBlockWeights, partition, settings);
+    KMeans<IndexType,ValueType>::rebalance( coordinates, nodeWeights, targetBlockWeights, partition, settings);
     
     //aux<IndexType,ValueType>::print2DGrid( graph, partition );
     for (IndexType w=0; w<nodeWeights.size(); w++) {
@@ -609,7 +609,7 @@ using ValueType = TypeParam;
 /* Calculate a partition and its fuzyness. Store to files and use
 the tools/visualizeMship.ipynb notebook to visualize them
 */
-TYPED_TEST(KMeansTest, testSortingForRefineForBalance) {
+TYPED_TEST(KMeansTest, testSortingForRebalance) {
 
 using ValueType = TypeParam;
 
@@ -651,7 +651,6 @@ using ValueType = TypeParam;
     std::string partOutFile = "./testing/mshipSort.part";
     ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
 
-    //KMeans<IndexType,ValueType>::refineForBalance( coordinates, nodeWeights, targetBlockWeights, partition, settings);
 
     const std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzyClustering = KMeans<IndexType,ValueType>::fuzzify( coordinates, nodeWeights, partition, settings);
     const std::vector<ValueType> mship = KMeans<IndexType,ValueType>::computeMembershipOneValueNormalized( fuzzyClustering, partition, settings.numBlocks);

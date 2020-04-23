@@ -12,6 +12,7 @@
 
 #include <scai/dmemo/NoDistribution.hpp>
 #include <scai/dmemo/GenBlockDistribution.hpp>
+#include <scai/dmemo/mpi/MPIException.hpp>
 
 #include "KMeans.h"
 #include "HilbertCurve.h"
@@ -19,6 +20,7 @@
 #include "quadtree/QuadNodeCartesianEuclid.h"
 // temporary, for debugging
 #include "FileIO.h"
+
 
 namespace ITI {
 
@@ -1971,7 +1973,9 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
     
     for(int i=0; i<numTries; i++){
         PRINT0("\tRepartition for epsilon= " << settingsCopy.epsilon << " and sampling nodes= " << settingsCopy.minSamplingNodes );
-        result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinates, nodeWeights, blockSizes, result, settingsCopy); 
+        //result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinates, nodeWeights, blockSizes, result, settingsCopy); 
+
+        ITI::KMeans<IndexType,ValueType>::rebalance(coordinates, nodeWeights, blockSizes, result, settingsCopy); 
 
         for(int w=0; w<settingsCopy.numNodeWeights; w++){
             imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, settingsCopy.numBlocks, nodeWeightCopy[w], blockSizes[w] );
@@ -2173,14 +2177,14 @@ std::vector<ValueType> KMeans<IndexType,ValueType>::computeMembershipOneValueNor
 //  same block
 
 template<typename IndexType, typename ValueType>
-int KMeans<IndexType,ValueType>::refineForBalance(
+void KMeans<IndexType,ValueType>::rebalance(
     const std::vector<DenseVector<ValueType>> &coordinates,
     const std::vector<DenseVector<ValueType>> &nodeWeights,
     const std::vector<std::vector<ValueType>> &targetBlockWeights,
     DenseVector<IndexType>& partition,
     const Settings settings){
 
-    SCAI_REGION("KMeans.refineForBalance");
+    SCAI_REGION("KMeans.rebalance");
     const scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
     const IndexType numWeights = nodeWeights.size();
     const IndexType localN = coordinates[0].getLocalValues().size();
@@ -2195,7 +2199,7 @@ int KMeans<IndexType,ValueType>::refineForBalance(
 
     //the size of its fuzziness vector
     const IndexType fuzzSize = fuzzyClustering[0].size();
-    assert( fuzzSize==centersToUse );
+    assert( fuzzSize==centersToUse or fuzzSize==settings.numBlocks);
 
     const std::vector<ValueType> mship = computeMembershipOneValueNormalized( fuzzyClustering, partition, numBlocks);
     assert( mship.size()==localN );
@@ -2217,7 +2221,8 @@ int KMeans<IndexType,ValueType>::refineForBalance(
 
     //calculate the imbalance for every block; hardcode to double
     std::vector<std::vector<double>> imbalancesPerBlock(numWeights, std::vector<double>(numBlocks));
-    std::vector<double> maxImbalancePerBlock(numBlocks, std::numeric_limits<double>::lowest() ); //only the maximum imbalance
+    //only the maximum imbalance
+    std::vector<double> maxImbalancePerBlock(numBlocks, std::numeric_limits<double>::lowest() ); 
     for (IndexType w=0; w<numWeights; w++) {
         for (IndexType b=0; b<numBlocks; b++) {
             ValueType optWeight = targetBlockWeights[w][b];
@@ -2237,7 +2242,6 @@ int KMeans<IndexType,ValueType>::refineForBalance(
             return maxImbalancePerBlock[i]>maxImbalancePerBlock[j];
     });
 
-    
     scai::hmemo::ReadAccess<IndexType> rPart(partition.getLocalValues());
     std::vector<IndexType> localPart( rPart.get(), rPart.get()+localN );
     rPart.release();
@@ -2286,23 +2290,25 @@ int KMeans<IndexType,ValueType>::refineForBalance(
 
     std::sort(indices.begin(), indices.end(), sortFunction );
 
-
     const IndexType numPointsToCheck = comm->min(localN);
 
-    //here we store the difference to the block weight caused y each move
+    //here we store the difference to the block weight caused by each move
     std::vector<std::vector<ValueType>> blockWeightDifference(numWeights, std::vector<ValueType>(numBlocks, 0.0));
     
-    const IndexType batchSize = localN*settings.batchPercent + 1;
+    const IndexType myBatchSize = localN*settings.batchPercent + 1;
+    //pick min across all processors;  this is needed so they all do the global sum together
+    const IndexType batchSize = comm->min(myBatchSize);
+
     bool meDone = false;
-    IndexType i=0;
+    bool allDone = false;
+    IndexType localI=0;
 
     IndexType numRound = 0;
     IndexType maxRounds = 3;
 
     //for all local nodes until all points are checked
-    while( not comm->all(meDone) ){
-
-        const IndexType thisInd = indices[i];
+    while( not allDone ){
+        const IndexType thisInd = indices[localI];
         const IndexType myBlock = localPart[thisInd];
 
         vector<ValueType> myWeights(numWeights);
@@ -2323,6 +2329,19 @@ int KMeans<IndexType,ValueType>::refineForBalance(
         SCAI_ASSERT_LE_ERROR( thisBlockNewMaxImbalance, maxImbalancePerBlock[myBlock], "Since we remove, imbalance value should be reduced");
 
         //TODO: check what happens if we forbid moves from under-weighted blocks
+        //      and to overweighted blocks
+        /*
+        if( maxImbalancePerBlock[myBlock]<0 ){
+            PRINT("negative imbalance for block " << myBlock << ", do not remove vertices" );
+            //exit condition
+            if( i<numPointsToCheck-1 ){
+                i++;
+            }else{
+                meDone=true;
+            }
+            continue;
+        }
+        */
 
         //possible centers to move are the ones that the point is closer
         //WARNING/TODO: "closer" depends on which distance function we use. Here we use the euclidean distance
@@ -2335,26 +2354,37 @@ int KMeans<IndexType,ValueType>::refineForBalance(
 
         //for all possible center in the fuzzy vector
         for( IndexType c=0; c<fuzzSize; c++){
-            const IndexType possibleBlock = fuzzyClustering[thisInd][c].second;
-            if( myBlock==possibleBlock){
+            //candidate block to change to
+            const IndexType candidateBlock = fuzzyClustering[thisInd][c].second;
+            if( myBlock==candidateBlock){
                 continue;
             }
+            //if candidate block is "too" heavy
+            /*
+            if( maxImbalancePerBlock[candidateBlock]>0 ){
+                PRINT("block " << myBlock << " is too heavy, do not add vertices" );
+                continue;
+            }
+            */
 
-            //calculate block weight and imbalance of the new block
-            
+            //calculate block weight and imbalance of the new candidate block if we add this point
+
             std::vector<double> newBlockImbalances(numWeights);
 
-            double maxOldImbalanceNewBlock = std::numeric_limits<double>::lowest();    //the old max imbalance for the new block
+            //the old max imbalance for the new block
+            double maxOldImbalanceNewBlock = std::numeric_limits<double>::lowest(); //used for checks
             for (IndexType w=0; w<numWeights; w++) {
-                ValueType optWeight = targetBlockWeights[w][possibleBlock];
-                newBlockImbalances[w] = imbalancesPerBlock[w][possibleBlock] + myWeights[w]/optWeight;            
+                ValueType optWeight = targetBlockWeights[w][candidateBlock];
+                //will (possibly) add this point to the block, so add its weights
+                newBlockImbalances[w] = imbalancesPerBlock[w][candidateBlock] + myWeights[w]/optWeight;
 
-                if(imbalancesPerBlock[w][possibleBlock]>maxOldImbalanceNewBlock){
-                    maxOldImbalanceNewBlock= imbalancesPerBlock[w][possibleBlock];
+                if(imbalancesPerBlock[w][candidateBlock]>maxOldImbalanceNewBlock){
+                    maxOldImbalanceNewBlock= imbalancesPerBlock[w][candidateBlock];
                 }
             }
+            //TODO: is maxOldImbalanceNewBlock  changed at this point ?
+            SCAI_ASSERT_LE_ERROR( std::abs(maxOldImbalanceNewBlock-maxImbalancePerBlock[candidateBlock]), 1e-5, comm->getRank()<< ": for block " << candidateBlock << "; should not agree?" );
 
-SCAI_ASSERT_LE_ERROR( std::abs(maxOldImbalanceNewBlock-maxImbalancePerBlock[possibleBlock]), 1e-5, comm->getRank()<< ": for block " << possibleBlock << "; should not agree?" );
             //
             //evaluate if the move was beneficial
             //
@@ -2362,32 +2392,28 @@ SCAI_ASSERT_LE_ERROR( std::abs(maxOldImbalanceNewBlock-maxImbalancePerBlock[poss
             //the max imbalance of the new block is larger than the previous max imbalance of the same block 
             // since we added a point (with positive weight)
             const double maxNewImbalanceNewBlock = *std::max_element(newBlockImbalances.begin(), newBlockImbalances.end());
-            SCAI_ASSERT_GE_ERROR( maxNewImbalanceNewBlock,  maxImbalancePerBlock[possibleBlock], "??") ;
+            SCAI_ASSERT_GE_ERROR( maxNewImbalanceNewBlock,  maxImbalancePerBlock[candidateBlock], "??") ;
 
- 
-//PRINT(comm->getRank() << ": moving point " << thisInd << " to block " << possibleBlock << " changes the imbalance from "<< maxOldImbalanceNewBlock<< " to " << maxNewImbalanceNewBlock );
-
-            //if this possible block offers a better imbalance
+            //if this candidate block offers a better imbalance
             if( bestBlockMaxNewImbalance>maxNewImbalanceNewBlock ){
-//PRINT0(comm->getRank() << ": moving "<< thisInd << " from " << myBlock << " to " << possibleBlock<< " and new min imbalance= " << maxNewImbalanceNewBlock );                 
+//PRINT0(comm->getRank() << ": moving "<< thisInd << " from " << myBlock << " to " << candidateBlock<< " and new min imbalance= " << maxNewImbalanceNewBlock );
                 //from all the moves that improve the imbalance, keep the one that improves it the most
-                //check also is the change in this possible block is less
+                //check also if the change in this possible block is less
                 bestBlockMaxNewImbalance = maxNewImbalanceNewBlock;
-                bestBlock = possibleBlock;
+                bestBlock = candidateBlock;
                 bestBlockNewImbalances = newBlockImbalances;
             }
         }
 
-        //here, we have picked the block that worsens the imbalance the least
+        //here, we have picked a candidate block that worsens the imbalance the least
         //also check if moving to the best block is beneficial in total
         //if this block is not beneficial, then no other is
-//TODO: check the above claim
+
         if( bestBlock!=myBlock ){
-            // if the increase of the new block's imbalance is more than from the block we removed
-            //the point, then do not perform the move.
-//TODO: ^^ not completely true: the increase maybe be more but still            
-//TODO: is this needed/correct? we just do not want to increase the global max imbalance
-//PRINT0(thisBlockNewMaxImbalance << " >? " << bestBlockMaxNewImbalance )  ;
+            //if the new candidate block's imbalance is increased more than the 
+            //block we removed the point from, then do not perform the move.
+            //TODO: ^^ not completely true: the increase maybe be more but 
+            //we just do not want to increase the global max imbalance
             if( thisBlockNewMaxImbalance < bestBlockMaxNewImbalance ){
                 bestBlock=myBlock;
             }
@@ -2405,36 +2431,25 @@ SCAI_ASSERT_LE_ERROR( std::abs(maxOldImbalanceNewBlock-maxImbalancePerBlock[poss
             for (IndexType w=0; w<numWeights; w++) {
                 blockWeightDifference[w][myBlock] -= myWeights[w];
                 blockWeightDifference[w][bestBlock] += myWeights[w];
-                //blockWeights[w][myBlock] -= myWeights[w];
-                //blockWeights[w][bestBlock] += myWeights[w];
                 imbalancesPerBlock[w][myBlock] = thisBlockNewImbalances[w];
                 imbalancesPerBlock[w][bestBlock] = bestBlockNewImbalances[w];
             }
 
-//PRINT(comm->getRank() << ": \t moving local point " << thisInd << " from block " << myBlock << " (new maxImbalance= "<< maxImbalancePerBlock[myBlock] << ") to " << bestBlock << " (new max imbalance= " << maxImbalancePerBlock[bestBlock] );
-SCAI_ASSERT_EQ_ERROR( *std::max_element(bestBlockNewImbalances.begin(), bestBlockNewImbalances.end()) , (double) maxImbalancePerBlock[bestBlock], comm->getRank() << ": block " << bestBlock );
+            SCAI_ASSERT_EQ_ERROR( *std::max_element(bestBlockNewImbalances.begin(), bestBlockNewImbalances.end()) , (double) maxImbalancePerBlock[bestBlock], comm->getRank() << ": wrong new max imbalance for block " << bestBlock );
 
-/*
-- block imbalance has to be updated after every move. This also affects the order of points that need
-to be resorted. Maybe use some priority queue?
-*/
+            //TODO: block imbalance has to be updated after every move. 
+            //This also affects the order of points that need to be resorted/
+            //Maybe use some priority queue?
 
-
-//recalculate and re-sort local points???
-//std::sort(indices.begin()+i, indices.end()+(i+50), sortFunction ); //TOO slow
-//i=0;
         }
         //else no improvement was achieved
 
-        
-//global sum needed
-        if( (i+1)%batchSize==0 or meDone ){
-PRINT0(comm->getRank() << " :::::: " << i << " _____ " << batchSize);
+        //global sum needed
+        if( (localI+1)%batchSize==0 or meDone ){
             //reset local block max weight imbalances
             std::fill( maxImbalancePerBlock.begin(), maxImbalancePerBlock.end(), std::numeric_limits<double>::lowest() );  
 
-            for (IndexType w=0; w<numWeights; w++) {    
-                        
+            for (IndexType w=0; w<numWeights; w++) {
                 //sum all the differences for all blocks among PEs
                 comm->sumImpl(blockWeightDifference[w].data(), blockWeightDifference[w].data(), numBlocks, scai::common::TypeTraits<ValueType>::stype );
                 std::transform( blockWeights[w].begin(), blockWeights[w].end(), blockWeightDifference[w].begin(), blockWeights[w].begin(), std::plus<ValueType>() );
@@ -2446,34 +2461,40 @@ PRINT0(comm->getRank() << " :::::: " << i << " _____ " << batchSize);
                     if( imbalancesPerBlock[w][b]>maxImbalancePerBlock[b] ) {
                         maxImbalancePerBlock[b] = imbalancesPerBlock[w][b];
                     }
-PRINT0( comm->getRank() << " +++ " << w <<", "<< b << ": " << blockWeights[w][b] << " __  diff= " << blockWeightDifference[w][b] << " imbalance= " << maxImbalancePerBlock[b]);
+//PRINT0( comm->getRank() << " +++ " << w <<", "<< b << ": " << blockWeights[w][b] << " __  diff= " << blockWeightDifference[w][b] << " imbalance= " << maxImbalancePerBlock[b]);
                 }    
 
                 //reset local block weight differences
-                std::fill( blockWeightDifference[w].begin(), blockWeightDifference[w].end(), 0.0);    
+                std::fill( blockWeightDifference[w].begin(), blockWeightDifference[w].end(), 0.0);
             }
-            
+
 for (IndexType b=0; b<numBlocks; b++) {
-    PRINT0(b <<": max imbalance " << maxImbalancePerBlock[b]);
+    //PRINT0(b <<": max imbalance " << maxImbalancePerBlock[b]);
 }            
 
-//resort local points based on new global weights
-//recalculate and re-sort local points???
-std::sort(indices.begin(), indices.end(), sortFunction );
-i=0;
-numRound++;
+            //TODO: check if the following works better
+            //resort local points based on new global weights
+            //recalculate and re-sort local points???
+            //std::sort(indices.begin(), indices.end(), sortFunction );
+            //i=0; //restart
+            //numRound++;
         }
 
-if(numRound>maxRounds){
-    meDone=true;
-}
         //exit condition
-        if( i<numPointsToCheck-1 ){
-            i++;
+        if( localI<numPointsToCheck-1 ){
+            localI++;
         }else{
             meDone=true;
         }
-        //comm->synchronize();
+
+        try{
+            allDone = comm->all(meDone);
+        }catch(scai::dmemo::MPIException& e){
+            //e.addCallStack( std::cout );
+            std::cout << e.what() << std::endl <<
+                "Probably some PE is in another global operation...." << std::endl;
+        }
+
     }//while
 
     // copy to DenseVector; TODO: a better way to do it?
@@ -2484,10 +2505,7 @@ if(numRound>maxRounds){
         }
     }
 
-    //what to return? partition is already changed
-    return 1;
-
-}//refine
+}//rebalance
 
 
 template<typename IndexType, typename ValueType>
