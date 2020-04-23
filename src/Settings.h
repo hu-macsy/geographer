@@ -232,6 +232,7 @@ struct Settings {
     double batchPercent = 0.05;          ///< calculate the batch size as a percentage of the number of local points
     //bool manhattanDistance = false;
     std::vector<IndexType> hierLevels; 		///< for hierarchial kMeans, the number of blocks per level
+    std::string kMeansMshipSort = "lex";    ///< used in KMeans::refineForBalance to sort vertices. Possible values are "lex" and "sqImba"
     //@}
 
     /** @name Parameters for multisection

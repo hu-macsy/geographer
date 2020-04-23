@@ -2200,9 +2200,6 @@ int KMeans<IndexType,ValueType>::refineForBalance(
     const std::vector<ValueType> mship = computeMembershipOneValueNormalized( fuzzyClustering, partition, numBlocks);
     assert( mship.size()==localN );
 
-    //DenseVector<ValueType> allMships( partition.getDistributionPtr(), scai::hmemo::HArray<ValueType>( localN, mship.data()) );
-    //writeDenseVectorParallel( allMships, "/home/harry/geographer/tools/mships.txt");
-
     //
     // convert weights to vector<vector> 
     //
@@ -2249,7 +2246,9 @@ int KMeans<IndexType,ValueType>::refineForBalance(
     // lower values indicate fuzzier points
     //
 
-    auto lexSort = [&](int i, int j){
+    //sort lexicographically: first by the imbalance of the block this point belongs to.
+    //  if they are in the same block or the imbalance is the same, sort by membership
+    auto lexSort = [&](int i, int j)->bool{
         const IndexType blockI = localPart[i];
         const IndexType blockJ = localPart[j];
         //if in the same block, sort by membership
@@ -2266,7 +2265,8 @@ int KMeans<IndexType,ValueType>::refineForBalance(
         }
     };
 
-    auto squaredImbaSort = [&](int i, int j){
+    //maxImba^2/mship
+    auto squaredImbaSort = [&](int i, int j)->bool{
         const IndexType blockI = localPart[i];
         const IndexType blockJ = localPart[j];
         const ValueType fI = std::pow(maxImbalancePerBlock[blockI], 2)/mship[i];
@@ -2274,12 +2274,16 @@ int KMeans<IndexType,ValueType>::refineForBalance(
         return fI>fJ;
     };
     
-    auto sortFunction = squaredImbaSort;
+    std::function<bool(int,int)> sortFunction;
+    if(settings.kMeansMshipSort=="lex"){
+        sortFunction = lexSort;
+    }else{
+         sortFunction = squaredImbaSort;
+    }
 
     std::vector<IndexType> indices(localN);
     std::iota(indices.begin(), indices.end(), 0);
-    //sort lexicographically: first by the imbalance of the block this point belongs to.
-    //  if they are in the same block or the imbalance is the same, sort by membership
+
     std::sort(indices.begin(), indices.end(), sortFunction );
 
 
