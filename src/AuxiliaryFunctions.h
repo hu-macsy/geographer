@@ -225,7 +225,7 @@ public:
         IndexType row1 = pixel1%sideLen;
         IndexType row2 = pixel2%sideLen;
 
-        return std::abs(col1-col2) + std::abs(row1-row2);;
+        return absDiff(col1, col2) + absDiff(row1, row2);;
     }
 
 
@@ -238,7 +238,7 @@ public:
         IndexType row1 = pixel1%sideLen;
         IndexType row2 = pixel2%sideLen;
 
-        return std::pow( ValueType (std::pow(std::abs(col1-col2),2) + std::pow(std::abs(row1-row2),2)), 0.5);
+        return std::pow( ValueType (std::pow(absDiff(col1, col2),2) + std::pow(absDiff(row1, row2),2)), 0.5);
     }
 
 //template<T>
@@ -399,7 +399,11 @@ public:
         scai::lama::DenseVector<IndexType>& partition,
         const Settings settings);
 
-	
+    static IndexType absDiff(const IndexType& a, const IndexType& b) {
+        return (a > b) ? (a - b) : (b - a);
+    }
+
+
 private:
 
 //------------------------------------------------------------------------------

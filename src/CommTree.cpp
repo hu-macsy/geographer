@@ -159,7 +159,8 @@ IndexType CommTree<IndexType, ValueType>::createFlatHomogeneous(
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneous( const std::vector<std::vector<ValueType>> &leafSizes ) {
+IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneousCore( 
+    const std::vector<std::vector<ValueType>> &leafSizes ) {
     //leafSizes.size() = number of weights
     std::vector<cNode<IndexType, ValueType>> leaves = createLeaves( leafSizes );
     SCAI_ASSERT_EQ_ERROR( leaves.size(), leafSizes[0].size(), "Wrong number of leaves" );
@@ -167,9 +168,28 @@ IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneous( const std::ve
 
     this->numNodes = createTreeFromLeaves(leaves);
     this->numWeights = leafSizes.size();
-    //this->isProportional = std::vector<bool>(numNodeWeights, true); //TODO: check if this is correct
-
     return this->numNodes;
+}
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneous( 
+    const std::vector<std::vector<ValueType>> &leafSizes ) {
+
+    IndexType numNodes = createFlatHeterogeneousCore(leafSizes);
+    this->isProportional = std::vector<bool>(leafSizes.size(), true); //TODO: check if this is correct
+    return numNodes;
+}//createFlatHeterogeneous
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneous( 
+    const std::vector<std::vector<ValueType>> &leafSizes,
+    const std::vector<bool> &isWeightProp) {
+
+    IndexType numNodes = createFlatHeterogeneousCore(leafSizes);
+    this->isProportional = isWeightProp;
+    return numNodes;
 }//createFlatHeterogeneous
 //------------------------------------------------------------------------
 
@@ -232,8 +252,8 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
                 //go over the nodes and adapt the weights
                 for( commNode& node : hierLevel ) {
                     node.weights[i] *= scalingFactor;
-                    //scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-                    //PRINT0( cNode.weights[i] );
+                    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+                    //PRINT0( node.weights[i] );
                 }
             }
         }

@@ -510,7 +510,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         std::chrono::duration<double> redistTime = std::chrono::steady_clock::now() - beforeRedist;
         ValueType totRedistTime = ValueType( comm->max(redistTime.count()) );
         if(comm->getRank() == 0){
-            std::cout << "redistribution after K-Means, Time:" << totRedistTime << std::endl;
+            std::cout << "redistribution after K-Means, Time: " << totRedistTime << std::endl;
         }
     }
 
@@ -608,6 +608,20 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
         std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
 
     	scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
+
+        if( settings.setAutoSettings ){
+            IndexType localCutNodes = halo.getLocalIndexes().size(); 
+            IndexType sumLocalCutNodes = comm->sum(localCutNodes); //equal to total communication volume
+
+            //WARNING: minGainForNextRound should be same in all PEs because otherwise, in the one-to-one 
+            // communication scheme later, only one PE may exit the loop and the other hangs
+            // set gain to at least 1% of the average local cut
+            settings.minGainForNextRound = std::max( int(sumLocalCutNodes*0.01/settings.numBlocks), 1);
+            if(comm->getRank() == 0 ){
+                std::cout << "\tsetting minGainForNextRound to " << settings.minGainForNextRound << std::endl;
+            }
+        }
+
     	ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights[0], coordinates, halo, settings, metrics);
 
         std::chrono::duration<double> LRtime = std::chrono::steady_clock::now() - start;
@@ -798,8 +812,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
                 toInsert.first = neighbours[j];
                 SCAI_ASSERT(neighbours[j] < sumDensity.size(), "Too big index: " + std::to_string(neighbours[j]));
                 SCAI_ASSERT(neighbours[j] >= 0, "Negative index: " + std::to_string(neighbours[j]));
-                geomSpread = 1 + 1/std::log2(sideLen)*( std::abs(sideLen/2 - neighbours[j]/sideLen)/(0.8*sideLen/2) + std::abs(sideLen/2 - neighbours[j]%sideLen)/(0.8*sideLen/2) );
-                //PRINT0( geomSpread );
+                geomSpread = 1 + 1/std::log2(sideLen)*( aux<IndexType,ValueType>::absDiff(sideLen/2, neighbours[j]/sideLen)/(0.8*sideLen/2) + aux<IndexType,ValueType>::absDiff(sideLen/2, neighbours[j]%sideLen)/(0.8*sideLen/2) );
+                
                 // value to pick a border node
                 pixelDistance = aux<IndexType, ValueType>::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);
                 toInsert.second = (1/pixelDistance)* geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[maxDensityPixel], 0.5) );

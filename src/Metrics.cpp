@@ -1,6 +1,10 @@
 #include <scai/solver/criteria/IterationCount.hpp>
 #include <scai/solver/CG.hpp>
 
+#include <scai/solver/logger/CommonLogger.hpp>
+#include <scai/solver/criteria/ResidualThreshold.hpp>
+#include <scai/lama/norm/L2Norm.hpp>
+
 #include "Metrics.h"
 #include "FileIO.h"
 
@@ -306,7 +310,10 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
     MM["SpMVtime"] = getSPMVtime(copyGraph, repeatTimes);
 
     //TODO: take a percentage of repeatTimes; maybe all repeatTimes are too much for CG
-    MM["CGtime"] = getLinearSolverTime( copyGraph, 10, settings.maxCGIterations); 
+    //in rhs: all 1s
+    std::tie( MM["CGtime_a1"], MM["CGiterations_a1"], MM["CGresidual_a1"] ) = getCGTime( copyGraph, 10, settings.maxCGIterations, settings.CGResidual, false); 
+    //in rhs: one 1 and all others 0
+    std::tie( MM["CGtime_o1"], MM["CGiterations_o1"], MM["CGresidual_o1"] ) = getCGTime( copyGraph, 10, settings.maxCGIterations, settings.CGResidual, true); 
 
     //TODO: maybe extract this time from the actual SpMV above
     // comm time in SpMV
@@ -537,56 +544,98 @@ ValueType Metrics<ValueType>::getSPMVtime(
 }
 //---------------------------------------------------------------------------------------
 
+//for the initial values of solution and rhs see papers
+//Parallel Conjugate Gradient: Effects of Ordering Strategies, Programming Paradigms and Architectural Platforms.
+//Oliker, Xi, Heber et al., section 4
+//High-performance conjugate-gradient benchmark: A new metric for ranking high-performance computing systems
+// Dongarra1, Michael A Heroux2and Piotr Luszczek, section 4
 template<typename ValueType>
-ValueType Metrics<ValueType>::getLinearSolverTime( 
+std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime( 
     const scai::lama::CSRSparseMatrix<ValueType>& graph,
     const IndexType repeatTimes,
-    const IndexType maxIterations){
+    const IndexType maxIterations,
+    const ValueType residual,
+    const bool oneOne){
 
     const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
     const scai::dmemo::DistributionPtr colDist = graph.getColDistributionPtr();
 
-    //the construction of the laplacian does not work when both rows and columns are distributed
-    //based on a general distribution; TODO:fix
-    //workaround: copy graph to preserve const-ness, redistribute with a block distribution, get
-    //the laplacian, redistribute the laplacian with the same distribution as the input
-    scai::lama::CSRSparseMatrix<ValueType> laplacian;
-    {
-        scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph ); 
-        const IndexType N = graph.getNumRows();
-        const scai::dmemo::DistributionPtr blockDistPtr( new scai::dmemo::BlockDistribution(N, comm) );
-        copyGraph.redistribute( blockDistPtr, blockDistPtr );
-        
-        laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian( copyGraph );
-        laplacian.redistribute( rowDist, colDist);
-    }
+    //identity matrix
+    CSRSparseMatrix<ValueType> identity;
+    identity.setIdentity(rowDist);
+    //the laplacian
 
-    scai::lama::DenseVector<ValueType> solution( colDist, ValueType(1.0) );
-    
+std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
+
+    scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian(graph);
+
+std::chrono::duration<double> endTime = std::chrono::steady_clock::now() - startTime;
+double totalTimeLapl= comm->max(endTime.count() );
+if( comm->getRank()==0 ) {
+    std::cout<< " time to construct laplacian in " << totalTimeLapl << " seconds " << std::endl;
+}
+
+    //add the identity matrix to make the laplacian positive definite
+    laplacian += identity;
+
+    //this assertion fails because lama does not set up the local data of the matrix correctly
+    //SCAI_ASSERT_EQ_ERROR( laplacian.l1Norm(), 2*graph.l1Norm(), "wrong l1Norm in laplacian");
+    SCAI_ASSERT_EQ_ERROR( laplacian.getNumValues(), graph.getNumValues()+graph.getNumRows(), "wrong numValues in laplacian");
+    SCAI_ASSERT_EQ_ERROR( laplacian.getLocalNumValues(), graph.getLocalNumValues()+graph.getLocalNumRows(), "laplacian is wrong");
+
+    // Allocate a common logger that prints convergenceHistory
+    //bool isDisabled = comm->getRank() > 0;
+    //scai::solver::LoggerPtr logger( new scai::solver::CommonLogger( "CGLogger: ", scai::solver::LogLevel::convergenceHistory, scai::solver::LoggerWriteBehaviour::toConsoleOnly, isDisabled ) );
+
+    //scai::solver::CG<ValueType> solver("CGSolver", logger);
     scai::solver::CG<ValueType> solver("CGSolver");
 
-    scai::solver::CriterionPtr<ValueType> criterion( new scai::solver::IterationCount<ValueType>( maxIterations ) );
+    scai::lama::NormPtr<ValueType> norm( new scai::lama::L2Norm<ValueType>( ) );
+
+    scai::solver::CriterionPtr<ValueType> criterion1( new scai::solver::ResidualThreshold<ValueType>( norm, residual, scai::solver::ResidualCheck::Absolute ) );
+    scai::solver::CriterionPtr<ValueType> criterion2( new scai::solver::IterationCount<ValueType>( maxIterations ) );
+    scai::solver::CriterionPtr<ValueType> criterion( new scai::solver::Criterion<ValueType>( criterion1, criterion2, scai::solver::BooleanOp::OR ) );
+
     solver.setStoppingCriterion( criterion );
     ValueType totalTime = 0.0;
+    IndexType totalIterations = 0;
+    ValueType retResidual = 0.0;
 
     for(IndexType r=0; r<repeatTimes; r++) {
-        const scai::lama::DenseVector<ValueType> rhs( colDist, ValueType(1.0) );
+        scai::lama::DenseVector<ValueType> rhs;
+        if(oneOne){
+            rhs.setSameValue( colDist, ValueType(0.0) );
+            const IndexType globalN = laplacian.getNumRows();
+            const IndexType globIndex = scai::common::Math::random<IndexType>( globalN );
+            assert( globIndex<= globalN);
+            rhs.setValue( globIndex, 1.0);
+        }else{
+            //just all ones
+            rhs.setSameValue( colDist, ValueType(1.0) );
+        }
+
+        scai::lama::DenseVector<ValueType> solution( colDist, ValueType(0.0) );
         solver.initialize( laplacian );
 
         std::chrono::time_point<std::chrono::steady_clock> beforeTime = std::chrono::steady_clock::now();
-
         solver.solve(solution, rhs);
 
         std::chrono::duration<ValueType> elapTime = std::chrono::steady_clock::now() - beforeTime;
         totalTime += elapTime.count();
+        //number of iterations is (should be!) always the same; maybe just get them outside the loop?
+        totalIterations += solver.getIterationCount();
         //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
+        retResidual += solver.getResidual().l2Norm();
     }
     ValueType globTime = comm->max(totalTime)/repeatTimes;
-    
-    PRINT0("total time for "<< repeatTimes << " calls to CG solver: " << totalTime );
+    ValueType avgIterations = ((ValueType) totalIterations)/repeatTimes;
+    ValueType avgResidual = retResidual/repeatTimes;
 
-    return globTime;
+    PRINT0("total time for "<< repeatTimes << " calls to CG solver: " << totalTime << 
+            " and " << avgIterations << " average iterations and average residual reached " << avgResidual );
+
+    return std::make_tuple( globTime, avgIterations, avgResidual);
 }
 
 template class Metrics<double>;

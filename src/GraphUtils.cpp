@@ -17,13 +17,14 @@
 #include <scai/dmemo/GenBlockDistribution.hpp>
 #include <scai/lama/matrix/DenseMatrix.hpp>
 #include <scai/lama/matrix/DIASparseMatrix.hpp>
-
+#include <scai/logging.hpp>
 #include <scai/tracing.hpp>
+
 #include <JanusSort.hpp>
 
 #include "GraphUtils.h"
 
-
+SCAI_LOG_DEF_LOGGER( logger, "GraphUtilsLogger" );
 
 using std::vector;
 using std::queue;
@@ -1446,16 +1447,10 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     IndexType maxLocalVertex=0;
     IndexType minLocalVertex=std::numeric_limits<IndexType>::max();
 
+    //get min and max first;
     for(IndexType i=0; i<localM; i++) {
         IndexType v1 = edgeList[i].first;
         IndexType v2 = edgeList[i].second;
-        localPairs[2*i].first = v1;
-        localPairs[2*i].second = v2;
-
-        //insert also reversed edge to keep matrix symmetric
-        localPairs[2*i+1].first = v2;
-        localPairs[2*i+1].second = v1;
-
         IndexType minV = std::min(v1,v2);
         IndexType maxV = std::max(v1,v2);
 
@@ -1467,6 +1462,23 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
         }
     }
     //PRINT(thisPE << ": vertices range from "<< minLocalVertex << " to " << maxLocalVertex);
+
+    const IndexType globalMinIndex = comm->min(minLocalVertex);
+    globalMinIndex==0 ? maxLocalVertex : maxLocalVertex-- ;
+
+    //if vertices are numbered starting from 1, subtract 1 by every vertex index
+    const IndexType oneORzero = globalMinIndex==0 ? 0: 1;
+    
+    for(IndexType i=0; i<localM; i++) {
+        IndexType v1 = edgeList[i].first - oneORzero;;
+        IndexType v2 = edgeList[i].second - oneORzero;;
+        localPairs[2*i].first = v1;
+        localPairs[2*i].second = v2;
+
+        //insert also reversed edge to keep matrix symmetric
+        localPairs[2*i+1].first = v2;
+        localPairs[2*i+1].second = v1;
+    }
 
     const IndexType N = comm->max( maxLocalVertex );
     localM *=2 ;	// for the duplicated edges
@@ -1574,28 +1586,28 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     }
 
     PRINT0("rebuild local edge list");
-
-    //IndexType numEdges = localPairs.size() ;
-
     SCAI_ASSERT_ERROR(std::is_sorted(localPairs.begin(), localPairs.end()), "Disorder after insertion of received edges." );
 
     //
     //remove duplicates
     //
-    localPairs.erase(unique(localPairs.begin(), localPairs.end(), [](int_pair p1, int_pair p2) {
-        return ( (p1.second==p2.second) and (p1.first==p2.first));
-    }), localPairs.end() );
-    //PRINT( thisPE <<": removed " << numEdges - localPairs.size() << " duplicate edges" );
-
-    PRINT0("removed duplicates");
+    {
+        const IndexType numEdges = localPairs.size() ;
+        localPairs.erase(unique(localPairs.begin(), localPairs.end(), [](int_pair p1, int_pair p2) {
+            return ( (p1.second==p2.second) and (p1.first==p2.first));
+        }), localPairs.end() );
+        const IndexType numRemoved = numEdges - localPairs.size();
+        const IndexType totalNumRemoved = comm->sum(numRemoved);
+        PRINT0("removed duplicates, total removed edges: " << totalNumRemoved);
+    }
 
     //
     // check that all is correct
     //
     newMaxLocalVertex = localPairs.back().first;
     IndexType newMinLocalVertex = localPairs[0].first;
-    IndexType checkSum = newMaxLocalVertex - newMinLocalVertex;
-    IndexType globCheckSum = comm->sum( checkSum ) + comm->getSize() -1;
+    IndexType checkSum = newMaxLocalVertex - newMinLocalVertex  ;
+    IndexType globCheckSum = comm->sum( checkSum )+ comm->getSize() -1;
 
     //TODO: should we allow isolated vertices?
     //this assertion triggers when the graph has isolated (with no edges) vertices
@@ -1679,21 +1691,19 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
             scai::hmemo::HArray<IndexType>(ja.size(), ja.data()),
             scai::hmemo::HArray<ValueType>(values.size(), values.data()));//no longer allowed. TODO: change
 
-    //const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
-    const auto genDist = scai::dmemo::generalDistributionUnchecked(globalN, localIndices, comm);//this could be a GenBlockDistribution, right?
-
+    const scai::dmemo::DistributionPtr blockDist = scai::dmemo::genBlockDistributionBySize(globalN, localN, comm);
     PRINT0("assembled CSR storage");
 
-    return scai::lama::CSRSparseMatrix<ValueType>(genDist, std::move(myStorage));
+    return scai::lama::CSRSparseMatrix<ValueType>(blockDist, std::move(myStorage));
 
-}
+}//edgeList2CSR
 
 //---------------------------------------------------------------------------------------
 //WARNING,TODO: Assumes the graph is undirected
 // given a non-distributed csr undirected matrix converts it to an edge list
 // two first numbers are the vertex IDs and the third one is the edge weight
 template<typename IndexType, typename ValueType>
-std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, ValueType>::CSR2EdgeList_local(const CSRSparseMatrix<ValueType> &graph, IndexType &maxDegree) {
+std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, ValueType>::CSR2EdgeList_repl(const CSRSparseMatrix<ValueType> &graph, IndexType &maxDegree) {
 
     scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     CSRSparseMatrix<ValueType> tmpGraph(graph);
@@ -1701,62 +1711,71 @@ std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, Val
 
     // TODO: maybe handle differently? with an error message?
     if (!tmpGraph.getRowDistributionPtr()->isReplicated()) {
-        PRINT0("***WARNING: In CSR2EdgeList_local: given graph is not replicated; will replicate now");
+        PRINT0("***WARNING: In CSR2EdgeList_repl: given graph is not replicated; will replicate now");
         const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N) );
         tmpGraph.redistribute(noDist, noDist);
         PRINT0("Graph replicated");
     }
 
-    const CSRStorage<ValueType>& localStorage = tmpGraph.getLocalStorage();
+    std::vector<std::tuple<IndexType,IndexType,ValueType>> edgeList = localCSR2GlobalEdgeList(graph,  maxDegree );
+
+    return edgeList;
+}
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<std::tuple<IndexType,IndexType,ValueType>> GraphUtils<IndexType, ValueType>::localCSR2GlobalEdgeList(
+    const CSRSparseMatrix<ValueType> &graph,
+    IndexType &maxDegree){
+
+    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    const scai::lama::CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
     const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
     const scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+    
+    const IndexType numLocalEdges = values.size();
+    const IndexType localN = localStorage.getNumRows();
 
     //not needed assertion
     SCAI_ASSERT_EQ_ERROR( ja.size(), values.size(), "Size mismatch for csr sparse matrix" );
-    SCAI_ASSERT_EQ_ERROR( ia.size(), N+1, "Wrong ia size?" );
+    SCAI_ASSERT_EQ_ERROR( ia.size(), localN+1, "Wrong ia size?" );
 
-    const IndexType numEdges = values.size();
     std::vector<std::tuple<IndexType,IndexType,ValueType>> edgeList;//( numEdges/2 );
     IndexType edgeIndex = 0;
-    IndexType maxEdgeWeight = 0;
-    IndexType minEdgeWeight = std::numeric_limits<int>::max();
 
     //WARNING: we only need the upper, left part of the matrix values since
-    //		matrix is symmetric
-    for(IndexType i=0; i<N; i++) {
-        const IndexType v1 = i;	//first vertex
+    //      matrix is symmetric
+    for(IndexType i=0; i<localN; i++) {
+        const IndexType v1 = dist->local2Global(i); //first vertex
         SCAI_ASSERT_LE_ERROR( i+1, ia.size(), "Wrong index for ia[i+1]" );
         IndexType thisDegree = ia[i+1]-ia[i];
         if(thisDegree>maxDegree) {
             maxDegree = thisDegree;
         }
         for (IndexType j = ia[i]; j < ia[i+1]; j++) {
-            const IndexType v2 = ja[j]; //second vertex
-            // so we do not enter every edge twice
-            //WARNING: here, we assume graph is undirected
-            if ( v2<v1 ) {
-                edgeIndex++;
-                continue;
-            }
-            SCAI_ASSERT_LE_ERROR( edgeIndex, numEdges, "Wrong edge index");
+            const IndexType v2 =  ja[j]; //second vertex
+            //WARNING: here, we assume graph is directed
+            // so we DO enter every edge twice as (u,v) and (v,u)
+            //if ( v2<v1 ) {
+            //    edgeIndex++;
+            //    continue;
+            //}
+
+            SCAI_ASSERT_LE_ERROR( edgeIndex, numLocalEdges, "Wrong edge index");
             edgeList.push_back( std::make_tuple( v1, v2, values[edgeIndex]) );
-//PRINT0( v1 << " _ " << v2);
-            if( values[edgeIndex] > maxEdgeWeight ) maxEdgeWeight = values[edgeIndex];
-            if( values[edgeIndex] < minEdgeWeight ) minEdgeWeight = values[edgeIndex];
+
             edgeIndex++;
         }
     }
 
-    //PRINT0("min edge weight: " <<minEdgeWeight << ", max edge weight: " << maxEdgeWeight);
-
-    SCAI_ASSERT_EQ_ERROR( edgeList.size()*2, numEdges, "Wrong number of edges");
+    //SCAI_ASSERT_EQ_ERROR( edgeList.size()*2, numLocalEdges, "Wrong number of edges");// assertion when NOT adding all edges
+    SCAI_ASSERT_EQ_ERROR( edgeList.size(), numLocalEdges, "Wrong number of edges");
     return edgeList;
 }
 
 //---------------------------------------------------------------------------------------
-//TODO: diagonal elements wrongly found when row distribution and column distribution are some general distribution
-//  while it works if both are a block distribution
+
 template<typename IndexType, typename ValueType>
 CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(const CSRSparseMatrix<ValueType>& graph) {
     using scai::lama::CSRStorage;
@@ -1770,6 +1789,65 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(
         throw std::runtime_error("Matrix must be square to be an adjacency matrix");
     }
 
+    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+
+    vector<ValueType> targetDegree(localN,0);
+    {
+        const CSRStorage<ValueType>& storage = graph.getLocalStorage();
+        const ReadAccess<IndexType> ia(storage.getIA());
+        const ReadAccess<ValueType> values(storage.getValues());
+        assert(ia.size() == localN+1);
+
+        for (IndexType i = 0; i < localN; i++) {
+            for (IndexType j = ia[i]; j < ia[i+1]; j++) {
+                targetDegree[i] += values[j];
+            }
+        }
+    }
+
+    //the degree matrix
+    CSRSparseMatrix<ValueType> degreeM;
+    degreeM.setIdentity(dist);
+
+    SCAI_ASSERT_ERROR( degreeM.isConsistent(), "identity matrix not consistent");
+    scai::hmemo::HArray<ValueType> localDiagValues(targetDegree.size(), targetDegree.data() );
+    scai::lama::DenseVector<ValueType> distDiagonal( dist, localDiagValues);
+
+    degreeM.setDiagonal( distDiagonal );
+    degreeM.redistribute( graph.getRowDistributionPtr(), graph.getColDistributionPtr() );
+
+    SCAI_ASSERT_ERROR( degreeM.isConsistent(), "degree matrix not consistent");
+    SCAI_ASSERT_EQ_ERROR( degreeM.getNumValues(), globalN, "matrix should be diagonal" );
+
+    CSRSparseMatrix<ValueType> L = graph;
+    
+    //TODO: check, this might break the matrix's consistency
+    //L = D-A
+    L.matrixPlusMatrix( 1.0, degreeM, -1.0, graph );
+    //L *= -1.0;
+    //L += degreeM;
+    SCAI_ASSERT_ERROR(L.isConsistent(), "laplacian matrix not consistent");
+
+    return L;
+}
+
+//---------------------------------------------------------------------------------------
+//TODO: diagonal elements wrongly found when row distribution and column distribution are some general distribution
+//  while it works if both are a block distribution
+template<typename IndexType, typename ValueType>
+CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian_depr(const CSRSparseMatrix<ValueType>& graph) {
+    using scai::lama::CSRStorage;
+    using scai::hmemo::HArray;
+    using std::vector;
+
+    const IndexType globalN = graph.getNumRows();
+    const IndexType localN = graph.getLocalNumRows();
+
+    if (graph.getNumColumns() != globalN) {
+        throw std::runtime_error("Matrix must be square to be an adjacency matrix");
+    }
+    //SCAI_ASSERT_EQ_ERROR( globalN, graph.getLocalNumColumns(), "Row must not have a distribution" );
+
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 
     const CSRStorage<ValueType>& storage = graph.getLocalStorage();
@@ -1777,6 +1855,7 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(
     const ReadAccess<IndexType> ja(storage.getJA());
     const ReadAccess<ValueType> values(storage.getValues());
     assert(ia.size() == localN+1);
+    assert(ja.size() == graph.getLocalNumValues() );
 
     std::vector<IndexType> newIA(ia.size());
     std::vector<IndexType> newJA(ja.size()+localN);
@@ -1825,14 +1904,15 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(
         }
         assert(foundDiagonal);
     }
-
     assert(newIA[localN] == newJA.size());
 
     const CSRStorage<ValueType> resultStorage(localN, globalN, newIA, newJA, newValues);
 
-    CSRSparseMatrix<ValueType> result(dist, resultStorage);
-    result.redistribute(dist, dist);
+    CSRSparseMatrix<ValueType> result = graph;
+    result.assignLocal( resultStorage, dist );
+    SCAI_ASSERT_EQ_ERROR( newValues.size(), values.size()+localN, "values size wrong?");
     return result;
+    //return CSRSparseMatrix<ValueType>(dist, resultStorage);
 }
 
 //---------------------------------------------------------------------------------------
@@ -1942,7 +2022,7 @@ std::vector< std::vector<IndexType>> GraphUtils<IndexType, ValueType>::mecGraphC
 
     //edgeList[i] = a tuple (v1,v2,w) describing an edges. v1 and v2 are the two
     // edge IDs and w is the edge weight
-    std::vector<edge> edgeList = CSR2EdgeList_local(graph, maxDegree);
+    std::vector<edge> edgeList = CSR2EdgeList_repl(graph, maxDegree);
 
     //
     // 2 - sort adjacency list based on edge weights
@@ -2076,11 +2156,13 @@ bool GraphUtils<IndexType, ValueType>::hasSelfLoops(const CSRSparseMatrix<ValueT
 
     scai::hmemo::HArray<ValueType> diagonal;
     storage.getDiagonal( diagonal );
+//for( int i)
+ //   PRINT(comm->getRank() << ": " << x);
     const IndexType diagonalSum = scai::utilskernel::HArrayUtils::sum(diagonal);
     
     const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const IndexType diagonalSumSum = comm->sum( diagonalSum );
-PRINT(diagonalSumSum);
+
     if( diagonalSumSum>0 ){
         return true;
     }

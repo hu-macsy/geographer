@@ -84,15 +84,16 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     }
 
     std::chrono::duration<double> beforeLoop = std::chrono::steady_clock::now() - startTime;
-    if(settings.verbose) {
-        //ValueType t1 = comm->max(beforeLoop.count());
-        //PRINT0("time elapsed before main loop: " << t1 );
+    if(settings.verbose or settings.debugMode) {
+        ValueType t1 = comm->max(beforeLoop.count());
+        PRINT0("time elapsed before main loop: " << t1 );
         PRINT0("number of rounds/loops: " << communicationScheme.size() );
     }
 
     //main loop, one iteration for each color of the graph coloring
     for (IndexType color = 0; color < communicationScheme.size(); color++) {
         SCAI_REGION( "LocalRefinement.distributedFMStep.loop" )
+        std::chrono::time_point<std::chrono::steady_clock> startColor =  std::chrono::steady_clock::now();
 
         const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
         const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
@@ -114,6 +115,9 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
             if (partnerOfPartner != comm->getRank()) {
                 throw std::runtime_error("Process " + std::to_string(comm->getRank()) + ": Partner " + std::to_string(partner) + " has partner "
                                          + std::to_string(partnerOfPartner) + ".");
+            }
+            if(settings.debugMode){
+                std::cout<< "Comm round "<< color <<": PE " << comm->getRank() << " is paired with " << partner << std::endl;
             }
         }
 
@@ -460,7 +464,12 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
                 }
             }
         } // if (partner != comm->getRank())
-    }
+        if(settings.debugMode){
+            std::chrono::duration<double> colorElapTime = std::chrono::steady_clock::now() - startColor;
+            std::cout << "PE " << comm->getRank() << " finished round " << color << " with gain " << gainThisRound \
+                << " in time " << colorElapTime.count() <<std::endl;
+        }
+    }//for color
 
     comm->synchronize();
 

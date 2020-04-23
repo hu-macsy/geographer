@@ -57,7 +57,11 @@ public:
      * @param[in] adjM The graph's adjacency matrix.
      * @param[in] filename The file's name to write to.
      */
-    static void writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename, const bool edgeWeights = false);
+    static void writeGraph (
+        const CSRSparseMatrix<ValueType> &adjM,
+        const std::string filename,
+        const bool binary = false,
+        const bool edgeWeights = false);
 
     /** Given an adjacency matrix and a filename writes the local part of matrix in the file using the METIS format.
      * Every PE writes its local data in a separate file by adding its rank in the end of the file name.
@@ -65,6 +69,9 @@ public:
      * @param[in] filename The file's name to write to
      */
     static void writeGraphDistributed (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
+
+
+    static void writeGraphAsEdgeList (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
 
     /** @brief Write graph and partition into a .vtk file; this can be opened by paraview.
      *
@@ -93,7 +100,9 @@ public:
      * @param[in] coordinates The coordinates of the points.
      * @param[in] filename The file's name to write to
     */
-    static void writeCoordsParallel(const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
+    static void writeCoordsParallel(
+        const std::vector<DenseVector<ValueType>> &coords,
+        const std::string filename);
 
     /** Each PE writes its own part of the coordinates in a separate file called filename_X.xyz where X is the rank of the PE,
      * i.e., a number from 0 until the total number of PEs-1.
@@ -101,7 +110,10 @@ public:
      * @param[in] dimensions Number of dimensions of coordinates.
      * @param[in] filename The file's name to write to.
      * */
-    static void writeCoordsDistributed (const std::vector<DenseVector<ValueType>> &coords,  const IndexType dimensions, const std::string filename);
+    static void writeCoordsDistributed (
+        const std::vector<DenseVector<ValueType>> &coords,
+        const IndexType dimensions,
+        const std::string filename);
 
     /** Given the vector of the coordinates and the nodeWeights, writes them both in a file in the form:
     *

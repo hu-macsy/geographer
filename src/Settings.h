@@ -128,7 +128,7 @@ inline std::ostream& operator<<(std::ostream& out, Format method) {
 - zoltanMJ Partition a point set (no graph is needed) using the Multijagged algorithm of zoltan2.
 - zoltanMJ Partition a point set (no graph is needed) using the space filling curves algorithm of zoltan2.
 */
-enum class Tool { geographer, geoKmeans, geoKmeansBalance, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, parMetisRefine, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, parhipFastMesh, parhipUltraFastMesh, parhipEcoMesh, myAlgo, none, unknown};
+enum class Tool { geographer, geoKmeans, geoKmeansBalance, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, parMetisRefine, zoltanRIB, zoltanRCB, zoltanMJ, zoltanXPulp, zoltanSFC, parhipFastMesh, parhipUltraFastMesh, parhipEcoMesh, myAlgo, none, unknown};
 
 
 std::istream& operator>>(std::istream& in, ITI::Tool& tool);
@@ -147,7 +147,7 @@ std::string getCallingCommand( const int argc, char** argv );
 */
 struct Settings {
     Settings();
-    bool checkValidity();
+    bool checkValidity(const scai::dmemo::CommunicatorPtr comm );
 
     /** @name General partition settings
     */
@@ -174,10 +174,12 @@ struct Settings {
     ITI::Format coordFormat = ITI::Format::AUTO; 	///< the format of the coordinated input file, \sa Format
     bool useDiffusionCoordinates = false;		///< if not coordinates are provided, we can use artificial coordinates
     IndexType diffusionRounds = 20;				///< number of rounds to create the diffusion coordinates
-    IndexType numNodeWeights = -1;		///< number of vertex weights
+    IndexType numNodeWeights = 0;		///< number of vertex weights
     std::string machine;                ///< name of the machine that the executable is running
     double seed;                        ///< random seed used for some routines
     std::string callingCommand;         ///< the complete calling command used
+    bool autoSetCpuMem = false;         ///< if set, geographer will gather cpu and memory info and use them for partitioning
+    IndexType processPerNode = 24;      ///< the number of processes per compute node. Is used with autoSetCpuMem to determine the cpu ID
     //@}
 
     /** @name Mesh generation settings
@@ -193,6 +195,7 @@ struct Settings {
      */
     //@{
     IndexType minBorderNodes = 1;			///< minimum number of border nodes for the local refinement
+    double minBorderNodesPercent = 0.001;
     IndexType stopAfterNoGainRounds = 0; 	///< number of rounds to stop local refinement if no gain is achieved
     IndexType minGainForNextRound = 1;		///< minimum gain to be achieved so local refinement proceeds to next round
     IndexType numberOfRestarts = 0;
@@ -245,7 +248,7 @@ struct Settings {
     */
     //@{
     bool noRefinement = false;				///< if we will do local refinement or not
-    IndexType multiLevelRounds = 0;			///< number of multilevel rounds
+    IndexType multiLevelRounds = 3;			///< number of multilevel rounds
     IndexType coarseningStepsBetweenRefinement = 3; ///< number of rounds every which we do coarsening
     bool nnCoarsening = false;              ///< when matching vertices, use the nearest neighbor to match (and contract with)
     //@}
@@ -267,7 +270,8 @@ struct Settings {
     //calculate expensive performance metrics?
     bool computeDiameter = false;			///< if the diameter should be computed (can be expensive)
     IndexType maxDiameterRounds = 2;		///< max number of rounds to approximate the diameter
-    IndexType maxCGIterations = 500;        ///< max number of iterations of the CG solver in metrics
+    IndexType maxCGIterations = 300;        ///< max number of iterations of the CG solver in metrics
+    double CGResidual = 1e-6;
     //@}
 
     /** @name Various parameters

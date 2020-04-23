@@ -1,6 +1,11 @@
 #pragma once
 #include "Wrappers.h"
 
+//needed in main. Added it here so no new dependencies are needed.
+#include <Tpetra_Core.hpp>
+#include <Zoltan2_PartitioningProblem.hpp>
+
+
 namespace ITI {
 
 /** @brief Class for external partitioning tools like zoltan.
@@ -51,7 +56,7 @@ public:
 
 private:
 
-    static scai::lama::DenseVector<IndexType> zoltanCore (
+    static scai::lama::DenseVector<IndexType> zoltanCoreCoords (
         const std::vector<scai::lama::DenseVector<ValueType>> &coords,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
         const bool nodeWeightsFlag,
@@ -60,6 +65,34 @@ private:
         const struct Settings &settings,
         Metrics<ValueType> &metrics);
 
+    static scai::lama::DenseVector<IndexType> zoltanCoreGraph (
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        const bool nodeWeightsFlag,
+        const std::string algo,
+        const bool repart,
+        const struct Settings &settings,
+        Metrics<ValueType> &metrics);
+
+    static Teuchos::ParameterList setParams( 
+        const std::string algo,
+        const Settings settings,
+        const bool repart=false,
+        const IndexType thisPE=0);
+
+    static std::vector<std::vector<ValueType>> extractLocalNodeWeights(
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        const bool nodeWeightsFlag );
+
+    template<typename Adapter>
+    static scai::lama::DenseVector<IndexType> runZoltanAlgo(
+        Zoltan2::PartitioningProblem<Adapter> *problem,
+        const scai::dmemo::DistributionPtr dist,
+        const Settings& settings,
+        const scai::dmemo::CommunicatorPtr comm,
+        Metrics<ValueType> &metrics );
+
     static std::string tool2String( ITI::Tool tool);
+
     };//class zoltanWrapper
 } /* namespace ITI */

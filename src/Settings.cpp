@@ -52,6 +52,9 @@ std::ostream& ITI::operator<<( std::ostream& out, const ITI::Tool tool) {
     case Tool::zoltanMJ:
         token = "zoltanMJ";
         break;
+    case Tool::zoltanXPulp:
+        token = "zoltanXPulp";
+        break;
     case Tool::zoltanSFC:
         token = "zoltanSFC";
         break;
@@ -126,6 +129,8 @@ std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool) {
         tool = ITI::Tool::zoltanRCB;
     else if( token=="zoltanMJ" or tokenLower=="zoltanmj")
         tool = ITI::Tool::zoltanMJ;
+    else if( token=="zoltanXPulp" or tokenLower=="zoltanxpulp")
+        tool = ITI::Tool::zoltanXPulp;
     else if( token=="zoltanSFC" or tokenLower=="zoltansfc")
         tool = ITI::Tool::zoltanSFC;
     else if( token=="parhipFastMesh" or tokenLower=="parhipfastmesh" )
@@ -167,16 +172,26 @@ ITI::Settings::Settings() {
     this->machine = std::string(machineChar);
 }
 
-bool ITI::Settings::checkValidity() {
-    if( this->storeInfo && this->outFile=="-" ) {
+bool ITI::Settings::checkValidity(const scai::dmemo::CommunicatorPtr comm ) {
+    if( this->storeInfo and this->outFile=="-" and this->outDir=="-" ){
         this->isValid = false;
+        if( comm->getRank()==0){
+            std::cout<< "ERROR: storeInfo argument was given but no outFile or outDir was given" << std::endl;
+        }
         return false;
     }
-    if( initialPartition==Tool::unknown or initialPartition==Tool::unknown){
+    if( initialMigration==Tool::unknown or initialPartition==Tool::unknown){
+        this->isValid = false;
+        if( initialMigration==Tool::unknown and comm->getRank()==0){
+            std::cout<< "ERROR: provided tool for initialMigration is not known" << std::endl;
+        }
+        if( initialPartition==Tool::unknown and comm->getRank()==0){
+            std::cout<< "ERROR: provided tool initialPartition is not known" << std::endl;
+        }
         return false;
     }
 
-    return isValid;
+    return true;
 }
 
 template <typename ValueType>
@@ -186,16 +201,19 @@ ITI::Settings ITI::Settings::setDefault( const scai::lama::CSRSparseMatrix<Value
     const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
     const long int localN = dist->getLocalSize();
 
-    retSet.minBorderNodes = std::max( int(localN*0.1), 1); //10% of local nodes
-    retSet.stopAfterNoGainRounds = 5;
-    long int localCut =  graph.getHaloStorage().getNumValues();
-    retSet.minGainForNextRound = std::max( int(localCut*0.1), 1); //10% of local halo
+    retSet.minBorderNodes = std::max( int(localN*minBorderNodesPercent), 1); //10% of local nodes
+    const scai::dmemo::CommunicatorPtr comm = dist->getCommunicatorPtr();
+    if(comm->getRank() == 0 ){
+        std::cout << "\tsetting (in PE 0) minBorderNodes to " << retSet.minBorderNodes << std::endl;
+    }
+
+    retSet.stopAfterNoGainRounds = 2;
 
     //TODO: when we set the minSamplingNodes, kmeans hangs after roundsTillAll rounds
     //long int roundsTillAll = 6; //in how many rounds we get all local points
     //retSet.minSamplingNodes = localN/std::pow(2,roundsTillAll);
 
-    retSet.multiLevelRounds = 9; //no reason...
+    //minGainForNextRound is set inside ParcoRepart::doLocalRefinement()
 
     return retSet;
 }

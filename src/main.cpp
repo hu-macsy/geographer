@@ -81,6 +81,8 @@ int main(int argc, char** argv) {
     //
     // generate or read graph and coordinates
     //
+    
+    std::chrono::time_point<std::chrono::steady_clock> beforeRead = std::chrono::steady_clock::now();
 
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<scai::lama::DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
@@ -88,13 +90,20 @@ int main(int argc, char** argv) {
 
     // total number of points
     const IndexType N = readInput<ValueType>( vm, settings, comm, graph, coordinates, nodeWeights );
-
+    
     if( settings.setAutoSettings ){
         settings = settings.setDefault( graph );
-        if( !settings.isValid )
-               return -1;
+    }
+    settings.isValid = settings.checkValidity(comm);
+    if( !settings.isValid ){
+       throw std::runtime_error("Settings struct is not valid, check the input parameter values.");
     }
 
+    std::chrono::duration<double> readTime =  std::chrono::steady_clock::now() - beforeRead;
+    if( comm->getRank()==0) {
+        std::cout << "Time to read/create input: " << readTime.count() << std::endl;
+    }
+    
     //---------------------------------------------------------------
     //
     // read the communication graph or the block sizes if provided
@@ -113,7 +122,9 @@ int main(int argc, char** argv) {
     } else if( vm.count("blockSizesFile") ) {
         //blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
         blockSizesFile = vm["blockSizesFile"].as<std::string>();
-        std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
+        std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks, settings.numNodeWeights );
+		SCAI_ASSERT( blockSizes.size()==settings.numNodeWeights, "Wrong number of weights, should be " << settings.numNodeWeights << " but is " << blockSizes.size() );
+		
         if (blockSizes.size() < nodeWeights.size()) {
             throw std::invalid_argument("Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
                                         + "but nodes have " + std::to_string(nodeWeights.size()) + " weights.");
@@ -135,8 +146,18 @@ int main(int argc, char** argv) {
 
         commTree.createFlatHeterogeneous( blockSizes );
     }else if( settings.hierLevels.size()!=0 ){
-        const IndexType numWeights = nodeWeights.size();
-        commTree.createFromLevels(settings.hierLevels, numWeights );
+        if( settings.autoSetCpuMem){
+            //the number of process or cores in each compute node
+            const int coresPerNode = settings.hierLevels.back(); 
+            std::vector<std::vector<ValueType>> blockWeights = calculateLoadRequests<ValueType>(comm, coresPerNode);
+            commTree.createFlatHeterogeneous( blockWeights, std::vector<bool>{true, false}  );
+        }else{
+            const IndexType numWeights = nodeWeights.size();
+            commTree.createFromLevels(settings.hierLevels, numWeights );
+        }
+    }else if( settings.autoSetCpuMem){
+        std::vector<std::vector<ValueType>> blockWeights = calculateLoadRequests<ValueType>(comm, settings.processPerNode);
+        commTree.createFlatHeterogeneous( blockWeights, std::vector<bool>{true, false} );
     } else {
         commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
     }
@@ -192,7 +213,8 @@ int main(int argc, char** argv) {
 
     std::vector<Metrics<ValueType>> metricsVec;
 
-    std::string outFile = getOutFileName(settings, "", comm);
+    const std::string outFile = getOutFileName(settings, "", comm);
+
     //------------------------------------------------------------
     //
     // partition the graph
@@ -352,11 +374,15 @@ int main(int argc, char** argv) {
                 //
 
                 //printVectorMetrics( metricsVec, outF );
-                std::cout<< "Output information written to file " << outFile << " in total time " << totalT << std::endl;
-            }	else	{
+                std::cout<< "Output information written to file " << outFile  << std::endl;
+            }else{
                 std::cout<< "Could not open file " << outFile << " information not stored"<< std::endl;
             }
         }
+    }
+
+    if( comm->getRank()==0) {
+        std::cout<< "Total time " << totalT << std::endl;
     }
 
 
@@ -412,6 +438,8 @@ int main(int argc, char** argv) {
         PRINT0("PE graph stored in " << filename );
     }
 
+    //getFreeRam(comm);
+    
     if (vm.count("callExit")) {
         //this is needed for supermuc
         std::exit(0);

@@ -40,8 +40,10 @@ public:
         {"preliminaryCut",-1.0}, {"preliminaryImbalance",-1.0}, {"finalCut",-1.0}, {"finalImbalance",-1.0}, {"maxBlockGraphDegree",-1.0},
         {"preliminaryMaxCommVol",-1.0},{"preliminaryTotalCommVol",-1.0},
         {"totalBlockGraphEdges",-1.0}, {"maxCommVolume",-1.0}, {"totalCommVolume",-1.0}, {"maxBoundaryNodes",-1.0}, {"totalBoundaryNodes",-1.0},
-        {"SpMVtime",-1.0}, {"commTime",-1.0}, {"CGtime", -1.0}, {"edgeImbalance", -1.0},
-        {"maxBorderNodesPercent",-1.0}, {"avgBorderNodesPercent",-1.0},
+        {"SpMVtime",-1.0}, {"commTime",-1.0}, 
+        {"CGtime_a1", -1.0}, {"CGiterations_a1", -1.0}, {"CGresidual_a1", -1.0},
+        {"CGtime_o1", -1.0}, {"CGiterations_o1", -1.0}, {"CGresidual_o1", -1.0},
+        {"edgeImbalance", -1.0}, {"maxBorderNodesPercent",-1.0}, {"avgBorderNodesPercent",-1.0},
         {"maxBlockDiameter",-1.0}, {"harmMeanDiam",-1.0}, {"numDisconBlocks",-1.0},
         {"maxRedistVol",-1.0}, {"totRedistVol",-1.0},	 //redistribution metrics
         {"maxCongestion",-1.0}, {"maxDilation",-1.0}, {"avgDilation",-1.0}		//mapping metrics
@@ -185,14 +187,18 @@ protected:
         scai::lama::CSRSparseMatrix<ValueType> matrix,
         const IndexType repeatTimes);
 
-    /** @brief Given a graph and a partition, solve the linear system implied by the laplacian of the graph.
+    /** @brief Given a graph and a partition, solve the linear system implied by the laplacian of the graph
+        using the conjugate gradient solver by lama. The initial solution and rhs vectors are set to 0 and 1
+        respectively.
 
         @return The time needed to solve the linear system.
     */
-    ValueType getLinearSolverTime(
+    std::tuple<ValueType,ValueType,ValueType> getCGTime(
         const scai::lama::CSRSparseMatrix<ValueType>& graph,
         const IndexType repeatTimes,
-        const IndexType maxIterations = 100
+        const IndexType maxIterations = 100,
+        const ValueType residual = 1e-4,
+        const bool oneOne=false
         );
 
 }; //struct Metrics
