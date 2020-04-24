@@ -36,7 +36,6 @@ IndexType readInput(
 
     IndexType N;
 
-
     if (vm.count("graphFile")) {
         std::string graphFile =  vm["graphFile"].as<std::string>();
         std::string coordFile;
@@ -280,6 +279,7 @@ std::string getOutFileName( const Settings& settings, const std::string& toolNam
     return outFile;
 }
 
+
 //taken from 
 //https://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
 unsigned long getFreeRam(const scai::dmemo::CommunicatorPtr& comm){
@@ -404,7 +404,7 @@ std::vector<std::vector<vType>> calculateLoadRequests(const scai::dmemo::Communi
     }
 
     //memory
-	//TODO: remove hardcoded long int size
+    //TODO: remove hardcoded long int size
     const unsigned long myFreeRam = getFreeRam(comm)/sizeof(long int); //value returned in bytes; convert to vertex size 
 
     std::vector<vType> allFreeRam(numPEs, 0.0);
@@ -412,13 +412,98 @@ std::vector<std::vector<vType>> calculateLoadRequests(const scai::dmemo::Communi
 
     //replicate all memory capacities in all PEs
     comm->sumImpl( retWeights[1].data(), allFreeRam.data(), numPEs, scai::common::TypeTraits<vType>::stype );
-	
-	
-	for( int i=0; i<numPEs; i++){
-	PRINT0( i << ": cpu " << retWeights[0][i] << ", free ram " << retWeights[1][i] );	
-	}
-	
+    
+    
+    for( int i=0; i<numPEs; i++){
+    PRINT0( i << ": cpu " << retWeights[0][i] << ", free ram " << retWeights[1][i] );   
+    }
+    
     return retWeights;
 }
+
+
+template <typename ValueType>
+ITI::CommTree<IndexType,ValueType> createCommTree( 
+    const cxxopts::ParseResult& vm,
+    Settings& settings,
+    const scai::dmemo::CommunicatorPtr& comm,
+    std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights){
+
+    ITI::CommTree<IndexType,ValueType> commTree;
+
+    if( vm.count("PEgraphFile") and vm.count("blockSizesFile") ) {
+        throw std::runtime_error("You should provide either a file for a communication graph OR a file for block sizes. Not both.");
+    }
+
+    if(vm.count("PEgraphFile")) {
+        throw std::logic_error("Reading of communication trees not yet implemented here.");
+        //commTree =  FileIO<IndexType, ValueType>::readPETree( settings.PEGraphFile );
+    } else if( vm.count("blockSizesFile") or vm.count("topologyFile") ) {
+        std::string blockSizesFile;
+        //blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
+        std::vector<std::vector<ValueType>> blockSizes;
+
+        if( vm.count("blockSizesFile") and vm.count("topologyFile") ){
+            throw std::invalid_argument("Two conflicting arguments are given: blockSizesFile and topologyFile. Pick one."  );
+        }else if( vm.count("blockSizesFile") ){
+            blockSizesFile = vm["blockSizesFile"].as<std::string>();
+            blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks, settings.numNodeWeights );
+        }else{
+            if( settings.numBlocks!= comm->getSize() ){
+                throw std::runtime_error("Provided argument topologyFile. This option only works when the number of calling processors equals the number of blocks. One solution is to not provide the numBLocks argument");
+            }
+            blockSizesFile = vm["topologyFile"].as<std::string>();
+            blockSizes = ITI::FileIO<IndexType, ValueType>::createBlockSizesFromTopology( blockSizesFile, settings.machine, comm );
+        }
+        
+        //blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
+        //std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks, settings.numNodeWeights );
+        SCAI_ASSERT( blockSizes.size()==settings.numNodeWeights, "Wrong number of weights, should be " << settings.numNodeWeights << " but is " << blockSizes.size() );
+        
+        if (blockSizes.size() < nodeWeights.size()) {
+            nodeWeights.resize(blockSizes.size());
+            if (comm->getRank() == 0) {
+                std::cout << "WARNING: Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + 
+                " weights per block, "+ "but nodes have " + std::to_string(nodeWeights.size()) + 
+                " weights. Discarding surplus node weights." << std::endl;
+            }
+        }
+
+        if (blockSizes.size() > nodeWeights.size()) {
+            blockSizes.resize(nodeWeights.size());
+            if (comm->getRank() == 0) {
+                std::cout << "WARNING: Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + 
+                " weights per block, "+ "but nodes have " + std::to_string(nodeWeights.size()) + 
+                " weights. Discarding surplus block sizes." << std::endl;
+            }
+        }
+
+        for (IndexType i = 0; i < nodeWeights.size(); i++) {
+            const ValueType blockSizesSum  = std::accumulate( blockSizes[i].begin(), blockSizes[i].end(), 0);
+            const ValueType nodeWeightsSum = nodeWeights[i].sum();
+            SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
+        }
+
+        commTree.createFlatHeterogeneous( blockSizes );
+    }else if( settings.hierLevels.size()!=0 ){
+        if( settings.autoSetCpuMem){
+            //the number of process or cores in each compute node
+            const int coresPerNode = settings.hierLevels.back(); 
+            std::vector<std::vector<ValueType>> blockWeights = calculateLoadRequests<ValueType>(comm, coresPerNode);
+            commTree.createFlatHeterogeneous( blockWeights, std::vector<bool>{true, false}  );
+        }else{
+            const IndexType numWeights = nodeWeights.size();
+            commTree.createFromLevels(settings.hierLevels, numWeights );
+        }
+    }else if( settings.autoSetCpuMem){
+        std::vector<std::vector<ValueType>> blockWeights = calculateLoadRequests<ValueType>(comm, settings.processPerNode);
+        commTree.createFlatHeterogeneous( blockWeights, std::vector<bool>{true, false} );
+    } else {
+        commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
+    }
+
+    return commTree;
+}
+
 
 }//namespace ITI
