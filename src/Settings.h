@@ -169,7 +169,6 @@ struct Settings {
     std::string outFile = "-";	///< name of the file to store metrics (if desired)
     std::string outDir = "-"; 	//this is used by the competitors main
     std::string PEGraphFile = "-"; //TODO: this should not be in settings
-    std::string blockSizesFile = "-"; //TODO: this should not be in settings
     ITI::Format fileFormat = ITI::Format::AUTO;   	///< the format of the input file, \sa Format
     ITI::Format coordFormat = ITI::Format::AUTO; 	///< the format of the coordinated input file, \sa Format
     bool useDiffusionCoordinates = false;		///< if not coordinates are provided, we can use artificial coordinates

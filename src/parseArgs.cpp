@@ -30,6 +30,7 @@ Options populateOptions() {
     ("seed", "random seed, default is current time", value<double>()->default_value(std::to_string(time(NULL))))
     //mapping
     ("PEgraphFile", "read communication graph from file", value<std::string>())
+    ("topologyFile", "read system topology  from file: a line per processor with CPU, MEM and number of cores", value<std::string>())
     ("blockSizesFile", "file to read the block sizes for every block", value<std::string>() )
     ("autoSetCpuMem", "if set, geographer will gather cpu and memory info and use them to build a heterogeneous communication tree used for partitioning")
     ("processPerNode", "the number of processes per compute node. Is used with autoSetCpuMem to determine the internal cpu/core ID within a compute node and query the cpu frequency.",  value<IndexType>())
@@ -217,6 +218,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("coordFormat")) {
         settings.coordFormat = vm["coordFormat"].as<ITI::Format>();
     }
+
     if (vm.count("PEgraphFile")) {
         settings.PEGraphFile = vm["PEgraphFile"].as<std::string>();
     }
@@ -249,9 +251,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("epsilon")) {
         settings.epsilon = vm["epsilon"].as<double>();
     }
-    if (vm.count("blockSizesFile")) {
-        settings.blockSizesFile = vm["blockSizesFile"].as<std::string>();
-    }
+
     if (vm.count("processPerNode")) {
         settings.processPerNode = vm["processPerNode"].as<IndexType>();
     }    
