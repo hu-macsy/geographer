@@ -442,18 +442,21 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
         std::string blockSizesFile;
         //blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
         std::vector<std::vector<ValueType>> blockSizes;
+        std::vector<bool> isWeightProportional( settings.numNodeWeights ); //if false, then treat as an absolute value
 
         if( vm.count("blockSizesFile") and vm.count("topologyFile") ){
             throw std::invalid_argument("Two conflicting arguments are given: blockSizesFile and topologyFile. Pick one."  );
         }else if( vm.count("blockSizesFile") ){
             blockSizesFile = vm["blockSizesFile"].as<std::string>();
             blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks, settings.numNodeWeights );
+            isWeightProportional = {true, true };
         }else{
             if( settings.numBlocks!= comm->getSize() ){
                 throw std::runtime_error("Provided argument topologyFile. This option only works when the number of calling processors equals the number of blocks. One solution is to not provide the numBLocks argument");
             }
             blockSizesFile = vm["topologyFile"].as<std::string>();
             blockSizes = ITI::FileIO<IndexType, ValueType>::createBlockSizesFromTopology( blockSizesFile, settings.machine, comm );
+            isWeightProportional = {true, false };
         }
         
         //blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
@@ -479,12 +482,14 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
         }
 
         for (IndexType i = 0; i < nodeWeights.size(); i++) {
-            const ValueType blockSizesSum  = std::accumulate( blockSizes[i].begin(), blockSizes[i].end(), 0);
-            const ValueType nodeWeightsSum = nodeWeights[i].sum();
-            SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
+            if( not isWeightProportional[i]){
+                const ValueType blockSizesSum  = std::accumulate( blockSizes[i].begin(), blockSizes[i].end(), 0);
+                const ValueType nodeWeightsSum = nodeWeights[i].sum();
+                SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
+            }
         }
 
-        commTree.createFlatHeterogeneous( blockSizes );
+        commTree.createFlatHeterogeneous( blockSizes, isWeightProportional );
     }else if( settings.hierLevels.size()!=0 ){
         if( settings.autoSetCpuMem){
             //the number of process or cores in each compute node

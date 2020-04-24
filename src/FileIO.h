@@ -331,7 +331,20 @@ public:
     //TODO: move to CommTree as, for example, importFromFile oder so?
     static CommTree<IndexType,ValueType> readPETree( const std::string& filename);
 
+    /* Read the file with the topology description; one line per compute node with 4 values: 
+        name (which is used as a key for the map), CPU speed, memory in MB  and number of cores
+
+    @param return key is the node name, vector as size 3 with the above attributes
+    */
+
     static std::map<std::string, std::vector<ValueType>> readFlatTopology( const std::string& filename );
+
+    /* Creates the block sizes (likely to be used to create a commTree) from a topology file.
+        \sa readFlatTopology() and \sa commTree::createFlatHeterogeneous().
+        This function works on;y when numBlock==number of calling processors.
+    */
+    static std::vector<std::vector<ValueType>>createBlockSizesFromTopology(
+        const std::string filename, const std::string myName, const scai::dmemo::CommunicatorPtr comm);
 
     // taken from https://stackoverflow.com/questions/4316442/stdofstream-check-if-file-exists-before-writing
     /** Check if a file exists

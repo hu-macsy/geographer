@@ -2462,6 +2462,52 @@ std::vector<std::vector<ValueType> > FileIO<IndexType, ValueType>::readBlockSize
     return blockSizes;
 }
 //-------------------------------------------------------------------------------------------------
+// the whole thing is harcoded for 3 specs: CPU, mem and num cores.
+//TODO: parameterize?
+template<typename IndexType, typename ValueType>
+std::vector<std::vector<ValueType>> FileIO<IndexType, ValueType>::createBlockSizesFromTopology (
+    const std::string filename, const std::string myName, const scai::dmemo::CommunicatorPtr comm){
+
+    //read the file with the topology description; one line per compute node with 4 values:
+    //name (which is used as a key for the map), CPU speed, memory in MB  and number of cores
+    std::map<std::string, std::vector<ValueType>> nodeMap = readFlatTopology( filename );
+
+    typename std::map<std::string, std::vector<ValueType>>::iterator it = nodeMap.find(myName);
+
+    if( it==nodeMap.end()){
+        throw std::runtime_error("Machine name " + myName + " does not exist in file " + filename);
+    }
+    
+    const std::vector<ValueType> mySpecs = it->second;
+    assert( mySpecs.size()==numWeights );
+
+    //third weight is the number of cores, leave it out
+    const int numWeights = 2;
+    const int numBlocks = comm->getSize();
+    const int myRank = comm->getRank();
+    std::vector<std::vector<ValueType> > blockSizes(numWeights, std::vector<ValueType>(numBlocks,0));
+
+    //insert my specs into the block size; each PE inserts to its own position
+    for(int w=0; w<numWeights; w++){
+        blockSizes[w][myRank] = mySpecs[w];
+    }
+
+    //sum globally
+    for(int w=0; w<numWeights; w++){
+        comm->sumImpl( blockSizes[w].data(), blockSizes[w].data(), numBlocks, scai::common::TypeTraits<ValueType>::stype );
+    }
+
+    //first weight is CPU speed and will be a proportional weight
+    ValueType sumCPU = std::accumulate( blockSizes[0].begin(), blockSizes[0].end(), 0.0);
+
+    for(int p=0; p<numBlocks; p++){
+        blockSizes[0][p] /= sumCPU;
+    }
+
+    return blockSizes;
+}
+
+//-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const std::string& filename ) {
