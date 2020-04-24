@@ -114,11 +114,14 @@ TYPED_TEST(KMeansTest, testFindCenters) {
     part.redistribute(dist);
 
     DenseVector<ValueType> uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
+    DenseVector<ValueType> randomWeights( graph.getRowDistributionPtr(), 1 ); 
+    randomWeights.fillRandom(3.0);
+    std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { uniformWeights, randomWeights };
 
     //get centers
     std::vector<IndexType> nodeIndices(uniformWeights.getLocalValues().size());
     std::iota(nodeIndices.begin(), nodeIndices.end(), 0);
-    std::vector<std::vector<ValueType> > centers = KMeans<IndexType,ValueType>::findCenters(coords, part, k,	nodeIndices.begin(), nodeIndices.end(), uniformWeights);
+    std::vector<std::vector<ValueType> > centers = KMeans<IndexType,ValueType>::findCenters(coords, part, k, nodeIndices.begin(), nodeIndices.end(), nodeWeights);
 
     //check for size
     EXPECT_EQ(dimensions, centers.size());
@@ -128,7 +131,7 @@ TYPED_TEST(KMeansTest, testFindCenters) {
     part = DenseVector<IndexType>(dist, 0);
 
     //get centers
-    centers = KMeans<IndexType,ValueType>::findCenters(coords, part, k, nodeIndices.begin(), nodeIndices.end(), uniformWeights);
+    centers = KMeans<IndexType,ValueType>::findCenters(coords, part, k, nodeIndices.begin(), nodeIndices.end(), nodeWeights);
 }
 
 
@@ -309,6 +312,7 @@ TYPED_TEST(KMeansTest, testHierarchicalPartition) {
     }
 }
 
+
 TYPED_TEST(KMeansTest, testComputePartitionWithMultipleWeights) {
     using ValueType = TypeParam;
 
@@ -381,7 +385,7 @@ TYPED_TEST(KMeansTest, testComputePartitionWithMultipleWeights) {
 TYPED_TEST(KMeansTest, testGetGlobalMinMax) {
     using ValueType = TypeParam;
 
-    std::string graphFile = "bubbles-00010.graph";
+    std::string graphFile = KMeansTest<ValueType>::graphPath + "bubbles-00010.graph";
     std::string coordFile = graphFile + ".xyz";
     const IndexType dimensions = 2;
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -405,6 +409,264 @@ TYPED_TEST(KMeansTest, testGetGlobalMinMax) {
         EXPECT_EQ(maxCoords[d], maxMax);
     }
 }
+
+
+
+TYPED_TEST(KMeansTest, testFuzzify) {
+    using ValueType = TypeParam;
+
+    std::string fileName = "bubbles-00010.graph";
+   // std::string fileName = "Grid8x8";
+    std::string graphFile = KMeansTest<ValueType>::graphPath + fileName;
+    std::string coordFile = graphFile + ".xyz";
+    const IndexType dimensions = 2;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+    const IndexType n = graph.getNumRows();
+    const IndexType localN = graph.getLocalNumRows();
+
+    //load coords
+    const std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
+
+    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+    const scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+    const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights}; //, unitNodeWeights, unitNodeWeights };
+    const IndexType numNodeWeights = 1;
+
+    Settings settings;
+    settings.numBlocks = comm->getSize();
+    settings.numNodeWeights = numNodeWeights;
+
+    Metrics<ValueType> metrics(settings);
+
+    //call the core implementation to get the influence values
+    DenseVector<IndexType> partition;
+    std::vector<std::vector<ValueType>> influence(numNodeWeights, std::vector<ValueType>(settings.numBlocks, 1));
+    {
+        std::vector<ValueType> minCoords(settings.dimensions);
+        std::vector<ValueType> maxCoords(settings.dimensions);
+        std::tie(minCoords, maxCoords) = KMeans<IndexType,ValueType>::getGlobalMinMaxCoords(coordinates);
+        std::vector<std::vector<ValueType>> centers = KMeans<IndexType,ValueType>::findInitialCentersSFC(coordinates, minCoords, maxCoords, settings);
+        std::vector<std::vector<std::vector<ValueType>>> centers2 = { centers };
+
+        scai::lama::DenseVector<IndexType> partitionPrev(coordinates[0].getDistributionPtr(), 0);
+        std::vector<std::vector<ValueType>> blockSizes(1, std::vector<ValueType>(settings.numBlocks, std::ceil( (ValueType)n/settings.numBlocks)));
+
+        //partition = KMeans<IndexType,ValueType>::computePartition(coordinates, nodeWeights, blockSizes, partitionPrev, centers2, settings, metrics );
+        partition = KMeans<IndexType,ValueType>::computePartition(coordinates, settings);
+    }
+
+    std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzyClustering = KMeans<IndexType,ValueType>::fuzzify( coordinates, nodeWeights, partition, settings);
+
+    EXPECT_EQ( fuzzyClustering.size(), localN );
+    EXPECT_EQ( fuzzyClustering[0].size(), std::min<int>(4, settings.numBlocks) ); //the default value for centers to use is 4
+
+    IndexType mismatches=0;
+    for( IndexType i=0; i<localN; i++){
+        //TODO: this is not actually an error. It would be in the standard k-means algorithm but because we have influence
+        // the center each point is assigned to it is not necessarily its closest center.
+        //if(comm->getRank()==0){
+        //    EXPECT_EQ( partition.getLocalValues()[i], fuzzyClustering[i][0].second ) << " for i= " << i << " in PE " << comm->getRank() ;
+        //}
+        if( partition.getLocalValues()[i]!=fuzzyClustering[i][0].second ){
+            mismatches++;
+        }
+    }
+    PRINT("detected " << mismatches << " mismatched points in PE " << comm->getRank() );
+}
+
+
+
+TYPED_TEST(KMeansTest, testMembership){
+    using ValueType = TypeParam;
+
+    //std::string fileName = "Grid8x8";
+    std::string fileName = "bubbles-00010.graph";
+    std::string graphFile = KMeansTest<ValueType>::graphPath + fileName;
+    std::string coordFile = graphFile + ".xyz";
+    const IndexType dimensions = 2;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    IndexType N;
+    {
+        CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+        N = graph.getNumRows();
+    }
+    
+
+    //load coords
+    const std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), N, dimensions);
+
+    const IndexType localN = coordinates[0].getLocalValues().size();
+
+    const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
+    const scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+    const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights}; //, unitNodeWeights, unitNodeWeights };
+    //const IndexType numNodeWeights = 1;
+
+    //initialize partition with rank
+    DenseVector<IndexType> partition(dist, comm->getRank() );
+
+    Settings settings;
+    settings.numBlocks = comm->getSize();
+
+    const IndexType commSize = IndexType ( comm->getSize()) ;
+    const IndexType ctu = std::min( commSize, IndexType (4) );
+
+    //get a fuzzy partition
+    std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzyClustering = KMeans<IndexType,ValueType>::fuzzify( coordinates, nodeWeights, partition, settings, ctu);
+
+    //get membership for every point
+    std::vector<std::vector<ValueType>> membershipV = KMeans<IndexType,ValueType>::computeMembership( fuzzyClustering );
+    assert( membershipV.size()==localN );
+
+    std::vector<ValueType> mshipOneValue = KMeans<IndexType,ValueType>::computeMembershipOneValue( fuzzyClustering);
+
+    for(IndexType i=0; i<localN; i++ ){
+        //std::cout<< comm->getRank() << ": i= " << i << ", mship= ";
+        std::vector<ValueType> myMships = membershipV[i];
+        assert(myMships.size()==ctu);
+        EXPECT_GE( mshipOneValue[i], 0 );
+        EXPECT_LE( mshipOneValue[i], 1 );
+
+        ValueType memSum =0.0;
+        for(IndexType c=0; c<ctu; c++ ){
+            //std::cout<< myMships[c] << ", ";
+            memSum +=myMships[c];
+        }
+
+        EXPECT_NEAR( memSum, 1, 1e-6 );
+        //std::cout << ", mship= " << mshipOneValue[i]<< std::endl;
+    }
+}
+
+
+
+TYPED_TEST(KMeansTest, testRebalance) {
+
+using ValueType = TypeParam;
+
+    //std::string fileName = "Grid16x16";
+    std::string fileName = "bubbles-00010.graph";
+    std::string graphFile = KMeansTest<ValueType>::graphPath + fileName;
+    std::string coordFile = graphFile + ".xyz";
+    const IndexType dimensions = 2;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+    IndexType N = graph.getNumRows();
+
+    //load coords
+    const std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), N, dimensions);
+
+    //const IndexType localN = coordinates[0].getLocalValues().size();
+
+    const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
+    const scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+    const scai::lama::DenseVector<ValueType> rankNodeWeights = scai::lama::DenseVector<ValueType>( dist, comm->getRank()+1);
+    DenseVector<ValueType> randomWeights( dist, 1.1 ); 
+    randomWeights.fillRandom(7.0);
+    DenseVector<ValueType> randomWeights2( dist, 1.1 );  
+    randomWeights2.fillRandom(13.0);
+    const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights, randomWeights, randomWeights2};
+
+    Settings settings;
+    settings.numBlocks = 13;// comm->getSize();
+    settings.batchPercent = 0.1;
+    Metrics<ValueType> metrics(settings);
+
+
+     //const std::vector<std::vector<ValueType>> targetBlockWeights( nodeWeights.size() ,std::vector<ValueType>( settings.numBlocks, (N+1)/comm->getSize() ) );
+    std::vector<std::vector<ValueType>> targetBlockWeights( nodeWeights.size() );
+    for( IndexType w=0; w<nodeWeights.size(); w++ ){
+        targetBlockWeights[w] = std::vector<ValueType>( settings.numBlocks, 1*nodeWeights[w].sum()/settings.numBlocks);
+    }
+
+
+    //initialize partition with rank
+    //DenseVector<IndexType> partition(dist, comm->getRank() );
+    //partition.fillRandom( settings.numBlocks-1);
+
+    DenseVector<IndexType> partition = KMeans<IndexType,ValueType>::computePartition(coordinates, nodeWeights, targetBlockWeights, settings, metrics);
+    //aux<IndexType,ValueType>::print2DGrid( graph, partition );
+
+    for (IndexType w=0; w<nodeWeights.size(); w++) {
+        ValueType imba = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks, nodeWeights[w], targetBlockWeights[w]);
+    PRINT0( w << ": " << imba );
+    }
+
+
+    KMeans<IndexType,ValueType>::rebalance( coordinates, nodeWeights, targetBlockWeights, partition, settings);
+    
+    //aux<IndexType,ValueType>::print2DGrid( graph, partition );
+    for (IndexType w=0; w<nodeWeights.size(); w++) {
+        ValueType imba = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks, nodeWeights[w], targetBlockWeights[w]);
+    PRINT0( w << ": " << imba );
+    }
+}
+
+/* Calculate a partition and its fuzyness. Store to files and use
+the tools/visualizeMship.ipynb notebook to visualize them
+*/
+TYPED_TEST(KMeansTest, testSortingForRebalance) {
+
+using ValueType = TypeParam;
+
+    //std::string fileName = "Grid16x16";
+    std::string fileName = "rotation-00000.graph";
+    std::string graphFile = KMeansTest<ValueType>::graphPath + fileName;
+    std::string coordFile = graphFile + ".xyz";
+    const IndexType dimensions = 2;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(graphFile );
+    IndexType N = graph.getNumRows();    
+
+    //load coords
+    const std::vector<DenseVector<ValueType>> coordinates = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), N, dimensions);
+
+    const IndexType localN = coordinates[0].getLocalValues().size();
+
+    const scai::dmemo::DistributionPtr dist = coordinates[0].getDistributionPtr();
+    const scai::lama::DenseVector<ValueType> unitNodeWeights = scai::lama::DenseVector<ValueType>( dist, 1);
+    const scai::lama::DenseVector<ValueType> rankNodeWeights = scai::lama::DenseVector<ValueType>( dist, comm->getRank()+1);
+    DenseVector<ValueType> randomWeights( dist, 1.1 ); 
+    randomWeights.fillRandom(7.0);
+    DenseVector<ValueType> randomWeights2( dist, 1.1 );  
+    randomWeights2.fillRandom(13.0);
+    const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights = { unitNodeWeights, randomWeights, randomWeights2};
+
+    Settings settings;
+    settings.numBlocks = comm->getSize();
+    settings.epsilon = 0.1;
+    Metrics<ValueType> metrics(settings);
+
+    std::vector<std::vector<ValueType>> targetBlockWeights( nodeWeights.size() );
+    for( IndexType w=0; w<nodeWeights.size(); w++ ){
+        targetBlockWeights[w] = std::vector<ValueType>( settings.numBlocks, nodeWeights[w].sum()/comm->getSize() );
+    }
+    DenseVector<IndexType> partition = KMeans<IndexType,ValueType>::computePartition(coordinates, nodeWeights, targetBlockWeights, settings, metrics);
+
+    std::string partOutFile = "./testing/mshipSort.part";
+    ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+
+
+    const std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzyClustering = KMeans<IndexType,ValueType>::fuzzify( coordinates, nodeWeights, partition, settings);
+    const std::vector<ValueType> mship = KMeans<IndexType,ValueType>::computeMembershipOneValueNormalized( fuzzyClustering, partition, settings.numBlocks);
+    assert( mship.size()==localN );
+    //^^^^^^
+    //this does not visualize different sorting versions
+
+    std::vector<IndexType> mshipInt( mship.size(), 0.0 );
+    std::transform( mship.begin(), mship.end(), mshipInt.begin(), std::bind(std::multiplies<ValueType>(), std::placeholders::_1, 100) );
+    DenseVector<IndexType> allMships( partition.getDistributionPtr(), scai::hmemo::HArray<IndexType>( localN, mshipInt.data()) );
+    FileIO<IndexType,ValueType>::writeDenseVectorCentral( allMships, "./testing/mships.txt");
+
+}
+
+
+
 /*
 TYPED_TEST(KMeansTest, testPartitionWithNodeWeights) {
     using ValueType = TypeParam;

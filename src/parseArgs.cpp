@@ -65,7 +65,9 @@ Options populateOptions() {
     ("balanceIterations", "Tuning parameter for K-Means", value<IndexType>())
     ("maxKMeansIterations", "Tuning parameter for K-Means", value<IndexType>())
     ("tightenBounds", "Tuning parameter for K-Means")
+    ("keepMostBalanced", "Tuning parameter for K-Means. When activated, k-means will return the solution with the minimum balance that was found.")
     ("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
+    ("kMeansMshipSort", "used in KMeans::rebalance to sort vertices. Possible values are 'lex' and 'sqImba'", value<std::string>())
     // using '/' to separate the lines breaks the output message
     ("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3,4,10 there are 3 levels. In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
     //output
@@ -163,6 +165,9 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (!vm.count("influenceExponent")) {
         settings.influenceExponent = 1.0/settings.dimensions;
     }
+    if (vm.count("metricsDetail")) {
+        settings.metricsDetail = vm["metricsDetail"].as<std::string>();
+    }
 
     if( vm.count("metricsDetail") ) {
         if( not (settings.metricsDetail=="no" or settings.metricsDetail=="easy" or settings.metricsDetail=="all" or settings.metricsDetail=="mapping") ) {
@@ -186,6 +191,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.storePartition = vm.count("storePartition");
     settings.erodeInfluence = vm.count("erodeInfluence");
     settings.tightenBounds = vm.count("tightenBounds");
+    settings.keepMostBalanced = vm.count("keepMostBalanced");
     settings.noRefinement = vm.count("noRefinement");
     settings.useDiffusionCoordinates = vm.count("useDiffusionCoordinates");
     settings.gainOverBalance = vm.count("gainOverBalance");
@@ -347,6 +353,16 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         }
     }
 
+    if( vm.count("kMeansMshipSort") ) {
+        settings.kMeansMshipSort = vm["kMeansMshipSort"].as<std::string>();
+        if( not (settings.kMeansMshipSort=="lex" or settings.kMeansMshipSort=="sqImba") ) {
+            if(comm->getRank() ==0 ) {
+                std::cout<<"WARNING: wrong value for parameter kMeansMshipSort= " << settings.kMeansMshipSort << ". Setting to lex" <<std::endl;
+                settings.kMeansMshipSort="lex";
+            }
+        }
+    }
+
     if (vm.count("repeatTimes")) {
         settings.repeatTimes = vm["repeatTimes"].as<IndexType>();
     }
@@ -359,9 +375,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("CGResidual")) {
         settings.CGResidual = vm["CGResidual"].as<double>();
     }
-    if (vm.count("metricsDetail")) {
-        settings.metricsDetail = vm["metricsDetail"].as<std::string>();
-    }
+
 
     /*** consistency checks ***/
     if (vm.count("previousPartition")) {

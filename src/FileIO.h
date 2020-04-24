@@ -141,6 +141,13 @@ public:
      */
     static void writeDenseVectorCentral(DenseVector<IndexType> &dv, const std::string filename);
 
+    /**
+     * Write a DenseVector in parallel in the filename. Each PE, one after another, write its own part.
+     */
+    template<typename T>
+    static void writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename);
+
+
     /** Reads a graph from filename in a given format and returns the adjacency matrix. \sa ITI::Format
      * @param[in] filename The file to read from.
      * @param[in] fileFormat The type of file to read from.
@@ -369,12 +376,6 @@ private:
      * Reads the coordinates for the MatrixMarket file format.
      */
     static std::vector<DenseVector<ValueType>> readCoordsMatrixMarket ( const std::string filename, const scai::dmemo::CommunicatorPtr comm);
-
-    /**
-     * Write a DenseVector in parallel in the filename. Each PE, one after another, write its own part.
-     */
-    template<typename T>
-    static void writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename);
 
     static void ltrim(std::string &s);
 

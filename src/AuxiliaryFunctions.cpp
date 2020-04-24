@@ -296,11 +296,11 @@ IndexType aux<IndexType, ValueType>::toMetisInterface(
     std::vector<IndexType>& xadj,
     std::vector<IndexType>& adjncy,
     std::vector<ValueType>& vwgt,
-    std::vector<ValueType>& tpwgts,
+    std::vector<double>& tpwgts,
     IndexType &wgtFlag,
     IndexType &numWeights,
-    std::vector<ValueType>& ubvec,
-    std::vector<ValueType>& xyzLocal,
+    std::vector<double>& ubvec,
+    std::vector<double>& xyzLocal,
     std::vector<IndexType>& options){
     SCAI_REGION( "aux.toMetisInterface");
 
@@ -643,7 +643,7 @@ bool aux<IndexType, ValueType>::alignDistributions(
 
 
 template class aux<IndexType, double>;
-//template class aux<long long unsigned int, double>; //rewuired for the parhip wrapper
+//template class aux<long long unsigned int, double>; //required for the parhip wrapper
 template class aux<IndexType, float>;
 
 }//namespace ITI

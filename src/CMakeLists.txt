@@ -42,7 +42,7 @@ find_library( PARHIP_LIB libparhip.a libparhip.so HINTS "${PARHIP_BASE}" "${PARH
 
 
 ###
-### define libraries and executables
+### define libraries and exectables
 ###
 
 

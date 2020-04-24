@@ -1233,7 +1233,6 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
             file.read((char*)(&header[0]), headerSize*sizeof(ULLI));
         }
 
-
         if (not comm->all(success)) {
             throw std::runtime_error("Error while opening the file " + filename);
         }
@@ -2700,5 +2699,6 @@ void FileIO<IndexType, ValueType>::trim(std::string &s) {
 template class FileIO<IndexType, double>;
 template class FileIO<IndexType, float>;
 //template class FileIO<IndexType, IndexType>;
+
 
 } /* namespace ITI */

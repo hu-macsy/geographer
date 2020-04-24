@@ -6,7 +6,6 @@
 #include "Settings.h"
 #include "Metrics.h"
 
-
 namespace ITI {
 
 /** @brief Map the blocks of a partitioned graph to a processor graph, i.e., the physical network.

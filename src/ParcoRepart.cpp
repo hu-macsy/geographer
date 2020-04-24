@@ -392,7 +392,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         }
     }
     else if (settings.initialPartition == ITI::Tool::geoKmeans or settings.initialPartition == ITI::Tool::geoHierKM \
-             or  settings.initialPartition == ITI::Tool::geoHierRepart) {
+             or  settings.initialPartition == ITI::Tool::geoHierRepart or  settings.initialPartition == ITI::Tool::geoKmeansBalance) {
         if (comm->getRank() == 0) {
             std::cout << "Initial partition with K-Means" << std::endl;
         }
@@ -435,9 +435,12 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
 
         if (settings.repartition) {
             result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
-        } else if (settings.initialPartition == ITI::Tool::geoKmeans) {
+        }else if (settings.initialPartition == ITI::Tool::geoKmeans) {
             result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
-        } else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart) {
+        }else if (settings.initialPartition == ITI::Tool::geoKmeansBalance) {
+            settings.keepMostBalanced = true;
+            result = ITI::KMeans<IndexType,ValueType>::computePartition_targetBalance(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
+        }else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart) {
 
             SCAI_ASSERT_ERROR( commTree.areWeightsAdapted(), "The weight of the tree are not adapted; should call tree.adaptWeights()" );
             SCAI_ASSERT_EQ_ERROR( commTree.getNumLeaves(), settings.numBlocks, "The number of leaves and blocks should agree" );            

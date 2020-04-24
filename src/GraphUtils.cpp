@@ -479,7 +479,6 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
             //optBlockSizes is the optimum weight/size for every block
             SCAI_ASSERT_EQ_ERROR( k, optBlockSizes.size(), "Number of blocks do not agree with the size of the vector of the block sizes");
             //TODO: vector not really needed, only the max value
-//TODO: recheck how imbalance is calculated
             std::vector<ValueType> imbalances( k );
             for( IndexType i=0; i<k; i++) {
                 imbalances[i] = (ValueType( globalSubsetSizes[i]- optBlockSizes[i]))/optBlockSizes[i];
