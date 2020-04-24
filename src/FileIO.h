@@ -331,6 +331,7 @@ public:
     //TODO: move to CommTree as, for example, importFromFile oder so?
     static CommTree<IndexType,ValueType> readPETree( const std::string& filename);
 
+    static std::map<std::string, std::vector<ValueType>> readFlatTopology( const std::string& filename );
 
     // taken from https://stackoverflow.com/questions/4316442/stdofstream-check-if-file-exists-before-writing
     /** Check if a file exists

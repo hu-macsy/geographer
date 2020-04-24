@@ -2467,7 +2467,7 @@ template<typename IndexType, typename ValueType>
 CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const std::string& filename ) {
 
     if( not fileExists(filename) ) {
-        std::cout<<"Erros, file " << filename << " to read processor tree does not exists.\nAborting..." << std::endl;
+        std::cout<<"Error, file " << filename << " to read processor tree does not exists.\nAborting..." << std::endl;
         throw std::runtime_error("File "+ filename+ " failed.");
     } else {
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -2550,7 +2550,59 @@ CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const st
 
     return CommTree<IndexType,ValueType>( leaves, isProp );
 }
+//-------------------------------------------------------------------------------------------------
 
+template<typename IndexType, typename ValueType>
+std::map<std::string, std::vector<ValueType>> FileIO<IndexType, ValueType>::readFlatTopology( const std::string& filename ) {
+
+    if( not fileExists(filename) ) {
+        std::cout<<"Error, file " << filename << " to read processor tree does not exists.\nAborting..." << std::endl;
+        throw std::runtime_error("File "+ filename+ " failed.");
+    } else {
+        scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+        if( comm->getRank()==0 ) {
+            std::cout<< "Reading from file "<< filename << std::endl;
+        }
+    }
+
+    std::ifstream file(filename);
+    std::string line;
+
+   const IndexType numWeights = 3;
+
+    //read by line to create the compute nodes
+
+    std::map<std::string, std::vector<ValueType>> allCompNodes;
+
+    while( std::getline(file, line) ) {
+        //skip the first lines that have comments starting with '%' or '#'
+        if( line[0]== '%' or line[0]== '#' ) {
+            continue;
+        }
+
+        std::stringstream ss;
+        ss.str( line );
+
+        //first is the node name
+        std::string compNodeName;
+        ss >> compNodeName;
+
+        std::vector<ValueType> weights( numWeights );
+
+        std::string tok;
+        for( unsigned int w=0; w<numWeights; w++) {
+            ss >> tok;
+            weights[w] = ValueType(std::stod(tok));
+        }
+        allCompNodes.insert( 
+            std::pair<std::string, std::vector<ValueType>>(compNodeName ,weights) );
+
+    }
+    if (file.bad())
+        throw std::runtime_error("error while reading file " + filename );
+
+    return allCompNodes;
+}
 
 // taken from https://stackoverflow.com/questions/4316442/stdofstream-check-if-file-exists-before-writing
 /** Check if a file exists

@@ -291,7 +291,7 @@ public:
     @param[in] numLeaves The number of the leaves.
     @param[in] numNodeWeights Number of weights that each node has.
     @return The size of the tree, i.e., numNodes. Since this is a flat tree with one hierarchy level,
-    numNodes=numLeanes+1, where +1 is for the root node.
+    numNodes=numLeaves+1, where +1 is for the root node.
     */
     IndexType createFlatHomogeneous( const IndexType numLeaves, const IndexType numNodeWeights = 1 );
 

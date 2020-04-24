@@ -759,7 +759,21 @@ TYPED_TEST (FileIOTest, testReadPETree) {
     tree.checkTree();
 
     tree.getRoot().print();
+}
+//-------------------------------------------------------------------------------------------------
 
+TYPED_TEST (FileIOTest, testTopologyFile) {
+    using ValueType = TypeParam;
+
+    std::string file = FileIOTest<ValueType>::graphPath+ "processorTrees/cpu_88_33_10.cfg";
+
+    std::map<std::string, std::vector<ValueType>> nodeMap = FileIO<IndexType, ValueType>::readFlatTopology( file );
+    //PRINT("read file " << file );
+
+    EXPECT_EQ( nodeMap.size(), 16);//file has 16 nodes
+    EXPECT_EQ( nodeMap["stark01"].size(), 3); //stark01 exists and has 3 weights
+    EXPECT_EQ( nodeMap["stark01"][0], (ValueType) 3.3); //stark01 cpu is 3.3
+    EXPECT_EQ( nodeMap["stark01"][1], (ValueType) 187321); //stark01 memory is 187321
 }
 
 } /* namespace ITI */
