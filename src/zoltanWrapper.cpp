@@ -310,36 +310,13 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::runZolta
     const scai::dmemo::CommunicatorPtr comm,
     Metrics<ValueType> &metrics ){
 
-    const IndexType localN= dist->getLocalSize();
+	std::chrono::time_point<std::chrono::steady_clock> beforePartTime =  std::chrono::steady_clock::now();
+    problem->solve();
 
-    int repeatTimes = settings.repeatTimes;
-    double sumPartTime = 0.0;
-    int r=0;
+    std::chrono::duration<double> partitionTmpTime = std::chrono::steady_clock::now() - beforePartTime;
+    double partitionTime= comm->max(partitionTmpTime.count() );
 
-    for( r=0; r<repeatTimes; r++) {
-        std::chrono::time_point<std::chrono::steady_clock> beforePartTime =  std::chrono::steady_clock::now();
-        problem->solve();
-
-        std::chrono::duration<double> partitionTmpTime = std::chrono::steady_clock::now() - beforePartTime;
-        double partitionTime= comm->max(partitionTmpTime.count() );
-        sumPartTime += partitionTime;
-        if( comm->getRank()==0 ) {
-            std::cout<< "Running time for run number " << r << " is " << partitionTime << std::endl;
-        }
-        if( sumPartTime>HARD_TIME_LIMIT) {
-            std::cout<< "Stopping runs because of excessive running total running time: " << sumPartTime << std::endl;
-            break;
-        }
-    }
-
-    if( r!=repeatTimes) {       // in case it has to break before all the runs are completed
-        repeatTimes = r+1;
-    }
-    if(comm->getRank()==0 ) {
-        std::cout<<"Number of runs: " << repeatTimes << std::endl;
-    }
-
-    metrics.MM["timeTotal"] = sumPartTime/(ValueType)repeatTimes;
+    metrics.MM["timeTotal"] = partitionTime;
 
     //
     // convert partition to a DenseVector
@@ -348,6 +325,8 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::runZolta
 
     const Zoltan2::PartitioningSolution<Adapter> &solution = problem->getSolution();
     const int *partAssignments = solution.getPartListView();
+	const IndexType localN= dist->getLocalSize();
+	
     for(unsigned int i=0; i<localN; i++) {
         IndexType thisBlock = partAssignments[i];
         SCAI_ASSERT_LT_ERROR( thisBlock, settings.numBlocks, "found wrong vertex id");
