@@ -171,12 +171,13 @@ static DenseVector<IndexType> computeRepartition(
     const Settings settings,
     Metrics<ValueType>& metrics);
 
-/** Version of k-means that does multiplie runs to achieve balance.
+/** Version of k-means that does multiple runs to achieve balance.
 */
 static DenseVector<IndexType> computePartition_targetBalance(
     const std::vector<DenseVector<ValueType>> &coordinates,
     const std::vector<DenseVector<ValueType>> &nodeWeights,
     const std::vector<std::vector<ValueType>> &blockSizes,
+    DenseVector<IndexType> &previous,
     const Settings settings,
     Metrics<ValueType>& metrics);
 

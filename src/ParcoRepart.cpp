@@ -439,7 +439,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         }else if (settings.initialPartition == ITI::Tool::geoKmeansBalance) {
             settings.keepMostBalanced = true;
             settings.erodeInfluence = true;
-            result = ITI::KMeans<IndexType,ValueType>::computePartition_targetBalance(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
+            result = ITI::KMeans<IndexType,ValueType>::computePartition_targetBalance(coordinateCopy, nodeWeightCopy, blockSizes, result, settings, metrics);
         }else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart) {
 
             SCAI_ASSERT_ERROR( commTree.areWeightsAdapted(), "The weight of the tree are not adapted; should call tree.adaptWeights()" );

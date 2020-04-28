@@ -1852,8 +1852,13 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierarchicalPartition
         // TODO: inside computePartition, settings.numBlocks is not
         // used. We infer the number of new blocks from the groupOfCenters
         // maybe, set also numBlocks for clarity??
-
-        partition = computePartition(coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics);
+PRINT0(numNodeWeights);
+        //automatically partition for balance if more than one node weights
+        if( numNodeWeights>1 ){
+            partition = computePartition_targetBalance(coordinates, nodeWeights, targetBlockWeights, partition, settings, metrics);
+        }else{
+            partition = computePartition(coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics);
+        }
 
         // TODO: not really needed assertions
         SCAI_ASSERT_EQ_ERROR(coordinates[0].getDistributionPtr()->getLocalSize(),\
@@ -1923,30 +1928,34 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
     const std::vector<DenseVector<ValueType>> &coordinates,
     const std::vector<DenseVector<ValueType>> &nodeWeights,
     const std::vector<std::vector<ValueType>> &blockSizes,
+    DenseVector<IndexType> &result,
     const Settings settings,
     Metrics<ValueType>& metrics){
     SCAI_REGION("KMeans.computePartition_targetBalance");
 
     const scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
     const IndexType globalN = coordinates[0].getDistributionPtr()->getGlobalSize();
-    std::vector<DenseVector<ValueType>> nodeWeightCopy = nodeWeights;//(1);
-    DenseVector<IndexType> result;
+    //std::vector<DenseVector<ValueType>> nodeWeightCopy = nodeWeights;//(1);
 
-    //get first result
-    result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinates, nodeWeightCopy, blockSizes, settings, metrics);
+    //get first result if given one is empty
+    if ( result.size()==0 or result.max()==0 ){
+        result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinates, nodeWeights, blockSizes, settings, metrics);
+    }
 
     PRINT0( std::endl<< "Repartitioning"<< std::endl );
 
     //
     //calculate max imbalance of the input,  maybe the initial partition is balanced enough
     //
-
+PRINT0( settings.numNodeWeights );
     std::vector<ValueType> imbalances( settings.numNodeWeights, 1.0 );
     for(int w=0; w<settings.numNodeWeights; w++){
-        imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, settings.numBlocks, nodeWeightCopy[w], blockSizes[w] );
+PRINT0( w);
+        imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, settings.numBlocks, nodeWeights[w], blockSizes[w] );
         metrics.befRebImbalance.push_back( imbalances[w] );
         metrics.MM["befRebImbalance_w"+std::to_string(w)] = imbalances[w];
     }
+PRINT0( settings.numNodeWeights );
     ValueType maxCurrImbalance = *std::max_element( imbalances.begin(), imbalances.end() );
     metrics.MM["befRebImbalance"] = maxCurrImbalance;
     const ValueType targetImbalance = settings.epsilon;
@@ -2014,7 +2023,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
         }
 
         for(int w=0; w<settingsCopy.numNodeWeights; w++){
-            imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, settingsCopy.numBlocks, nodeWeightCopy[w], blockSizes[w] );
+            imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, settingsCopy.numBlocks, nodeWeights[w], blockSizes[w] );
         }
          maxCurrImbalance = *std::max_element( imbalances.begin(), imbalances.end() );
 
