@@ -78,6 +78,7 @@ private:
         const std::string algo,
         const Settings settings,
         const bool repart=false,
+		const IndexType numWeights=1, 
         const IndexType thisPE=0);
 
     static std::vector<std::vector<ValueType>> extractLocalNodeWeights(
