@@ -4,6 +4,7 @@
 #include "LocalRefinement.h"
 #include "GraphUtils.h"
 #include "HaloPlanFns.h"
+#include "PrioQueue.h"
 
 #include <scai/utilskernel/TransferUtils.hpp>
 

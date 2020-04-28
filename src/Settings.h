@@ -227,11 +227,13 @@ struct Settings {
     bool freezeBalancedInfluence = false;
     bool erodeInfluence = false;
     bool keepMostBalanced = false;
+//bool KMBalanceUseRebalance = false;
+    std::string KMBalanceMethod = "reb_lex";
     //IndexType batchSize = 100;              ///< after how many moves we calculate the global sum in KMeans::rebalance()
-    double batchPercent = 0.05;          ///< calculate the batch size as a percentage of the number of local points
+    double batchPercent = 0.01;          ///< calculate the batch size as a percentage of the number of local points
     //bool manhattanDistance = false;
     std::vector<IndexType> hierLevels; 		///< for hierarchial kMeans, the number of blocks per level
-    std::string kMeansMshipSort = "lex";    ///< used in KMeans::rebalance() to sort vertices. Possible values are "lex" and "sqImba"
+//std::string kMeansMshipSort = "lex";    ///< used in KMeans::rebalance() to sort vertices. Possible values are "lex" and "sqImba"
     //@}
 
     /** @name Parameters for multisection

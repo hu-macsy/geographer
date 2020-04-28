@@ -103,7 +103,7 @@ int main(int argc, char** argv) {
     if( comm->getRank()==0) {
         std::cout << "Time to read/create input: " << readTime.count() << std::endl;
     }
-    
+
     //---------------------------------------------------------------
     //
     // read the communication graph or the block sizes if provided
@@ -111,7 +111,6 @@ int main(int argc, char** argv) {
     
     ITI::CommTree<IndexType,ValueType> commTree = createCommTree( vm, settings, comm, nodeWeights);
     commTree.adaptWeights( nodeWeights );
-
 
     //---------------------------------------------------------------
     //
@@ -140,7 +139,6 @@ int main(int argc, char** argv) {
 
     comm->synchronize();
     std::chrono::duration<double> inputTime = std::chrono::steady_clock::now() - startTime;
-
     assert(N > 0);
 
     if (settings.repartition && comm->getSize() == settings.numBlocks) {
@@ -183,7 +181,7 @@ int main(int argc, char** argv) {
     const scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ) );
 
     scai::lama::DenseVector<IndexType> partition;
-
+PRINT0( nodeWeights.size() );
     for( IndexType r=0; r<repeatTimes; r++) {
 
         // for the next runs the input is redistributed, so we must redistribute to the original distributions

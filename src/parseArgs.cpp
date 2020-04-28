@@ -67,7 +67,7 @@ Options populateOptions() {
     ("tightenBounds", "Tuning parameter for K-Means")
     ("keepMostBalanced", "Tuning parameter for K-Means. When activated, k-means will return the solution with the minimum balance that was found.")
     ("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
-    ("kMeansMshipSort", "used in KMeans::rebalance to sort vertices. Possible values are 'lex' and 'sqImba'", value<std::string>())
+    ("KMBalanceMethod", "used in KMeans to partition targeting for a better imbalance. Possible values are 'repart', 'reb_lex' and 'reb_sqImba'. First repartition, the two other apply a rebalance method and repartition.", value<std::string>())
     // using '/' to separate the lines breaks the output message
     ("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3,4,10 there are 3 levels. In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
     //output
@@ -353,12 +353,14 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         }
     }
 
-    if( vm.count("kMeansMshipSort") ) {
-        settings.kMeansMshipSort = vm["kMeansMshipSort"].as<std::string>();
-        if( not (settings.kMeansMshipSort=="lex" or settings.kMeansMshipSort=="sqImba") ) {
+    if( vm.count("KMBalanceMethod") ) {
+        settings.KMBalanceMethod = vm["KMBalanceMethod"].as<std::string>();
+        if( not (settings.KMBalanceMethod=="repart" 
+            or settings.KMBalanceMethod=="reb_sqImba"
+            or settings.KMBalanceMethod=="reb_lex") ) {
             if(comm->getRank() ==0 ) {
-                std::cout<<"WARNING: wrong value for parameter kMeansMshipSort= " << settings.kMeansMshipSort << ". Setting to lex" <<std::endl;
-                settings.kMeansMshipSort="lex";
+                std::cout<<"WARNING: wrong value for parameter KMBalanceMethod= " << settings.KMBalanceMethod << ". Setting to reb_lex" <<std::endl;
+                settings.KMBalanceMethod="lex";
             }
         }
     }

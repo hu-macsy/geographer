@@ -245,12 +245,13 @@ static std::vector<ValueType> computeMembershipOneValueNormalized(
 
 @param[in/out] partition The partition of the points to be refined
 */
-static void rebalance(
+static IndexType rebalance(
     const std::vector<DenseVector<ValueType>> &coordinates,
     const std::vector<DenseVector<ValueType>> &nodeWeights,
     const std::vector<std::vector<ValueType>> &targetBlockWeights,
     DenseVector<IndexType>& partition,
-    const Settings settings );
+    const Settings settings,
+    const ValueType pointPerCent=0.5);
 
 
 /** @brief Version for hierarchical version. The returned centers now are a vector of vectors,

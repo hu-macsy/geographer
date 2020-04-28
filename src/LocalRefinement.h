@@ -14,7 +14,7 @@
 #include <assert.h>
 
 #include "Settings.h"
-#include "PrioQueue.h"
+
 
 namespace ITI {
 

@@ -307,7 +307,6 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     if (comm->getSize() == k) {
         //WARNING: the result  is not redistributed. must redistribute afterwards
         if( !settings.noRefinement ) {
-			
             //store some metrics before local refinement
             if( settings.metricsDetail.compare("no")!=0 ){
                 Metrics<ValueType> tmpMetrics(settings);
@@ -439,6 +438,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
             result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
         }else if (settings.initialPartition == ITI::Tool::geoKmeansBalance) {
             settings.keepMostBalanced = true;
+            settings.erodeInfluence = true;
             result = ITI::KMeans<IndexType,ValueType>::computePartition_targetBalance(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
         }else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart) {
 

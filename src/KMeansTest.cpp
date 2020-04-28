@@ -583,27 +583,24 @@ using ValueType = TypeParam;
         targetBlockWeights[w] = std::vector<ValueType>( settings.numBlocks, 1*nodeWeights[w].sum()/settings.numBlocks);
     }
 
-
-    //initialize partition with rank
-    //DenseVector<IndexType> partition(dist, comm->getRank() );
-    //partition.fillRandom( settings.numBlocks-1);
-
     DenseVector<IndexType> partition = KMeans<IndexType,ValueType>::computePartition(coordinates, nodeWeights, targetBlockWeights, settings, metrics);
     //aux<IndexType,ValueType>::print2DGrid( graph, partition );
 
+    std::vector<ValueType> oldImbalances( nodeWeights.size() );
     for (IndexType w=0; w<nodeWeights.size(); w++) {
-        ValueType imba = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks, nodeWeights[w], targetBlockWeights[w]);
-    PRINT0( w << ": " << imba );
+        oldImbalances[w] = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks, nodeWeights[w], targetBlockWeights[w]);
     }
 
-
-    KMeans<IndexType,ValueType>::rebalance( coordinates, nodeWeights, targetBlockWeights, partition, settings);
+    [[maybe_unused]] IndexType numMoves = KMeans<IndexType,ValueType>::rebalance( coordinates, nodeWeights, targetBlockWeights, partition, settings);
     
+    std::vector<ValueType> newImbalances( nodeWeights.size() );
     //aux<IndexType,ValueType>::print2DGrid( graph, partition );
     for (IndexType w=0; w<nodeWeights.size(); w++) {
-        ValueType imba = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks, nodeWeights[w], targetBlockWeights[w]);
-    PRINT0( w << ": " << imba );
+        newImbalances[w] = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks, nodeWeights[w], targetBlockWeights[w]);
     }
+
+    //not all new imbalances are smaller but the max should be
+    EXPECT_LE( std::max_element(newImbalances.begin(), newImbalances.end()), std::max_element(oldImbalances.begin(), oldImbalances.end()) ); 
 }
 
 /* Calculate a partition and its fuzyness. Store to files and use
