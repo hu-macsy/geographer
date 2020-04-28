@@ -153,7 +153,8 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     ///////////////////////////////////////////////////////////////////////
     // Create parameters
 
-    Teuchos::ParameterList params = setParams( algo, settings, repart, thisPE);    
+    Teuchos::ParameterList params = setParams( algo, settings, repart, numWeights, thisPE);    
+	param.set("objects_to_partition", "coordinates");
 
     Zoltan2::PartitioningProblem<inputAdapter_t> *problem =
         new Zoltan2::PartitioningProblem<inputAdapter_t>(ia, &params);
@@ -281,9 +282,9 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
         grAdapter.setVertexWeights( weightVec[w], weightStrides[w], w);
     }
 
-   ///////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////
     // Create parameters
-    Teuchos::ParameterList params = setParams( algo, settings, repart, thisPE);
+    Teuchos::ParameterList params = setParams( algo, settings, repart, numWeights, thisPE);
     //seems that it does not affect much
     params.set("pulp_minimize_maxcut", true);
 
@@ -349,6 +350,7 @@ Teuchos::ParameterList zoltanWrapper<IndexType, ValueType>::setParams(
     const std::string algo,
     const Settings settings,
     const bool repart,
+	const IndexType numWeights, 
     const IndexType thisPE){
 
     const ValueType tolerance = 1+settings.epsilon;
@@ -358,9 +360,14 @@ Teuchos::ParameterList zoltanWrapper<IndexType, ValueType>::setParams(
     Teuchos::ParameterList params("zoltan params");
     //TODO: params.set("partitioning_objective", "minimize_cut_edge_count");
     //      or something else, check at
-    //      https://trilinos.org/docs/r12.12/packages/zoltan2/doc/html/z2_parameters.html
+    //      https://docs.trilinos.org/latest-release/packages/zoltan2/doc/html/z2_parameters.html
 
-    params.set("partitioning_objective", "minimize_cut_edge_count");
+	//if more than one vertex weights, emphasize in balancing
+	if(numWeights>1){
+		param.set("partitioning_objective", "balance_object_weight");
+	}else{
+		params.set("partitioning_objective", "minimize_cut_edge_count");
+	}
 
     params.set("debug_level", "basic_status");
     //params.set("debug_level", "verbose_detailed_status");
