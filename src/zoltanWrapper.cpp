@@ -154,7 +154,7 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     // Create parameters
 
     Teuchos::ParameterList params = setParams( algo, settings, repart, numWeights, thisPE);    
-	param.set("objects_to_partition", "coordinates");
+	params.set("objects_to_partition", "coordinates");
 
     Zoltan2::PartitioningProblem<inputAdapter_t> *problem =
         new Zoltan2::PartitioningProblem<inputAdapter_t>(ia, &params);
