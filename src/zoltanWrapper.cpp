@@ -364,7 +364,7 @@ Teuchos::ParameterList zoltanWrapper<IndexType, ValueType>::setParams(
 
 	//if more than one vertex weights, emphasize in balancing
 	if(numWeights>1){
-		param.set("partitioning_objective", "balance_object_weight");
+		params.set("partitioning_objective", "balance_object_weight");
 	}else{
 		params.set("partitioning_objective", "minimize_cut_edge_count");
 	}
