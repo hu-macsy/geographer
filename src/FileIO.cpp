@@ -2478,12 +2478,12 @@ std::vector<std::vector<ValueType>> FileIO<IndexType, ValueType>::createBlockSiz
     }
     
     const std::vector<ValueType> mySpecs = it->second;
-    assert( mySpecs.size()==numWeights );
 
     //third weight is the number of cores, leave it out
     const int numWeights = 2;
     const int numBlocks = comm->getSize();
     const int myRank = comm->getRank();
+	assert( mySpecs.size()==numWeights );
     std::vector<std::vector<ValueType> > blockSizes(numWeights, std::vector<ValueType>(numBlocks,0));
 
     //insert my specs into the block size; each PE inserts to its own position

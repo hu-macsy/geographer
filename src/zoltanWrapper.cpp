@@ -153,7 +153,8 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     ///////////////////////////////////////////////////////////////////////
     // Create parameters
 
-    Teuchos::ParameterList params = setParams( algo, settings, repart, thisPE);    
+    Teuchos::ParameterList params = setParams( algo, settings, repart, numWeights, thisPE);    
+	params.set("objects_to_partition", "coordinates");
 
     Zoltan2::PartitioningProblem<inputAdapter_t> *problem =
         new Zoltan2::PartitioningProblem<inputAdapter_t>(ia, &params);
@@ -281,9 +282,9 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
         grAdapter.setVertexWeights( weightVec[w], weightStrides[w], w);
     }
 
-   ///////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////
     // Create parameters
-    Teuchos::ParameterList params = setParams( algo, settings, repart, thisPE);
+    Teuchos::ParameterList params = setParams( algo, settings, repart, numWeights, thisPE);
     //seems that it does not affect much
     params.set("pulp_minimize_maxcut", true);
 
@@ -310,36 +311,13 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::runZolta
     const scai::dmemo::CommunicatorPtr comm,
     Metrics<ValueType> &metrics ){
 
-    const IndexType localN= dist->getLocalSize();
+	std::chrono::time_point<std::chrono::steady_clock> beforePartTime =  std::chrono::steady_clock::now();
+    problem->solve();
 
-    int repeatTimes = settings.repeatTimes;
-    double sumPartTime = 0.0;
-    int r=0;
+    std::chrono::duration<double> partitionTmpTime = std::chrono::steady_clock::now() - beforePartTime;
+    double partitionTime= comm->max(partitionTmpTime.count() );
 
-    for( r=0; r<repeatTimes; r++) {
-        std::chrono::time_point<std::chrono::steady_clock> beforePartTime =  std::chrono::steady_clock::now();
-        problem->solve();
-
-        std::chrono::duration<double> partitionTmpTime = std::chrono::steady_clock::now() - beforePartTime;
-        double partitionTime= comm->max(partitionTmpTime.count() );
-        sumPartTime += partitionTime;
-        if( comm->getRank()==0 ) {
-            std::cout<< "Running time for run number " << r << " is " << partitionTime << std::endl;
-        }
-        if( sumPartTime>HARD_TIME_LIMIT) {
-            std::cout<< "Stopping runs because of excessive running total running time: " << sumPartTime << std::endl;
-            break;
-        }
-    }
-
-    if( r!=repeatTimes) {       // in case it has to break before all the runs are completed
-        repeatTimes = r+1;
-    }
-    if(comm->getRank()==0 ) {
-        std::cout<<"Number of runs: " << repeatTimes << std::endl;
-    }
-
-    metrics.MM["timeTotal"] = sumPartTime/(ValueType)repeatTimes;
+    metrics.MM["timeTotal"] = partitionTime;
 
     //
     // convert partition to a DenseVector
@@ -348,6 +326,8 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::runZolta
 
     const Zoltan2::PartitioningSolution<Adapter> &solution = problem->getSolution();
     const int *partAssignments = solution.getPartListView();
+	const IndexType localN= dist->getLocalSize();
+	
     for(unsigned int i=0; i<localN; i++) {
         IndexType thisBlock = partAssignments[i];
         SCAI_ASSERT_LT_ERROR( thisBlock, settings.numBlocks, "found wrong vertex id");
@@ -370,6 +350,7 @@ Teuchos::ParameterList zoltanWrapper<IndexType, ValueType>::setParams(
     const std::string algo,
     const Settings settings,
     const bool repart,
+	const IndexType numWeights, 
     const IndexType thisPE){
 
     const ValueType tolerance = 1+settings.epsilon;
@@ -379,9 +360,14 @@ Teuchos::ParameterList zoltanWrapper<IndexType, ValueType>::setParams(
     Teuchos::ParameterList params("zoltan params");
     //TODO: params.set("partitioning_objective", "minimize_cut_edge_count");
     //      or something else, check at
-    //      https://trilinos.org/docs/r12.12/packages/zoltan2/doc/html/z2_parameters.html
+    //      https://docs.trilinos.org/latest-release/packages/zoltan2/doc/html/z2_parameters.html
 
-    params.set("partitioning_objective", "minimize_cut_edge_count");
+	//if more than one vertex weights, emphasize in balancing
+	if(numWeights>1){
+		params.set("partitioning_objective", "balance_object_weight");
+	}else{
+		params.set("partitioning_objective", "minimize_cut_edge_count");
+	}
 
     params.set("debug_level", "basic_status");
     //params.set("debug_level", "verbose_detailed_status");
