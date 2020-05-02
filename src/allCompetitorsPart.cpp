@@ -117,7 +117,7 @@ int main(int argc, char** argv) {
 
         // if graph is too big, repeat less times to avoid memory and time problems
         if( N>std::pow(2,29) ) {
-            settings.repeatTimes = 2;
+            settings.repeatTimes = 3;
             if( thisPE==0 ) {
                 std::cout << "WARNING: because the graph is too big, we repeat only " << settings.repeatTimes << " times" << std::endl;
             }

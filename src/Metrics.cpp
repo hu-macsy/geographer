@@ -561,12 +561,19 @@ std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime(
     const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
     const scai::dmemo::DistributionPtr colDist = graph.getColDistributionPtr();
 
-    //identity matrix
+    //the laplacian
+    //scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian(graph);
+	scai::lama::CSRSparseMatrix<ValueType> laplacian;
+	{
+		scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( graph.getNumRows() ));
+		scai::lama::CSRSparseMatrix<ValueType> copyGraph = graph;
+		copyGraph.redistribute( rowDist, noDistPtr);
+		laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian_depr(copyGraph);
+		laplacian.redistribute( rowDist, colDist);
+	}
+    //add the identity matrix to make the laplacian positive definite
     CSRSparseMatrix<ValueType> identity;
     identity.setIdentity(rowDist);
-    //the laplacian
-    scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian(graph);
-    //add the identity matrix to make the laplacian positive definite
     laplacian += identity;
 
     //this assertion fails because lama does not set up the local data of the matrix correctly
