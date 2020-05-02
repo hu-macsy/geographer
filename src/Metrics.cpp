@@ -619,7 +619,7 @@ std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime(
             rhs.setSameValue( colDist, ValueType(1.0) );
         }
 
-        scai::lama::DenseVector<ValueType> solution( colDist, ValueType(0.1) );
+        scai::lama::DenseVector<ValueType> solution( colDist, ValueType(0.0) );
         solver.initialize( laplacian );
 
         std::chrono::time_point<std::chrono::steady_clock> beforeTime = std::chrono::steady_clock::now();

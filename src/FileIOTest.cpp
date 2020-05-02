@@ -85,8 +85,8 @@ TYPED_TEST(FileIOTest, testWriteMetis_Dist_3D) {
 TYPED_TEST(FileIOTest, testReadAndWriteGraphFromFile) {
     using ValueType = TypeParam;
 
-    //std::string file = "Grid8x8";
-    std::string file = "slowrot-00000.graph";
+    std::string file = "Grid8x8";
+    //std::string file = "slowrot-00000.graph";
     std::string filename= FileIOTest<ValueType>::graphPath + file;
     CSRSparseMatrix<ValueType> Graph;
 
@@ -144,6 +144,71 @@ TYPED_TEST(FileIOTest, testReadAndWriteGraphFromFile) {
 }
 //-----------------------------------------------------------------
 
+TYPED_TEST(FileIOTest, testReadAndWriteBinaryGraphFromFile) {
+    using ValueType = TypeParam;
+
+    std::string file = "Grid8x8";
+    //std::string file = "slowrot-00000.graph";
+    std::string filename= FileIOTest<ValueType>::graphPath + file;
+    CSRSparseMatrix<ValueType> Graph;
+
+    std::ifstream f(filename);
+    IndexType nodes, edges;
+    //In the METIS format the two first number in the file are the number of nodes and edges
+    f >>nodes >> edges;
+
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    scai::dmemo::DistributionPtr dist( new scai::dmemo::NoDistribution( nodes ));
+
+    // read graph from file
+    {
+        SCAI_REGION("testReadAndWriteGraphFromFile.readGraphFromFile");
+        Graph = FileIO<IndexType, ValueType>::readGraph(filename);
+    }
+    EXPECT_EQ(Graph.getNumColumns(), Graph.getNumRows());
+    EXPECT_EQ(nodes, Graph.getNumColumns());
+    EXPECT_EQ(edges, (Graph.getNumValues())/2 );
+
+    std::string fileTo= FileIOTest<ValueType>::graphPath + std::string("MY_") + file+".bgf";
+
+    // write the graph you read in a new file
+    FileIO<IndexType, ValueType>::writeGraph(Graph, fileTo, true, false );
+
+    if(comm->getRank()==0 ) {
+        std::cout<< "Output written in file: "<< fileTo<< std::endl;
+    }
+
+    comm->synchronize();
+
+    // read new graph from the new file we just wrote
+    ITI::Format format = ITI::Format::BINARY;
+    CSRSparseMatrix<ValueType> Graph2 = FileIO<IndexType, ValueType>::readGraph( fileTo, comm, format );
+
+    // check that the two graphs are identical
+
+    EXPECT_EQ(Graph.getNumValues(), Graph2.getNumValues() );
+    EXPECT_EQ(Graph.l2Norm(), Graph2.l2Norm() );
+    EXPECT_EQ(Graph2.getNumValues(), Graph2.l1Norm() );
+    EXPECT_EQ( Graph.getNumRows(), Graph2.getNumColumns() );
+
+    // check every element of the  graphs
+    {
+        SCAI_REGION("testReadAndWriteGraphFromFile.checkArray");
+        const CSRStorage<ValueType>& localStorage = Graph.getLocalStorage();
+        scai::hmemo::ReadAccess<ValueType> values(localStorage.getValues());
+
+        const CSRStorage<ValueType>& localStorage2 = Graph2.getLocalStorage();
+        scai::hmemo::ReadAccess<ValueType> values2(localStorage2.getValues());
+
+        EXPECT_EQ( values.size(), values2.size() );
+
+        for(IndexType i=0; i< values.size(); i++) {
+            EXPECT_EQ( values[i], values2[i] );
+        }
+    }
+}
+//-----------------------------------------------------------------
+
 TYPED_TEST(FileIOTest, testWriteGraphWithEdgeWeights) {
     using ValueType = TypeParam;
     const IndexType N = 10;
@@ -161,7 +226,7 @@ TYPED_TEST(FileIOTest, testWriteGraphWithEdgeWeights) {
     std::string filename = "./meshes/noEdgeWeights.graph";
     FileIO<IndexType, ValueType>::writeGraph( graph, filename );
 
-    filename = "./meshes/dgeWeights.graph";
+    filename = "./meshes/edgeWeights.graph";
     FileIO<IndexType, ValueType>::writeGraph( graph, filename, true );
 
 }
@@ -451,8 +516,14 @@ TYPED_TEST(FileIOTest, testReadBlockSizes) {
     std::string blocksFile = path + "blockSizes.txt";
 
     std::vector<std::vector<ValueType>> blockSizes = FileIO<IndexType,ValueType>::readBlockSizes(blocksFile, 16);
-
+	SCAI_ASSERT( blockSizes.size()==1, "Wrong number of weights, should be 1 but is " << blockSizes.size() );
     SCAI_ASSERT( blockSizes[0].size()==16, "Wrong number of blocks, should be 16 but is " << blockSizes.size() );
+	
+	blocksFile = path + "blockSizes_2w.txt";
+	
+	std::vector<std::vector<ValueType>> blockSizes2 = FileIO<IndexType,ValueType>::readBlockSizes(blocksFile, 16, 2);
+	SCAI_ASSERT( blockSizes2.size()==2, "Wrong number of weights, should be 2 but is " << blockSizes2.size() );
+    SCAI_ASSERT( blockSizes2[0].size()==16, "Wrong number of blocks, should be 16 but is " << blockSizes2.size() );
 
 }
 //-------------------------------------------------------------------------------------------------
@@ -688,7 +759,21 @@ TYPED_TEST (FileIOTest, testReadPETree) {
     tree.checkTree();
 
     tree.getRoot().print();
+}
+//-------------------------------------------------------------------------------------------------
 
+TYPED_TEST (FileIOTest, testTopologyFile) {
+    using ValueType = TypeParam;
+
+    std::string file = FileIOTest<ValueType>::graphPath+ "processorTrees/cpu_88_33_10.cfg";
+
+    std::map<std::string, std::vector<ValueType>> nodeMap = FileIO<IndexType, ValueType>::readFlatTopology( file );
+    //PRINT("read file " << file );
+
+    EXPECT_EQ( nodeMap.size(), 16);//file has 16 nodes
+    EXPECT_EQ( nodeMap["stark01"].size(), 3); //stark01 exists and has 3 weights
+    EXPECT_EQ( nodeMap["stark01"][0], (ValueType) 3.3); //stark01 cpu is 3.3
+    EXPECT_EQ( nodeMap["stark01"][1], (ValueType) 187321); //stark01 memory is 187321
 }
 
 } /* namespace ITI */

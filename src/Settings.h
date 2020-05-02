@@ -128,7 +128,7 @@ inline std::ostream& operator<<(std::ostream& out, Format method) {
 - zoltanMJ Partition a point set (no graph is needed) using the Multijagged algorithm of zoltan2.
 - zoltanMJ Partition a point set (no graph is needed) using the space filling curves algorithm of zoltan2.
 */
-enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, parMetisRefine, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, parhipFastMesh, parhipUltraFastMesh, parhipEcoMesh, myAlgo, none, unknown};
+enum class Tool { geographer, geoKmeans, geoKmeansBalance, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, parMetisRefine, zoltanRIB, zoltanRCB, zoltanMJ, zoltanXPulp, zoltanSFC, parhipFastMesh, parhipUltraFastMesh, parhipEcoMesh, myAlgo, none, unknown};
 
 
 std::istream& operator>>(std::istream& in, ITI::Tool& tool);
@@ -147,7 +147,7 @@ std::string getCallingCommand( const int argc, char** argv );
 */
 struct Settings {
     Settings();
-    bool checkValidity();
+    bool checkValidity(const scai::dmemo::CommunicatorPtr comm );
 
     /** @name General partition settings
     */
@@ -169,7 +169,6 @@ struct Settings {
     std::string outFile = "-";	///< name of the file to store metrics (if desired)
     std::string outDir = "-"; 	//this is used by the competitors main
     std::string PEGraphFile = "-"; //TODO: this should not be in settings
-    std::string blockSizesFile = "-"; //TODO: this should not be in settings
     ITI::Format fileFormat = ITI::Format::AUTO;   	///< the format of the input file, \sa Format
     ITI::Format coordFormat = ITI::Format::AUTO; 	///< the format of the coordinated input file, \sa Format
     bool useDiffusionCoordinates = false;		///< if not coordinates are provided, we can use artificial coordinates
@@ -227,8 +226,12 @@ struct Settings {
     bool tightenBounds = false;
     bool freezeBalancedInfluence = false;
     bool erodeInfluence = false;
+    bool keepMostBalanced = false;
+    //IndexType batchSize = 100;              ///< after how many moves we calculate the global sum in KMeans::rebalance()
+    double batchPercent = 0.05;          ///< calculate the batch size as a percentage of the number of local points
     //bool manhattanDistance = false;
     std::vector<IndexType> hierLevels; 		///< for hierarchial kMeans, the number of blocks per level
+    std::string kMeansMshipSort = "lex";    ///< used in KMeans::rebalance() to sort vertices. Possible values are "lex" and "sqImba"
     //@}
 
     /** @name Parameters for multisection
@@ -267,8 +270,8 @@ struct Settings {
     //calculate expensive performance metrics?
     bool computeDiameter = false;			///< if the diameter should be computed (can be expensive)
     IndexType maxDiameterRounds = 2;		///< max number of rounds to approximate the diameter
-    IndexType maxCGIterations = 3000;        ///< max number of iterations of the CG solver in metrics
-    double CGResidual = 1e-4;
+    IndexType maxCGIterations = 300;        ///< max number of iterations of the CG solver in metrics
+    double CGResidual = 1e-6;
     //@}
 
     /** @name Various parameters

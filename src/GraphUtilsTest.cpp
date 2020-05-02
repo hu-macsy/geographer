@@ -74,6 +74,8 @@ TYPED_TEST(GraphUtilsTest, testReindexCut) {
         IndexType blockId = (rand() % k);
         partition.getLocalValues()[i] = blockId;
     }
+    partition[0]=0; //some times no vertex get 0 and triggers an assertion
+    partition[1]=k-1; //or max
 
     //redistribute based on the partition to simulate a real scenario
     aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings );    
@@ -105,13 +107,13 @@ TYPED_TEST(GraphUtilsTest, testReindexCut) {
     //graph.checkSettings();
     EXPECT_TRUE( graph.isConsistent() );
     EXPECT_TRUE( graph.checkSymmetry() );
+    EXPECT_TRUE( graph.getRowDistributionPtr()->isBlockDistributed(comm) );
     EXPECT_NEAR( l2Norm, graph.l2Norm(), 1e-5 );
 
     partition.redistribute( newGenBlockDist );
     DenseVector<IndexType> reIndexedPartition = partition;
 
     ASSERT_TRUE(reIndexedPartition.getDistributionPtr()->isEqual(*newGenBlockDist));
-
 
     ValueType secondCut = GraphUtils<IndexType, ValueType>::computeCut(graph, reIndexedPartition, true);
     ValueType secondImbalance = GraphUtils<IndexType, ValueType>::computeImbalance( reIndexedPartition, k );
@@ -310,6 +312,7 @@ TYPED_TEST (GraphUtilsTest, testComputeCommVolumeAndBoundaryNodes) {
     settings.dimensions = dimensions;
     settings.minGainForNextRound = 10;
     settings.storeInfo = false;
+    //settings.verbose = true;
 
     Metrics<ValueType> metrics(settings);
 
@@ -391,10 +394,67 @@ TYPED_TEST (GraphUtilsTest,testEdgeList2CSR) {
 
     scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils<IndexType,ValueType>::edgeList2CSR( localEdgeList, comm );
 
-    SCAI_ASSERT( graph.isConsistent(), "Graph not consistent");
+    EXPECT_TRUE( graph.isConsistent());
     EXPECT_TRUE( graph.checkSymmetry() );
+    EXPECT_EQ( graph.getNumRows(), N );
+    const IndexType globalM = comm->sum( localM );
+    EXPECT_LE( graph.getNumValues(), 2*globalM ); //some edges are duplicates and are removed
+    EXPECT_GE( graph.getNumValues(), N );
+    EXPECT_GE( graph.l1Norm(), N );
+    EXPECT_TRUE( graph.getRowDistributionPtr()->isBlockDistributed(comm) );
 }
+//---------------------------------------------------------------------------------------
 
+TYPED_TEST(GraphUtilsTest, testLocalCSR2EdgeList) {
+    using ValueType = TypeParam;
+
+    //const std::string file = GraphUtilsTest<ValueType>::graphPath + "Grid8x8";
+    const std::string file = GraphUtilsTest<ValueType>::graphPath + "rotation-00000.graph";
+    const CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph( file );
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+
+    IndexType localMaxDegree=0;
+
+    std::vector<std::tuple<IndexType,IndexType,ValueType>> edgeList = GraphUtils<IndexType,ValueType>::localCSR2GlobalEdgeList(
+        graph, localMaxDegree );
+
+    const IndexType globalMaxDegree = comm->max(localMaxDegree);
+
+    EXPECT_LE(localMaxDegree, globalMaxDegree);
+    EXPECT_LE(globalMaxDegree, 4);
+
+    const IndexType numNodes = graph.getNumRows();
+
+    //check number of edges
+
+    const IndexType localNumEdges = graph.getLocalNumValues();
+    EXPECT_EQ(localNumEdges, edgeList.size() );
+
+    const IndexType numEdges = graph.getNumValues();
+    const IndexType globalEsgeListSize = comm->sum( edgeList.size()  );
+    EXPECT_EQ( numEdges, globalEsgeListSize );
+
+    //check if all node ID are present
+    std::set<IndexType> nodeIDs; //set of local node IDs
+    for( auto edge : edgeList ){
+        const IndexType v1 = std::get<0>(edge);
+        EXPECT_LE( v1, numNodes );
+        nodeIDs.insert(v1);
+        const IndexType v2 = std::get<1>(edge);
+        EXPECT_LE( v2, numNodes );
+        nodeIDs.insert(v2);
+    }
+
+    for(int i=0; i<numNodes; i++){
+        auto it = nodeIDs.find( i );
+        bool found = false;
+        //element was found in some PE
+        if( it!=nodeIDs.end() )
+            found = true;
+        EXPECT_TRUE(comm->any(found));
+    }
+}
 //---------------------------------------------------------------------------------------
 // trancated function
 /*

@@ -10,6 +10,7 @@ allCommands = [
 "mpirun -n 4 installation/bin/GeographerStandalone --graphFile meshes/rotation-00000.graph --metricsDetail all --maxCGIterations 500",
 "mpirun -n 4 installation/bin/GeographerStandalone --graphFile meshes/rotation-00000.graph --metricsDetail all --CGResidual 0.001",
 "mpirun -n 7 installation/bin/GeographerStandalone --graphFile meshes/slowrot-00000.graph --noRefinement",
+"mpirun -n 16 installation/bin/GeographerStandalone --graphFile meshes/slowrot-00000.graph --noRefinement --blockSizesFile testing/blockSizes_2w.txt",
 "mpirun -n 5 installation/bin/GeographerStandalone --graphFile meshes/rotation-00000.graph --multiLevelRounds 5",
 "mpirun -n 7 installation/bin/GeographerStandalone --graphFile meshes/rotation-00000.graph --localRefAlgo parMetisRefine",
 "mpirun -n 7 installation/bin/GeographerStandalone --graphFile meshes/bubbles-00010.graph --localRefAlgo geographer",

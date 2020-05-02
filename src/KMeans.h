@@ -66,6 +66,22 @@ static DenseVector<IndexType> computePartition(
     const Settings settings, \
     Metrics<ValueType>& metrics);
 
+/** Version that also returns the influences per center and the centers
+@param[in/out] centers The provided centers and their final position
+@param[out] influence The influence per center calculated by the algorithm
+*/
+
+static DenseVector<IndexType> computePartition(
+    const std::vector<DenseVector<ValueType>> &coordinates, \
+    const std::vector<DenseVector<ValueType>> &nodeWeights, \
+    const std::vector<std::vector<ValueType>> &blockSizes, \
+    const DenseVector<IndexType>& prevPartition,\
+    std::vector<std::vector< std::vector<ValueType>>> &centers, \
+    std::vector<std::vector<ValueType>> &influence, \
+    const Settings settings, \
+    Metrics<ValueType>& metrics);
+
+
 /** @brief Minimal wrapper with only the coordinates. Unit weights are assumed and uniform block sizes.
 */
 //template<typename IndexType, typename ValueType>
@@ -154,6 +170,87 @@ static DenseVector<IndexType> computeRepartition(
     const std::vector<DenseVector<ValueType>>& nodeWeights,
     const Settings settings,
     Metrics<ValueType>& metrics);
+
+/** Version of k-means that does multiplie runs to achieve balance.
+*/
+static DenseVector<IndexType> computePartition_targetBalance(
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const std::vector<std::vector<ValueType>> &blockSizes,
+    const Settings settings,
+    Metrics<ValueType>& metrics);
+
+/**
+    Returns one entry for every local point. each entry has size centerToUse and stores a pair:
+    first is the distance value, second is the center that realizes this distance.
+
+    @param[in] centerInfluence The weight/influence of each center that is used to calculate
+    the effective distance as: effDist = dist(p,c)*influence(c). centerInfluence.size()= the number
+    of node weights and centerInfluence[i]=number of blocks
+
+    @return One entry for every local point. each entry has size centerToUse and stores a pair:
+    first is the distance value, second is the center that realizes this distance
+*/
+
+static std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzify( 
+    const std::vector<DenseVector<ValueType>>& coordinates,
+    const std::vector<DenseVector<ValueType>>& nodeWeights,
+    const DenseVector<IndexType>& partition,
+    const std::vector<ValueType>& centerInfluence,
+    const Settings settings,
+    const IndexType centersToUse=6);
+
+static std::vector<std::vector<std::pair<ValueType,IndexType>>> fuzzify( 
+    const std::vector<DenseVector<ValueType>>& coordinates,
+    const std::vector<DenseVector<ValueType>>& nodeWeights,
+    const DenseVector<IndexType>& partition,
+    const Settings settings,
+    const IndexType centersToUse=6);
+
+/**
+    Compute the membership values of every local point provided a fuzzy clustering vector.
+    Membership is calculated using the function mentioned in https://en.wikipedia.org/wiki/Fuzzy_clustering
+    using the euclidean distance.
+    \sa fuzzify
+
+    @return A vector for every point of size equal to the number of centers used to
+    obtain the fuzzy clustering. return[i][j] is the membership value of point \p i
+    to cluster \p j.
+*/
+
+static std::vector<std::vector<ValueType>> computeMembership(
+    const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering);
+
+/** 
+    Compute the membership values of every local point provided a fuzzy clustering vector.
+    Compared to the other version the function, it returns only one value per point.
+    First we calculate the membership vector of every point using computeMembership and 
+    the value for each point is the sum of (x_i-1/ctu)^2, where x_i us the membership
+    value for center i and ctu is the size of the membership vector.
+    Higher values mean that the points is close to one center, lower values indicate
+    fuzzier points, points that are between centers.
+*/
+static std::vector<ValueType> computeMembershipOneValue(
+    const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering);
+
+/** #brief Normalize membership by the max membership per block.
+*/
+static std::vector<ValueType> computeMembershipOneValueNormalized(
+    const std::vector<std::vector<std::pair<ValueType,IndexType>>>& fuzzyClustering,
+    const DenseVector<IndexType>& partition,
+    const IndexType numBlocks);
+
+
+/** Given a partitioned input, move points to other blocks to improve imbalance.
+
+@param[in/out] partition The partition of the points to be refined
+*/
+static void rebalance(
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const std::vector<std::vector<ValueType>> &targetBlockWeights,
+    DenseVector<IndexType>& partition,
+    const Settings settings );
 
 
 /** @brief Version for hierarchical version. The returned centers now are a vector of vectors,
@@ -248,13 +345,24 @@ static std::vector< std::vector<ValueType> > findCenters(
     const IndexType k,
     const Iterator firstIndex,
     const Iterator lastIndex,
-    const DenseVector<ValueType>& nodeWeights);
+    const std::vector<DenseVector<ValueType>>& nodeWeights);
 
 
 /** @brief Get minimum and maximum of the global coordinates.
  */
 //template<typename ValueType>
 static std::pair<std::vector<ValueType>, std::vector<ValueType> > getGlobalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
+
+
+/** @brief Calculate the global weight of all blocks
+*/
+static std::vector<std::vector<ValueType>> getGlobalBlockWeight(
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const DenseVector<IndexType>& partition);
+
+static std::vector<std::vector<ValueType>> getGlobalBlockWeight(
+    const std::vector<std::vector<ValueType>> &nodeWeights,
+    const DenseVector<IndexType>& partition);
 
 
 /**
@@ -295,8 +403,7 @@ static ValueType computeEffectiveDistance(
  * @param[in] previousAssignment previous assignment of points
  * @param[in] oldBlock The block from the previous hierarchy that every point
  belongs to. In case of the non-hierarchical version, this is 0 for all points. This is different from previousAssignment
- because it does not chacge inbetween kmeans iteration while
- previousAssignement changes until it converges and the
+ because it does not change in-between k-means iteration while previousAssignement changes until it converges and the
  algorithm stops.
  * @param[in] blockSizesPerCent A value indicating a percentage per block of
  the points weight. If, W is the sum of weights of all the points, then
@@ -305,7 +412,7 @@ static ValueType computeEffectiveDistance(
  * @param[in] boundingBox min and max coordinates of local points, used to compute distance bounds
  * @param[in,out] upperBoundOwnCenter for each point, an upper bound of the effective distance to its own center
  * @param[in,out] lowerBoundNextCenter for each point, a lower bound of the effective distance to the next-closest center
- * @param[in,out] influence a multiplier for each block to compute the effective distance
+ * @param[in,out] influence a multiplier for each block and for each balance constrain, to compute the effective distance
  * @param[in] settings
  *
  * @return assignment of points to blocks
