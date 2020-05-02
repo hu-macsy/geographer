@@ -562,25 +562,32 @@ std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime(
     const scai::dmemo::DistributionPtr colDist = graph.getColDistributionPtr();
 
     //the laplacian
+	std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
     //scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian(graph);
 	scai::lama::CSRSparseMatrix<ValueType> laplacian;
 	{
 		scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( graph.getNumRows() ));
 		scai::lama::CSRSparseMatrix<ValueType> copyGraph = graph;
 		copyGraph.redistribute( rowDist, noDistPtr);
-		laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian_depr(copyGraph);
+		laplacian = GraphUtils<IndexType,ValueType>::constructLaplacianPlusIdentity(copyGraph);
 		laplacian.redistribute( rowDist, colDist);
 	}
+	std::chrono::duration<double> endTime = std::chrono::steady_clock::now() - startTime;
+	double totalTimeLapl= comm->max(endTime.count() );
+	if( comm->getRank()==0 ) {
+	    std::cout<< " time to construct laplacian is " << totalTimeLapl << " seconds " << std::endl;
+	}
+
     //add the identity matrix to make the laplacian positive definite
-    CSRSparseMatrix<ValueType> identity;
-    identity.setIdentity(rowDist);
-    laplacian += identity;
+    //CSRSparseMatrix<ValueType> identity;
+    //identity.setIdentity(rowDist);
+    //laplacian += identity;
 
     //this assertion fails because lama does not set up the local data of the matrix correctly
     //SCAI_ASSERT_EQ_ERROR( laplacian.l1Norm(), 2*graph.l1Norm(), "wrong l1Norm in laplacian");
     SCAI_ASSERT_EQ_ERROR( laplacian.getNumValues(), graph.getNumValues()+graph.getNumRows(), "wrong numValues in laplacian");
     SCAI_ASSERT_EQ_ERROR( laplacian.getLocalNumValues(), graph.getLocalNumValues()+graph.getLocalNumRows(), "laplacian is wrong");
-
+	
     // Allocate a common logger that prints convergenceHistory
     //bool isDisabled = comm->getRank() > 0;
     //scai::solver::LoggerPtr logger( new scai::solver::CommonLogger( "CGLogger: ", scai::solver::LogLevel::convergenceHistory, scai::solver::LoggerWriteBehaviour::toConsoleOnly, isDisabled ) );
@@ -612,7 +619,7 @@ std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime(
             rhs.setSameValue( colDist, ValueType(1.0) );
         }
 
-        scai::lama::DenseVector<ValueType> solution( colDist, ValueType(0.0) );
+        scai::lama::DenseVector<ValueType> solution( colDist, ValueType(0.1) );
         solver.initialize( laplacian );
 
         std::chrono::time_point<std::chrono::steady_clock> beforeTime = std::chrono::steady_clock::now();

@@ -304,10 +304,11 @@ public:
      */
     static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 
-    /** @deprecated Not used anymore, use computeCommVolume().
+    /** @deprecated Construct positive semi-definite laplacian: like the regular laplacian but
+	 * the diagonal elements have value degree +1, not just degree, so the matrix is positive definite.
     */
     //TODO: debug and benchmark (it might be faster than the other method) or remove
-    static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian_depr(const scai::lama::CSRSparseMatrix<ValueType>& adjM);
+    static scai::lama::CSRSparseMatrix<ValueType> constructLaplacianPlusIdentity(const scai::lama::CSRSparseMatrix<ValueType>& adjM);
     
 
     /** @brief Construct a replicated projection matrix for a fast Johnson-Lindenstrauß-Transform

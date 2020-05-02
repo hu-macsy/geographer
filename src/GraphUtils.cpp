@@ -1827,7 +1827,7 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(
 //TODO: diagonal elements wrongly found when row distribution and column distribution are some general distribution
 //  while it works if both are a block distribution
 template<typename IndexType, typename ValueType>
-CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian_depr(const CSRSparseMatrix<ValueType>& graph) {
+CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacianPlusIdentity(const CSRSparseMatrix<ValueType>& graph) {
     using scai::lama::CSRStorage;
     using scai::hmemo::HArray;
     using std::vector;
@@ -1893,7 +1893,7 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian_
             if (newJA[j] == globalI) {
                 assert(!foundDiagonal);
                 foundDiagonal = true;
-                newValues[j] = targetDegree[i];
+                newValues[j] = targetDegree[i]+1;
             }
         }
         assert(foundDiagonal);
