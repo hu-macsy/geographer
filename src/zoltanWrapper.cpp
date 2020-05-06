@@ -353,7 +353,8 @@ Teuchos::ParameterList zoltanWrapper<IndexType, ValueType>::setParams(
 	const IndexType numWeights, 
     const IndexType thisPE){
 
-    const ValueType tolerance = 1+settings.epsilon;
+	//zoltan does not accept float 
+    const double tolerance = 1+settings.epsilon;
     if (thisPE == 0)
         std::cout << "Imbalance tolerance is " << tolerance << std::endl;
 

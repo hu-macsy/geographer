@@ -1835,7 +1835,7 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(
 //TODO: diagonal elements wrongly found when row distribution and column distribution are some general distribution
 //  while it works if both are a block distribution
 template<typename IndexType, typename ValueType>
-CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian_depr(const CSRSparseMatrix<ValueType>& graph) {
+CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacianPlusIdentity(const CSRSparseMatrix<ValueType>& graph) {
     using scai::lama::CSRStorage;
     using scai::hmemo::HArray;
     using std::vector;
@@ -1869,13 +1869,14 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian_
         newIA[i+1] = ia[i+1] + i + 1;
 
         for (IndexType j = ia[i]; j < ia[i+1]; j++) {
-            if (ja[j] == globalI) {
+			const IndexType neighbor = ja[j];
+            if (neighbor == globalI) {
                 throw std::runtime_error("Forbidden self loop at " + std::to_string(globalI) + " with weight " + std::to_string(values[j]));
             }
             //if (ja[j] < globalI && rightOfDiagonal)  {
             //    throw std::runtime_error("Outgoing edges are not sorted.");
             //}
-            if (ja[j] > globalI) {
+            if (neighbor > globalI) {
                 if (!rightOfDiagonal) {
                     newJA[j + i] = globalI;
                 }
@@ -1883,12 +1884,13 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian_
             }
 
             const IndexType jaOffset = i + rightOfDiagonal;
-            newJA[j+jaOffset] = ja[j];
+            newJA[j+jaOffset] = neighbor;
             newValues[j+jaOffset] = -values[j];
 
             targetDegree[i] += values[j];
         }
 
+		//if all neighbor vertices are before the diagonal
         if (!rightOfDiagonal) {
             newJA[ia[i+1] + i] = globalI;
         }
@@ -1899,7 +1901,7 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian_
             if (newJA[j] == globalI) {
                 assert(!foundDiagonal);
                 foundDiagonal = true;
-                newValues[j] = targetDegree[i];
+                newValues[j] = targetDegree[i]*1.1;
             }
         }
         assert(foundDiagonal);

@@ -130,7 +130,7 @@ if(Zoltan2_FOUND OR PARMETIS_LIB OR PARHIP_LIB )
     
     install(TARGETS wrappers EXPORT wrappers DESTINATION "${LIB_DEST}") 
     install(TARGETS allCompetitors DESTINATION "${BIN_DEST}") # executable
-    install(FILES Wrappers.h ${PARMETIS_WRAP_H} ${ZOLTAN_WRAP_H} ${PARHIP_H} DESTINATION "${HEADER_DEST}")   
+    install(FILES Wrappers.h ${PARMETIS_WRAP_H} ${ZOLTAN_WRAP_H} ${PARHIP_WRAP_H} DESTINATION "${HEADER_DEST}")   
 else()
     #message( "Some of the packages Zoltan2, metis or parmetis were not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
 endif()
