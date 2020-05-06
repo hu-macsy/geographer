@@ -331,6 +331,12 @@ PRINT0( nodeWeights.size() );
         std::cout<< "Total time " << totalT << std::endl;
     }
 
+    if( settings.outFile=="-" and settings.storePartition ){
+        settings.outFile = ITI::to_string(settings.initialPartition)+"_"+std::to_string(settings.numBlocks);
+        if( comm->getRank()==0 ) {
+            std::cout << "WARNING: partition file name not specified, setting it to " << settings.outFile << std::endl;
+        }
+    }
 
     if( settings.outFile!="-" and settings.storePartition ) {
         std::chrono::time_point<std::chrono::steady_clock> beforePartWrite = std::chrono::steady_clock::now();
