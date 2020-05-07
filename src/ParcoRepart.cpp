@@ -438,7 +438,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
             result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
         }else if (settings.initialPartition == ITI::Tool::geoKmeansBalance) {
             settings.keepMostBalanced = true;
-            settings.erodeInfluence = true;
+            settings.balanceIterations = 30;
+            //settings.erodeInfluence = true;
             result = ITI::KMeans<IndexType,ValueType>::computePartition_targetBalance(coordinateCopy, nodeWeightCopy, blockSizes, result, settings, metrics);
         }else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart) {
 
