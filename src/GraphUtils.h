@@ -408,6 +408,33 @@ public:
     static std::vector<IndexType> indexReorderCantor(const IndexType maxIndex);
 
 
+    /** @brief Calculate the global weight of all blocks.
+    @warning The version with the std::vector<DenseVector<>>
+    converts the weights internally to a std::vector<std::vector>> each time. For better efficiency,
+    if this is to be called multiple times, convert the node weights to a std::vector<std::vector>>
+    once before calling this function.
+    */
+    static std::vector<std::vector<ValueType>> getGlobalBlockWeight(
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        const scai::lama::DenseVector<IndexType>& partition);
+
+    static std::vector<std::vector<ValueType>> getGlobalBlockWeight(
+        const std::vector<std::vector<ValueType>> &nodeWeights,
+        const scai::lama::DenseVector<IndexType>& partition);
+
+    /** Useful for multiple node weights, it returns the maximum imbalance for each block.
+        Every block can have its maximum imbalance for a different node weight.
+        The returned vector has size equal the number of blocks.
+
+        @param[in] nodeWeightsV The node weights
+        @param[in] targetBlockWeights The desired sizes per block per weight, targetBlockWeights.size()==numWeights
+        @param[in] partition A partition of the input
+    */
+    static std::vector<double> getMaxImbalancePerBlock(
+        const std::vector<std::vector<ValueType>> &nodeWeightsV,
+        const std::vector<std::vector<ValueType>> &targetBlockWeights,
+        const scai::lama::DenseVector<IndexType> &partition);
+
 }; //class GraphUtils
 
 } /* namespace ITI */

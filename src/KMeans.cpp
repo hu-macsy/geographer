@@ -2270,7 +2270,7 @@ IndexType KMeans<IndexType,ValueType>::rebalance(
     }
 
     //the global weight of each block for each weight
-    std::vector<std::vector<ValueType>> blockWeights = getGlobalBlockWeight( nodeWeightsV, partition );
+    std::vector<std::vector<ValueType>> blockWeights = ITI::GraphUtils<IndexType,ValueType>::getGlobalBlockWeight( nodeWeightsV, partition );
     assert( blockWeights.size()==numWeights );
     assert( blockWeights[0].size()==numBlocks );
 
@@ -2575,64 +2575,6 @@ for (IndexType i = 0; i < numWeights; i++) {
     return numMoves;
 }//rebalance
 
-
-template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::getGlobalBlockWeight(
-    const std::vector<DenseVector<ValueType>> &nodeWeights,
-    const DenseVector<IndexType>& partition){
-
-    const IndexType numWeights = nodeWeights.size();
-    const IndexType localN = nodeWeights[0].size();
-
-    //
-    // convert to vector<vector> and then use overloaded function
-    //
-
-    std::vector<std::vector<ValueType>> nodeWeightsV( numWeights );
-
-    for(IndexType w=0; w<numWeights; w++){
-        scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[w].getLocalValues());
-        nodeWeightsV[w] = std::vector<ValueType>(rWeights.get(), rWeights.get()+localN);
-    }
-
-    return getGlobalBlockWeight( nodeWeightsV, partition );
-}
-
-template<typename IndexType, typename ValueType>
-std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::getGlobalBlockWeight(
-    const std::vector<std::vector<ValueType>> &nodeWeights,
-    const DenseVector<IndexType>& partition){
-
-    SCAI_REGION("KMeans.getGlobalBlockWeight");
-    const IndexType numWeights = nodeWeights.size();
-    const IndexType localN = nodeWeights[0].size();
-    assert( partition.getLocalValues().size()==localN);
-
-    const IndexType numBlocks = partition.max()+1;
-
-    scai::hmemo::ReadAccess<IndexType> rPart(partition.getLocalValues());
-
-    //the global weight of each block for each weight
-    std::vector<std::vector<ValueType>> blockWeights(numWeights, std::vector<ValueType>( numBlocks, 0.0));
-
-    //calculate the local weight first
-    for( IndexType i=0; i<localN; i++){
-        const IndexType myBlock = rPart[i];
-        for(IndexType w=0; w<numWeights; w++){
-            blockWeights[w][myBlock] += nodeWeights[w][i];
-        }
-    }
-
-    //take the global sum
-
-    const scai::dmemo::CommunicatorPtr comm = partition.getDistributionPtr()->getCommunicatorPtr();
-
-    for (IndexType w=0; w<numWeights; w++){
-        comm->sumImpl(blockWeights[w].data(), blockWeights[w].data(), numBlocks, scai::common::TypeTraits<ValueType>::stype);     
-    }
-
-    return blockWeights;
-}
 
 
 /* Get local minimum and maximum coordinates

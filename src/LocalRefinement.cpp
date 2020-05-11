@@ -1301,63 +1301,66 @@ IndexType ITI::LocalRefinement<IndexType,ValueType>::rebalance(
 
     SCAI_ASSERT_EQ_ERROR( localN, inputDist->getLocalSize(), "Possible distribution mismatch" )
 
-    DenseVector<IndexType> borderNodeFlags = GraphUtils<IndexType, ValueType>::getBorderNodes( graph, partition );
+    //
+    // convert weights to vector<vector> and get the block sizes
+    //
+
+    std::vector<std::vector<ValueType>> nodeWeightsV( numWeights );
+    for(IndexType w=0; w<numWeights; w++){
+        scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[w].getLocalValues());
+        nodeWeightsV[w] = std::vector<ValueType>(rWeights.get(), rWeights.get()+localN);
+    }
+
+    assert( blockWeights.size()==numWeights );
+    assert( blockWeights[0].size()==numBlocks );
+
+    std::vector<double> maxImbalancePerBlock = 
+        ITI::GraphUtils<IndexType,ValueType>::getMaxImbalancePerBlock(nodeWeightsV, targetBlockWeights, partition);
 
     //
     //get vertices that are on the boundaries up to some depth
     //
 
     std::vector<IndexType> interfaceNodes;
-    //keep track of which nodes were added at each BFS round
-    std::vector<IndexType> roundMarkers({0});
-/*
-    {
-        const scai::hmemo::ReadAccess<IndexType> localBorderFlags (borderNodeFlag.getLocalValues() );
-        assert( localBorderFlags.size()==localN );
-        std::queue<IndexType> bfsQueue;
-        std::vector<bool> touched(localN, false);
+    std::vector<IndexType> roundMarkers;
 
-        //initialize the BDS queue with the border nodes
+    {
+        DenseVector<IndexType> borderNodeFlags = GraphUtils<IndexType, ValueType>::getBorderNodes( graph, partition );
+        const scai::hmemo::ReadAccess<IndexType> localBorderFlags (borderNodeFlags.getLocalValues() );
+        assert( localBorderFlags.size()==localN );
+        std::vector<IndexType> borderNodes;
+        //initialize the BFS queue with the border nodes
         for(IndexType i=0; i<localN; i++){
             if(localBorderFlags[i]==1){
                 //it is a border node, put it in the queue
-                bfsQueue.push(i);
-                touched[i] = true;
+                borderNodes.push(i);
             }
         }
+        const IndexType minBorderNodes = std::min(settings.minBorderNodes, localN);
 
-        bool active = true;
-
-        while (active) {
-            //if the target number is reached, complete this round and then stop
-            if (interfaceNodes.size() >= minBorderNodes || interfaceNodes.size() == roundMarkers.back()) active = false;
-            roundMarkers.push_back(interfaceNodes.size());
-            std::queue<IndexType> nextQueue;
-            while (!bfsQueue.empty()) {
-                IndexType nextNode = bfsQueue.front();
-                bfsQueue.pop();
-                const IndexType localI = inputDist->global2Local(nextNode);
-                assert(localI != scai::invalidIndex);
-                assert(touched[localI]);
-                const IndexType beginCols = ia[localI];
-                const IndexType endCols = ia[localI+1];
-
-                for (IndexType j = beginCols; j < endCols; j++) {
-                    IndexType neighbor = ja[j];
-                    IndexType localNeighbor = inputDist->global2Local(neighbor);
-                    //assume k=p
-                    if (localNeighbor != scai::invalidIndex && !touched[localNeighbor]) {
-                        nextQueue.push(neighbor);
-                        interfaceNodes.push_back(neighbor);
-                        touched[localNeighbor] = true;
-                    }
-                }
-            }
-            bfsQueue = nextQueue;
-        }
-
+        std::tie( interfaceNodes, roundMarkers ) = 
+            ITI::GraphUtils<IndexType,ValueType>::localMultiSourceBFSWithRoundMarkers( input, borderNodes, minBorderNodes );
     }
-    */
+    
+    assert(interfaceNodes.size() <= localN);
+    assert( interfaceNodes.size() >= minBorderNodes ||
+            interfaceNodes.size() == localN ||
+            roundMarkers[roundMarkers.size()-2] == roundMarkers.back()
+    );
+
+    //interfaceNodes contain the global IDs of all nodes that are eligible to move to another block
+    //roundMarkers has size as many as the BFS rounds and roundMarkers[i] is the size of the i-th round
+
+    //get only the vertices of the first round and sort them
+
+    const IndexType firstRoundSize = roundMarkers[0];
+    const std::vector<IndexType> firstRoundNodes(firstRoundSize);
+    for( IndexType i=0; i<firstRoundSize; i++){
+        firstRoundNodes[i] = interfaceNodes[i];
+    }
+
+    
+
 
 }
 //---------------------------------------------------------------------------------------

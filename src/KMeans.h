@@ -356,17 +356,6 @@ static std::vector< std::vector<ValueType> > findCenters(
 static std::pair<std::vector<ValueType>, std::vector<ValueType> > getGlobalMinMaxCoords(const std::vector<DenseVector<ValueType>> &coordinates);
 
 
-/** @brief Calculate the global weight of all blocks
-*/
-static std::vector<std::vector<ValueType>> getGlobalBlockWeight(
-    const std::vector<DenseVector<ValueType>> &nodeWeights,
-    const DenseVector<IndexType>& partition);
-
-static std::vector<std::vector<ValueType>> getGlobalBlockWeight(
-    const std::vector<std::vector<ValueType>> &nodeWeights,
-    const DenseVector<IndexType>& partition);
-
-
 /**
  * Computes the weighted distance between a vertex and a cluster, given the geometric distance and the weights and influence values.
  *
