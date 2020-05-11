@@ -645,7 +645,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
 
     IndexType iter = 0;
     IndexType skippedLoops = 0;
-    ValueType totalBalanceTime = 0;	// for timing/profiling
+    ValueType totalBalanceTime = 0; // for timing/profiling
     std::vector<std::vector<bool>> influenceGrew(numNodeWeights, std::vector<bool>(numNewBlocks));
     std::vector<ValueType> influenceChangeUpperBound(numNewBlocks, 1+settings.influenceChangeCap);
     std::vector<ValueType> influenceChangeLowerBound(numNewBlocks, 1-settings.influenceChangeCap);
@@ -750,6 +750,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
                             for (IndexType w = 0; w < numNodeWeights; w++) {
                                 influenceEffect += influence[w][j]*normalizedNodeWeights[w][i];
                             }
+
                             const ValueType effectiveDistance = sqDist*influenceEffect;
 
                             // update best and second-best centers
@@ -821,8 +822,17 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
                 PRINT0("Warning, imbalance in weight " + std::to_string(i) + " is " + std::to_string(imbalance[i]) + ". Probably the given target block sizes are all too large.");
             }
 
-            if (imbalance[i] > settings.epsilon) {// TODO: generalize with multiple epsilons
-                allWeightsBalanced = false;
+            //if different epsilons where given for each weight
+            if( settings.epsilons.size()>0){
+                assert( settings.epsilons.size()==numNodeWeights );
+                if (imbalance[i] > settings.epsilons[i]) {// TODO: generalize with multiple epsilons
+                    allWeightsBalanced = false;
+                }
+            }
+            else{
+                if (imbalance[i] > settings.epsilon) {// TODO: generalize with multiple epsilons
+                    allWeightsBalanced = false;
+                }
             }
         }
 
@@ -1290,7 +1300,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition(
     }
 
     assert(minNodes > 0);
-    IndexType samplingRounds = 0;	// number of rounds needed to see all points
+    IndexType samplingRounds = 0;   // number of rounds needed to see all points
     std::vector<IndexType> samples;
 
     const bool randomInitialization = comm->all(localN > minNodes);
@@ -1936,7 +1946,6 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
 
     const scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
     const IndexType globalN = coordinates[0].getDistributionPtr()->getGlobalSize();
-    //std::vector<DenseVector<ValueType>> nodeWeightCopy = nodeWeights;//(1);
 
     //get first result if given one is empty
     if ( result.size()==0 or result.max()==0 ){
@@ -1985,7 +1994,7 @@ imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, blockS
         imbalanceDiff *= 1.2; // add 20% to give some slack
     }
 
-const IndexType numTries = 3;
+    const IndexType numTries = 5;
     const ValueType imbaDelta = imbalanceDiff/numTries; //how much to reduce epsilon
     ValueType pointPerCent = 0.005;
     ValueType maxMinImbalance = maxCurrImbalance;
@@ -1998,11 +2007,14 @@ const IndexType numTries = 3;
     settingsCopy.batchPercent = ((ValueType)100.0)/localN; //this sets batch to 100
 
     DenseVector<IndexType> bestResult = result;
+    
+settingsCopy.epsilons = std::vector<double>(settings.numNodeWeights, maxCurrImbalance );
+settingsCopy.epsilons[1] = settingsCopy.epsilons[1]*1.5;
 
     const std::chrono::time_point<std::chrono::steady_clock> beforeRebalance =  std::chrono::steady_clock::now();
 
     for(int i=0; i<numTries; i++){
-        PRINT0("\tRepartition for epsilon= " << settingsCopy.epsilon );
+        PRINT0("\tRepartition for epsilon= " << settingsCopy.epsilons[0] << ", " << settingsCopy.epsilons[1] );
         std::chrono::time_point<std::chrono::steady_clock> oneLoopTime =  std::chrono::steady_clock::now();
 
         if( settings.KMBalanceMethod=="repart" ){
@@ -2036,6 +2048,8 @@ const IndexType numTries = 3;
         }
         
         settingsCopy.epsilon -= imbaDelta;
+settingsCopy.epsilons[0] -= imbaDelta;
+settingsCopy.epsilons[1] -= imbaDelta*1.5;
 
         std::chrono::duration<double> oneLoopDuration =  std::chrono::steady_clock::now() - oneLoopTime;
         ValueType maxLoopTime = comm->max( oneLoopDuration.count() );
@@ -2301,10 +2315,10 @@ maxImbalancePerBlockForWeight[b] = w;
         }
     }
 
-PRINT0("max imbalance for block ");
-for (IndexType b=0; b<numBlocks; b++) {
-     PRINT0("\t" << b <<" is " << maxImbalancePerBlock[b] << " for weight " <<  maxImbalancePerBlockForWeight[b]);
-}
+//PRINT0("max imbalance for block ");
+//for (IndexType b=0; b<numBlocks; b++) {
+//     PRINT0("\t" << b <<" is " << maxImbalancePerBlock[b] << " for weight " <<  maxImbalancePerBlockForWeight[b]);
+//}
 
     //sort blocks based on their maxImbalance
     //blockIndices[0] is the block with the highest imbalance
@@ -2377,7 +2391,7 @@ PRINT0("most imbalanced block is " << blockIndices[0] << " with weight " <<  max
     //const IndexType myBatchSize = IndexType ( ((ValueType)localN)*settings.batchPercent + 1);
     const IndexType myBatchSize = localN*settings.batchPercent + 1;
     //pick min across all processors;  this is needed so they all do the global sum together
-
+//PRINT( comm->getRank() << ": "<< localN << " , " << myBatchSize );
     IndexType batchSize = comm->min(myBatchSize);
 
     bool meDone = false;
@@ -2516,7 +2530,7 @@ PRINT0("most imbalanced block is " << blockIndices[0] << " with weight " <<  max
             //Maybe use some priority queue?
             numMoves++;
             hasMoved[thisInd] = true;
-//TODO: consider aborting if noone has move vertices for some rounds
+            //TODO: consider aborting if no PE has moved vertices for some rounds
         }
         //else no improvement was achieved
 
@@ -2546,11 +2560,6 @@ PRINT0("most imbalanced block is " << blockIndices[0] << " with weight " <<  max
 
             //TODO: check if resorting local points based on new global weights
             //and restarting would benefit
-// PRINT0("********* global sum ***************");
-// for (IndexType b=0; b<numBlocks; b++) {
-//      PRINT0("\t" << b <<" is " << maxImbalancePerBlock[b] << " for weight " <<  maxImbalancePerBlockForWeight[b]);
-// }
-
 
             if(thisRun<maxNumRestarts){
                 std::sort(indices.begin(), indices.end(), sortFunction );
@@ -2559,7 +2568,7 @@ PRINT0("most imbalanced block is " << blockIndices[0] << " with weight " <<  max
                 thisRun++;
             }else{
                 //increase the batch size
-                batchSize = std::min( (IndexType) (batchSize*1.01), (IndexType) localN/1000);
+                batchSize = std::min( (IndexType) (batchSize*1.05),  std::min(localN/1000, IndexType(1000)) );
                 batchSize = comm->min(batchSize);
             }
         }
