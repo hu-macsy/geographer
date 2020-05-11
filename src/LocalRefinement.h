@@ -129,6 +129,16 @@ public:
     */
     static std::vector<ValueType> distancesFromBlockCenter(const std::vector<DenseVector<ValueType>> &coordinates);
 
+    static IndexType rebalance(
+        const CSRSparseMatrix<ValueType> &graph,
+        const std::vector<DenseVector<ValueType>> &coordinates,
+        const std::vector<DenseVector<ValueType>> &nodeWeights,
+        const std::vector<std::vector<ValueType>> &targetBlockWeights,
+        DenseVector<IndexType>& partition,
+        const Settings settings,
+        const ValueType pointPerCent=0.5);
+
+
 private:
 
     /**

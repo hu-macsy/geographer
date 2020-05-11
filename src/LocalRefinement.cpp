@@ -1197,7 +1197,8 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
     /*
      * check which of the neighbors of our local border nodes are actually the partner's border nodes
      */
-    std::vector<IndexType> interfaceNodes;
+
+    std::vector<IndexType> sourceNodes;
 
     for (IndexType node : nodesWithNonLocalNeighbors) {
         SCAI_REGION( "LocalRefinement.getInterfaceNodes.getBorderToPartner" )
@@ -1206,66 +1207,15 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
 
         for (IndexType j = ia[localI]; j < ia[localI+1]; j++) {
             if (foreignNodes.count(ja[j])> 0) {
-                interfaceNodes.push_back(node);
+                sourceNodes.push_back(node);
                 break;
             }
         }
     }
 
-    assert(interfaceNodes.size() <= localN);
+    assert(sourceNodes.size() <= localN);
 
-    //keep track of which nodes were added at each BFS round
-    std::vector<IndexType> roundMarkers({0});
-
-    /*
-     * now gather buffer zone with breadth-first search
-     */
-    {
-        SCAI_REGION( "LocalRefinement.getInterfaceNodes.breadthFirstSearch" )
-        std::vector<bool> touched(localN, false);
-
-        std::queue<IndexType> bfsQueue;
-        for (IndexType node : interfaceNodes) {
-            bfsQueue.push(node);
-            const IndexType localID = inputDist->global2Local(node);
-            assert(localID != scai::invalidIndex);
-            touched[localID] = true;
-        }
-        assert(bfsQueue.size() == interfaceNodes.size());
-        bool active = true;
-
-        while (active) {
-            //if the target number is reached, complete this round and then stop
-            if (interfaceNodes.size() >= minBorderNodes || interfaceNodes.size() == roundMarkers.back()) active = false;
-            roundMarkers.push_back(interfaceNodes.size());
-            std::queue<IndexType> nextQueue;
-            while (!bfsQueue.empty()) {
-                IndexType nextNode = bfsQueue.front();
-                bfsQueue.pop();
-                const IndexType localI = inputDist->global2Local(nextNode);
-                assert(localI != scai::invalidIndex);
-                assert(touched[localI]);
-                const IndexType beginCols = ia[localI];
-                const IndexType endCols = ia[localI+1];
-
-                for (IndexType j = beginCols; j < endCols; j++) {
-                    IndexType neighbor = ja[j];
-                    IndexType localNeighbor = inputDist->global2Local(neighbor);
-                    //assume k=p
-                    if (localNeighbor != scai::invalidIndex && !touched[localNeighbor]) {
-                        nextQueue.push(neighbor);
-                        interfaceNodes.push_back(neighbor);
-                        touched[localNeighbor] = true;
-                    }
-                }
-            }
-            bfsQueue = nextQueue;
-        }
-    }
-
-    assert(interfaceNodes.size() <= localN);
-    assert(interfaceNodes.size() >= minBorderNodes || interfaceNodes.size() == localN || roundMarkers[roundMarkers.size()-2] == roundMarkers.back());
-    return {interfaceNodes, roundMarkers};
+    return ITI::GraphUtils<IndexType,ValueType>::localMultiSourceBFSWithRoundMarkers( input, sourceNodes, minBorderNodes );
 }
 //---------------------------------------------------------------------------------------
 
@@ -1329,6 +1279,87 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distancesFrom
     return result;
 }
 
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+IndexType ITI::LocalRefinement<IndexType,ValueType>::rebalance(
+    const CSRSparseMatrix<ValueType> &graph,
+    const std::vector<DenseVector<ValueType>> &coordinates,
+    const std::vector<DenseVector<ValueType>> &nodeWeights,
+    const std::vector<std::vector<ValueType>> &targetBlockWeights,
+    DenseVector<IndexType>& partition,
+    const Settings settings,
+    const ValueType pointPerCent){
+
+    SCAI_REGION("LocalRefinement.rebalance");
+    const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
+    const IndexType numWeights = nodeWeights.size();
+    assert( targetBlockWeights.size()==numWeights);
+    const IndexType localN = coordinates[0].getLocalValues().size();
+//    IndexType numBlocks = settings.numBlocks;    
+    const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
+
+    SCAI_ASSERT_EQ_ERROR( localN, inputDist->getLocalSize(), "Possible distribution mismatch" )
+
+    DenseVector<IndexType> borderNodeFlags = GraphUtils<IndexType, ValueType>::getBorderNodes( graph, partition );
+
+    //
+    //get vertices that are on the boundaries up to some depth
+    //
+
+    std::vector<IndexType> interfaceNodes;
+    //keep track of which nodes were added at each BFS round
+    std::vector<IndexType> roundMarkers({0});
+/*
+    {
+        const scai::hmemo::ReadAccess<IndexType> localBorderFlags (borderNodeFlag.getLocalValues() );
+        assert( localBorderFlags.size()==localN );
+        std::queue<IndexType> bfsQueue;
+        std::vector<bool> touched(localN, false);
+
+        //initialize the BDS queue with the border nodes
+        for(IndexType i=0; i<localN; i++){
+            if(localBorderFlags[i]==1){
+                //it is a border node, put it in the queue
+                bfsQueue.push(i);
+                touched[i] = true;
+            }
+        }
+
+        bool active = true;
+
+        while (active) {
+            //if the target number is reached, complete this round and then stop
+            if (interfaceNodes.size() >= minBorderNodes || interfaceNodes.size() == roundMarkers.back()) active = false;
+            roundMarkers.push_back(interfaceNodes.size());
+            std::queue<IndexType> nextQueue;
+            while (!bfsQueue.empty()) {
+                IndexType nextNode = bfsQueue.front();
+                bfsQueue.pop();
+                const IndexType localI = inputDist->global2Local(nextNode);
+                assert(localI != scai::invalidIndex);
+                assert(touched[localI]);
+                const IndexType beginCols = ia[localI];
+                const IndexType endCols = ia[localI+1];
+
+                for (IndexType j = beginCols; j < endCols; j++) {
+                    IndexType neighbor = ja[j];
+                    IndexType localNeighbor = inputDist->global2Local(neighbor);
+                    //assume k=p
+                    if (localNeighbor != scai::invalidIndex && !touched[localNeighbor]) {
+                        nextQueue.push(neighbor);
+                        interfaceNodes.push_back(neighbor);
+                        touched[localNeighbor] = true;
+                    }
+                }
+            }
+            bfsQueue = nextQueue;
+        }
+
+    }
+    */
+
+}
 //---------------------------------------------------------------------------------------
 
 

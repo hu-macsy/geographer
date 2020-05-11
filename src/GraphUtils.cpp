@@ -164,6 +164,75 @@ std::vector<IndexType> GraphUtils<IndexType,ValueType>::localBFS(const scai::lam
     return result;
 }
 //------------------------------------------------------------------------------------
+template<typename IndexType, typename ValueType>
+std::pair<std::vector<IndexType>, std::vector<IndexType>> GraphUtils<IndexType,ValueType>::localMultiSourceBFSWithRoundMarkers(
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const std::vector<IndexType> &sources, // global node IDs
+    const IndexType &minBorderNodes)
+{
+    const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
+    const IndexType localN = inputDist->getLocalSize();
+    SCAI_ASSERT_LE_ERROR(minBorderNodes, localN, "Minimum number of nodes must be at most as the local number of nodes");
+
+    std::vector<IndexType> interfaceNodes = sources;
+
+    //keep track of which nodes were added at each BFS round
+    std::vector<IndexType> roundMarkers({0});
+
+    /*
+     * now gather buffer zone with breadth-first search
+     */
+
+    const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+    const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+    const scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+
+    std::vector<bool> touched(localN, false);
+    std::queue<IndexType> bfsQueue;
+
+    for (IndexType node : interfaceNodes) {
+        bfsQueue.push(node); //global node IDs
+        const IndexType localID = inputDist->global2Local(node);
+        assert(localID != scai::invalidIndex);
+        touched[localID] = true;
+    }
+    assert(bfsQueue.size() == interfaceNodes.size());
+    bool active = true;
+    //const IndexType minBorderNodes = std::min( minBorderNodes, localN);
+
+    while (active) {
+        //if the target number is reached, complete this round and then stop
+        if (interfaceNodes.size() >= minBorderNodes || interfaceNodes.size() == roundMarkers.back()) active = false;
+        roundMarkers.push_back(interfaceNodes.size());
+        std::queue<IndexType> nextQueue;
+        while (!bfsQueue.empty()) {
+            IndexType nextNode = bfsQueue.front();
+            bfsQueue.pop();
+            const IndexType localI = inputDist->global2Local(nextNode);
+            assert(localI != scai::invalidIndex);
+            assert(touched[localI]);
+            const IndexType beginCols = ia[localI];
+            const IndexType endCols = ia[localI+1];
+
+            for (IndexType j = beginCols; j < endCols; j++) {
+                IndexType neighbor = ja[j];
+                IndexType localNeighbor = inputDist->global2Local(neighbor);
+                //if neighbor is not local or is already seen. do not do anything
+                if (localNeighbor != scai::invalidIndex && !touched[localNeighbor]) {
+                    nextQueue.push(neighbor);
+                    interfaceNodes.push_back(neighbor);
+                    touched[localNeighbor] = true;
+                }
+            }
+        }
+        bfsQueue = nextQueue;
+    }
+
+    assert(interfaceNodes.size() <= localN);
+    assert(interfaceNodes.size() >= minBorderNodes || interfaceNodes.size() == localN || roundMarkers[roundMarkers.size()-2] == roundMarkers.back());
+    return {interfaceNodes, roundMarkers};
+}
+//------------------------------------------------------------------------------------
 
 //very similar to localBFS
 

@@ -55,6 +55,20 @@ public:
      */
     static std::vector<IndexType> localBFS(const scai::lama::CSRSparseMatrix<ValueType> &graph, IndexType u);
 
+    /** BFS starting from multiple sources. Sources are global node ID that should be local in the calling PE
+     The result is a pair: The first element is a vector of nodes, in the order they were visited by the BFS.
+     The second element is a vector of round markers: For round i, roundMarkers[i] gives the position in the returned node set where the nodes encountered in BFS round i begin.
+
+    @param[in] graph Input (can be distributed) graph
+    @param [in] sources Global node IDs
+    @return pair of interfaceNodes, roundMarkers. Interface nodes are all the nodes discovered (the global IDs)
+    abnd the roundMarkers
+    */
+    static std::pair<std::vector<IndexType>, std::vector<IndexType>> localMultiSourceBFSWithRoundMarkers(
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const std::vector<IndexType> &sources,
+    const IndexType &minBorderNodes);
+
     /**
     	@brief Single source shortest path, a Dijkstra implementation
 
@@ -170,7 +184,7 @@ public:
     * @param[in] adjM Adjacency matrix of the input graph
     * @param[in] part A partition of the graph.
 
-    * @return A distributed vector that contains 0 or 1: of retunr[i]=1 then the i-th vertex is a border node, if 0 it is not.
+    * @return A distributed vector that contains 0 or 1: of return[i]=1 then the i-th vertex is a border node, if 0 it is not.
     */
     static scai::lama::DenseVector<IndexType> getBorderNodes( const scai::lama::CSRSparseMatrix<ValueType> &adjM, const scai::lama::DenseVector<IndexType> &part);
 
