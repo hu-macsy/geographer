@@ -1333,13 +1333,13 @@ IndexType ITI::LocalRefinement<IndexType,ValueType>::rebalance(
         for(IndexType i=0; i<localN; i++){
             if(localBorderFlags[i]==1){
                 //it is a border node, put it in the queue
-                borderNodes.push(i);
+                borderNodes.push_back(i);
             }
         }
         const IndexType minBorderNodes = std::min(settings.minBorderNodes, localN);
 
         std::tie( interfaceNodes, roundMarkers ) = 
-            ITI::GraphUtils<IndexType,ValueType>::localMultiSourceBFSWithRoundMarkers( input, borderNodes, minBorderNodes );
+            ITI::GraphUtils<IndexType,ValueType>::localMultiSourceBFSWithRoundMarkers( graph, borderNodes, minBorderNodes );
     }
     
     assert(interfaceNodes.size() <= localN);
@@ -1354,12 +1354,12 @@ IndexType ITI::LocalRefinement<IndexType,ValueType>::rebalance(
     //get only the vertices of the first round and sort them
 
     const IndexType firstRoundSize = roundMarkers[0];
-    const std::vector<IndexType> firstRoundNodes(firstRoundSize);
+    std::vector<IndexType> firstRoundNodes(firstRoundSize);
     for( IndexType i=0; i<firstRoundSize; i++){
         firstRoundNodes[i] = interfaceNodes[i];
     }
 
-    
+
 
 
 }
