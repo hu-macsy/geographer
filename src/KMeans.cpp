@@ -2289,22 +2289,20 @@ maxImbalancePerBlockForWeight[b] = w;
             }
         }
     }
-/*
-PRINT0("max imbalance for block ");
-for (IndexType b=0; b<numBlocks; b++) {
-     PRINT0("\t" << b <<" is " << maxImbalancePerBlock[b] << " for weight " <<  maxImbalancePerBlockForWeight[b]);
-}
-*/
-    //sort blocks based on their maxImbalance
-    //blockIndices[0] is the block with the highest imbalance
-    std::vector<IndexType> blockIndices(numBlocks);
-    std::iota(blockIndices.begin(), blockIndices.end(), 0);
-    std::sort(blockIndices.begin(), blockIndices.end(),
-        [&maxImbalancePerBlock](int i, int j) {
-            return maxImbalancePerBlock[i]>maxImbalancePerBlock[j];
-    });
 
-PRINT0("most imbalanced block is " << blockIndices[0] << " with weight " <<  maxImbalancePerBlock[blockIndices[0]] );
+    {
+        //sort blocks based on their maxImbalance
+        //blockIndices[0] is the block with the highest imbalance
+        std::vector<IndexType> blockIndices(numBlocks);
+        std::iota(blockIndices.begin(), blockIndices.end(), 0);
+        std::sort(blockIndices.begin(), blockIndices.end(),
+            [&maxImbalancePerBlock](int i, int j) {
+                return maxImbalancePerBlock[i]>maxImbalancePerBlock[j];
+        });
+
+        PRINT0("most imbalanced block is " << blockIndices[0] << " with weight " <<  maxImbalancePerBlock[blockIndices[0]] );
+    }
+
 
     scai::hmemo::ReadAccess<IndexType> rPart(partition.getLocalValues());
     assert(rPart.size()==localN);
