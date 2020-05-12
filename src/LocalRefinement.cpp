@@ -1,5 +1,5 @@
-
 #include <unordered_set>
+#include <numeric>
 
 #include "LocalRefinement.h"
 #include "GraphUtils.h"
@@ -7,6 +7,7 @@
 #include "PrioQueue.h"
 
 #include <scai/utilskernel/TransferUtils.hpp>
+#include <scai/dmemo/mpi/MPIException.hpp>
 
 using scai::hmemo::HArray;
 
@@ -1295,11 +1296,11 @@ IndexType ITI::LocalRefinement<IndexType,ValueType>::rebalance(
     const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const IndexType numWeights = nodeWeights.size();
     assert( targetBlockWeights.size()==numWeights);
-    const IndexType localN = coordinates[0].getLocalValues().size();
-//    IndexType numBlocks = settings.numBlocks;    
     const scai::dmemo::DistributionPtr inputDist = graph.getRowDistributionPtr();
-
-    SCAI_ASSERT_EQ_ERROR( localN, inputDist->getLocalSize(), "Possible distribution mismatch" )
+    const IndexType localN = coordinates[0].getLocalValues().size();
+    const IndexType globalN = inputDist->getGlobalSize();    
+    SCAI_ASSERT_EQ_ERROR( localN, inputDist->getLocalSize(), "Possible distribution mismatch" );
+    SCAI_ASSERT_EQ_ERROR( inputDist, partition.getDistributionPtr(), "Distribution mismatch" );
 
     //
     // convert weights to vector<vector> and get the block sizes
@@ -1310,12 +1311,17 @@ IndexType ITI::LocalRefinement<IndexType,ValueType>::rebalance(
         scai::hmemo::ReadAccess<ValueType> rWeights(nodeWeights[w].getLocalValues());
         nodeWeightsV[w] = std::vector<ValueType>(rWeights.get(), rWeights.get()+localN);
     }
+    const IndexType numBlocks = settings.numBlocks;
+    SCAI_ASSERT_EQ_ERROR( partition.max()+1, numBlocks, "Given number of blocks and partition.max mismatch" );
+    assert( targetBlockWeights[0].size()==numBlocks );
 
+    std::vector<std::pair<double,IndexType>> maxImbalancePerBlock = 
+        ITI::GraphUtils<IndexType,ValueType>::getMaxImbalancePerBlock(nodeWeightsV, targetBlockWeights, partition);
+
+    //the global weight of each block for each weight
+    std::vector<std::vector<ValueType>> blockWeights = ITI::GraphUtils<IndexType,ValueType>::getGlobalBlockWeight( nodeWeightsV, partition );
     assert( blockWeights.size()==numWeights );
     assert( blockWeights[0].size()==numBlocks );
-
-    std::vector<double> maxImbalancePerBlock = 
-        ITI::GraphUtils<IndexType,ValueType>::getMaxImbalancePerBlock(nodeWeightsV, targetBlockWeights, partition);
 
     //
     //get vertices that are on the boundaries up to some depth
@@ -1323,6 +1329,7 @@ IndexType ITI::LocalRefinement<IndexType,ValueType>::rebalance(
 
     std::vector<IndexType> interfaceNodes;
     std::vector<IndexType> roundMarkers;
+    const IndexType minBorderNodes = localN*pointPerCent;
 
     {
         DenseVector<IndexType> borderNodeFlags = GraphUtils<IndexType, ValueType>::getBorderNodes( graph, partition );
@@ -1333,34 +1340,326 @@ IndexType ITI::LocalRefinement<IndexType,ValueType>::rebalance(
         for(IndexType i=0; i<localN; i++){
             if(localBorderFlags[i]==1){
                 //it is a border node, put it in the queue
-                borderNodes.push_back(i);
+                borderNodes.push_back( inputDist->local2Global(i) );
             }
         }
-        const IndexType minBorderNodes = std::min(settings.minBorderNodes, localN);
 
         std::tie( interfaceNodes, roundMarkers ) = 
             ITI::GraphUtils<IndexType,ValueType>::localMultiSourceBFSWithRoundMarkers( graph, borderNodes, minBorderNodes );
     }
-    
+PRINT( interfaceNodes.size() << " __ " << roundMarkers.size() << " +_+_ " << roundMarkers.back() );
+
     assert(interfaceNodes.size() <= localN);
     assert( interfaceNodes.size() >= minBorderNodes ||
             interfaceNodes.size() == localN ||
             roundMarkers[roundMarkers.size()-2] == roundMarkers.back()
     );
 
+    //const IndexType numEligibleNodes = interfaceNodes.size();
+
     //interfaceNodes contain the global IDs of all nodes that are eligible to move to another block
     //roundMarkers has size as many as the BFS rounds and roundMarkers[i] is the size of the i-th round
 
-    //get only the vertices of the first round and sort them
+    //mark eligible to move nodes
+    std::vector<bool> isEligible(localN, false);
 
-    const IndexType firstRoundSize = roundMarkers[0];
-    std::vector<IndexType> firstRoundNodes(firstRoundSize);
-    for( IndexType i=0; i<firstRoundSize; i++){
-        firstRoundNodes[i] = interfaceNodes[i];
+    for( IndexType node : interfaceNodes){
+        const IndexType localI = inputDist->global2Local(node);
+        assert(localI<localN);
+        isEligible[localI] = true;
     }
 
+//For now consider all sampled nodes; leave similar ideas for later optimizations
+/*
+//get only the vertices of the first round and sort them
+
+const IndexType firstRoundSize = roundMarkers[1];
+std::vector<IndexType> firstRoundNodes(firstRoundSize);
+for( IndexType i=0; i<firstRoundSize; i++){
+    firstRoundNodes[i] = interfaceNodes[i];
+}
+*/
+//PRINT(comm->getRank() << ": localN " << localN << ", firstRoundSize " << firstRoundSize);
+
+    //local partition
+    scai::hmemo::ReadAccess<IndexType> rPart(partition.getLocalValues());
+    assert(rPart.size()==localN);
+    std::vector<IndexType> localPart( rPart.get(), rPart.get()+localN );
+    rPart.release();
+
+    //sort lexicographically: first by the imbalance of the block this point belongs to.
+    //  if they are in the same block or the imbalance is the same, sort by membership
+    auto lexSort = [&](int i, int j)->bool{
+        const IndexType blockI = localPart[i];
+        const IndexType blockJ = localPart[j];
+        //if in the same block or blocks have the same imbalance
+        if( blockI==blockJ or maxImbalancePerBlock[blockI].first==maxImbalancePerBlock[blockJ].first ){
+            //get the weight that causes the imbalance
+            const IndexType badWeight = maxImbalancePerBlock[blockI].second;
+            //sort by which vertex is heavier in this weight
+            return nodeWeightsV[badWeight][i]>nodeWeightsV[badWeight][j];
+        }
+        if( maxImbalancePerBlock[blockI].first>maxImbalancePerBlock[blockJ].first){
+            return true;
+        }else{
+            return false;
+        }
+    };
+
+for( int b=0; b<numBlocks; b++){
+     PRINT0( b <<" ** " << maxImbalancePerBlock[b].first << ", for w " << maxImbalancePerBlock[b].second );
+}
 
 
+    //TODO: this sorts ALL local nodes and then ignores non-eligible to move nodes
+    //maybe we could only consider the eligible to move nodes from here
+    std::vector<IndexType> localIndices( localN );
+    std::iota(localIndices.begin(), localIndices.end(), 0);
+    std::sort( localIndices.begin(), localIndices.end(), lexSort );
+
+    //get the halo of the partition
+    scai::dmemo::HaloExchangePlan partHalo = ITI::GraphUtils<IndexType,ValueType>::buildNeighborHalo(graph);
+    scai::hmemo::HArray<IndexType> haloData;
+    partHalo.updateHalo( haloData, partition.getLocalValues() , inputDist->getCommunicator() );
+
+    //get read accesses to the matrix data
+    const CSRStorage<ValueType>& localStorage = graph.getLocalStorage();
+    scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());
+    scai::hmemo::ReadAccess<IndexType> ja(localStorage.getJA());
+
+    //here we store the difference to the block weight caused by each move
+    std::vector<std::vector<ValueType>> blockWeightDifference(numWeights, std::vector<ValueType>(numBlocks, 0.0));
+
+    //determine every how many nodes we do a global sum
+    const IndexType myBatchSize = localN*settings.batchPercent + 1;
+    //pick min across all processors;  this is needed so they all do the global sum together
+    IndexType batchSize = comm->min(myBatchSize);
+    //this has to be the same for all PE otherwise the global reduce step are not synchronized
+    const IndexType numPointsToCheck = comm->min(localN);
+PRINT( comm->getRank() << ": numPointsToCheck " << numPointsToCheck << " , batchSize " << batchSize );
+    bool meDone = false;
+    bool allDone = false;
+    IndexType localI = 0;
+    IndexType numMoves = 0;
+
+//TODO: if the minimum number of points to check is agreed, can this be turned into a for loop?
+// even if we restart? WEll, in the end we should use a priority queue
+    while( not allDone ){
+        const IndexType thisInd = localIndices[localI];
+        const IndexType myBlock = localPart[thisInd];
+        assert(thisInd<localN);
+
+        //for certain reasons, moving this point is not desirable
+        bool tryToMove = true;
+        //if this is not in the interface nodes
+        if( not isEligible[thisInd] ){
+            tryToMove = false;
+        }
+        //if my blocks is too light do not remove
+//TODO: not sure how to handle this case
+        if( maxImbalancePerBlock[myBlock].first< -0.08 ){
+            tryToMove = false;
+        }
+PRINT0("will I move point " << thisInd  << "?  " << tryToMove );
+        std::vector<ValueType> myWeights(numWeights);
+        for (IndexType w=0; w<numWeights; w++) {
+            myWeights[w] = nodeWeightsV[w][thisInd];
+        }
+
+        //the effect that the removal of this point will have to its current block
+        //these are this block's (the block this point belongs to) weight and imbalance
+        //after the removal of this point
+//NOT both are needed
+        //std::vector<double> thisBlockNewWeights(numWeights);
+        std::vector<double> thisBlockNewImbalances(numWeights);
+        std::pair<double,IndexType> thisBlockNewMaxImbalance = std::make_pair( std::numeric_limits<double>::min(), -1);
+
+        for (IndexType w=0; w<numWeights; w++) {
+            ValueType optWeight = targetBlockWeights[w][myBlock];
+            //thisBlockNewImbalances[w] = imbalancesPerBlock[w][myBlock] - myWeights[w]/optWeight;
+            ValueType thisBlockNewWeights = blockWeights[w][myBlock] - myWeights[w];
+            thisBlockNewImbalances[w] = (thisBlockNewWeights - optWeight)/optWeight;
+
+            if( thisBlockNewImbalances[w]>thisBlockNewMaxImbalance.first ){
+                thisBlockNewMaxImbalance.first = thisBlockNewImbalances[w];
+                thisBlockNewMaxImbalance.second = w;
+            }
+        }
+        SCAI_ASSERT_LE_ERROR( thisBlockNewMaxImbalance.first, maxImbalancePerBlock[myBlock].first, "Since we remove, imbalance value should be reduced");
+
+        //Get the blocks of all neighbors of this vertex. These are possible blocks
+        //to move this vertex to
+
+        std::set<IndexType> possibleBlocks;
+        if( tryToMove ){
+            const IndexType beginCols = ia[thisInd];
+            const IndexType endCols = ia[thisInd+1];
+            assert(ja.size() >= endCols);
+
+            for (IndexType j = beginCols; j < endCols; j++) {
+                IndexType neighbor = ja[j];
+                assert(neighbor >= 0);
+                assert(neighbor < globalN);
+
+                IndexType neighborBlock;
+                if (inputDist->isLocal(neighbor)) {
+                    neighborBlock = localPart[inputDist->global2Local(neighbor)];
+                } else {
+                    neighborBlock = haloData[partHalo.global2Halo(neighbor)];
+                }
+                assert(neighborBlock<numBlocks);
+
+                if (neighborBlock != myBlock) {
+                    possibleBlocks.insert( neighborBlock);
+                }
+            }
+        }
+
+        IndexType bestBlock = myBlock;
+        std::pair<double,IndexType> bestBlockMaxNewImbalance = std::make_pair( std::numeric_limits<double>::min(), -1);
+        std::vector<double> bestBlockNewImbalances;
+
+        for( IndexType candidateBlock : possibleBlocks ){
+            //
+            //if( myBlock==candidateBlock) continue;
+            assert( myBlock!=candidateBlock );
+            //if candidate block is already too imbalanced
+//if( maxImbalancePerBlock[candidateBlock].first>settings.epsilon ) continue;
+PRINT("myBlock= " <<  myBlock << ", checking candidate block " << candidateBlock );
+            //calculate block weight and imbalance of the new candidate block if we add this point
+            std::vector<double> newBlockImbalances(numWeights);
+            std::pair<double,IndexType> maxNewImbalanceNewBlock = std::make_pair( std::numeric_limits<double>::min(), -1);
+
+            for (IndexType w=0; w<numWeights; w++) {
+                ValueType optWeight = targetBlockWeights[w][candidateBlock];
+                //will (possibly) add this point to the block, so add its weights
+                ValueType candidateBlockNewWeights = blockWeights[w][candidateBlock] + myWeights[w];
+                newBlockImbalances[w] = (candidateBlockNewWeights - optWeight)/optWeight;
+
+                if(newBlockImbalances[w]>maxNewImbalanceNewBlock.first){
+                    maxNewImbalanceNewBlock.first = newBlockImbalances[w];
+                    maxNewImbalanceNewBlock.second = w;
+                }
+            }
+
+            //the max imbalance of the new block is larger than the previous max imbalance of the same block 
+            // since we added a point (with positive weight)
+            SCAI_ASSERT_GE_ERROR( maxNewImbalanceNewBlock.first,  maxImbalancePerBlock[candidateBlock].first, "??") ;
+
+            //
+            //evaluate if the move was beneficial
+            //
+
+            //if this candidate block offers a better imbalance
+            if( bestBlockMaxNewImbalance.first>maxNewImbalanceNewBlock.first ){
+                //from all the moves that improve the imbalance, keep the one that improves it the most
+                //check also if the change in this possible block is less
+                bestBlockMaxNewImbalance = maxNewImbalanceNewBlock;
+                bestBlock = candidateBlock;
+                bestBlockNewImbalances = newBlockImbalances;
+            }
+        }//for( IndexType candidateBlock : possibleBlocks){
+PRINT("myBlock= " <<  myBlock << ", best block " << bestBlock );
+        if( bestBlock!=myBlock ){
+            //If the best move is not actually good, do not do it
+            //This can happen if the candidate block is overweighted in another weight
+            if( thisBlockNewMaxImbalance < bestBlockMaxNewImbalance ){
+                bestBlock=myBlock;
+            }
+        }
+
+        //if we actually found a block that improves the imbalance
+        if( bestBlock!=myBlock ){
+            //the new max imbalances
+            assert( bestBlockNewImbalances.size()==numWeights );
+            maxImbalancePerBlock[bestBlock].first = std::numeric_limits<double>::min();
+            for( int w=0; w<numWeights; w++ ){
+                if(bestBlockNewImbalances[w]>maxImbalancePerBlock[bestBlock].first){
+                    maxImbalancePerBlock[bestBlock].first = bestBlockNewImbalances[w];
+                    maxImbalancePerBlock[bestBlock].second = w;
+                }
+            }
+            maxImbalancePerBlock[myBlock] = thisBlockNewMaxImbalance;
+
+            localPart[thisInd] = bestBlock;
+
+            //update values of the block weights and imbalances locally
+            for (IndexType w=0; w<numWeights; w++) {
+                blockWeightDifference[w][myBlock] -= myWeights[w];
+                blockWeightDifference[w][bestBlock] += myWeights[w];
+//                imbalancesPerBlock[w][myBlock] = thisBlockNewImbalances[w];
+//                imbalancesPerBlock[w][bestBlock] = bestBlockNewImbalances[w];
+            }
+
+            numMoves++;
+        }
+        //else no improvement was achieved
+
+        //global sum needed
+        if( (localI+1)%batchSize==0 or meDone ){
+            //reset local block max weight imbalances
+            std::fill( maxImbalancePerBlock.begin(), maxImbalancePerBlock.end(), 
+                std::make_pair( std::numeric_limits<double>::lowest(), -1) );
+
+            for (IndexType w=0; w<numWeights; w++) {
+                //sum all the differences for all blocks among PEs
+                comm->sumImpl(blockWeightDifference[w].data(), blockWeightDifference[w].data(), numBlocks, scai::common::TypeTraits<ValueType>::stype );
+                std::transform( blockWeights[w].begin(), blockWeights[w].end(), blockWeightDifference[w].begin(), blockWeights[w].begin(), std::plus<ValueType>() );
+  
+                //recalculate imbalances after the new global blocks weights are summed
+                for (IndexType b=0; b<numBlocks; b++) {
+                    ValueType optWeight = targetBlockWeights[w][b];
+                    ValueType imbalancesPerBlock = (ValueType(blockWeights[w][b] - optWeight)/optWeight);
+                    if( imbalancesPerBlock>maxImbalancePerBlock[b].first ) {
+                        maxImbalancePerBlock[b].first = imbalancesPerBlock;
+                        maxImbalancePerBlock[b].second = w;
+                    }
+                }
+// for( int b=0; b<numBlocks; b++){
+//     PRINT0( b <<" ** " << maxImbalancePerBlock[b].first << ", for w " << maxImbalancePerBlock[b].second );
+// }
+                //reset local block weight differences
+                std::fill( blockWeightDifference[w].begin(), blockWeightDifference[w].end(), 0.0);
+            }
+
+            //TODO: check if resorting local points based on new global weights
+            //and restarting would benefit
+/*
+            if(thisRun<maxNumRestarts){
+                std::sort(indices.begin(), indices.end(), sortFunction );
+                //restart
+                localI=-1;
+                thisRun++;
+            }else{
+                //increase the batch size
+                batchSize = std::min( (IndexType) (batchSize*1.01), (IndexType) localN/1000);
+                batchSize = comm->min(batchSize);
+            }
+*/
+        }
+
+        //exit condition
+        if( localI<numPointsToCheck-1 ){
+            localI++;
+        }else{
+            meDone=true;
+        }
+
+        try{
+            allDone = comm->all(meDone);
+        }catch(scai::dmemo::MPIException& e){
+            //e.addCallStack( std::cout );
+            std::cout << e.what() << std::endl <<
+                "Probably some PE is in another global operation...." << std::endl;
+        }
+
+    }//while
+
+for (IndexType i = 0; i < numWeights; i++) {
+    ValueType imba = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, settings.numBlocks, nodeWeights[i], targetBlockWeights[i]);
+    PRINT0(i<< " -- " << imba);
+}
+return numMoves;
 
 }
 //---------------------------------------------------------------------------------------

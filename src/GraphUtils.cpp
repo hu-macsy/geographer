@@ -198,7 +198,6 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> GraphUtils<IndexType,V
     }
     assert(bfsQueue.size() == interfaceNodes.size());
     bool active = true;
-    //const IndexType minBorderNodes = std::min( minBorderNodes, localN);
 
     while (active) {
         //if the target number is reached, complete this round and then stop
@@ -2334,13 +2333,13 @@ std::vector<std::vector<ValueType>> GraphUtils<IndexType,ValueType>::getGlobalBl
 //-----------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<double> GraphUtils<IndexType,ValueType>::getMaxImbalancePerBlock(
+std::vector<std::pair<double,IndexType>> GraphUtils<IndexType,ValueType>::getMaxImbalancePerBlock(
     const std::vector<std::vector<ValueType>> &nodeWeightsV,
     const std::vector<std::vector<ValueType>> &targetBlockWeights,
     const scai::lama::DenseVector<IndexType> &partition){
 
     const IndexType numWeights = nodeWeightsV.size();
-    const IndexType numBlocks = partition.max()-1;
+    const IndexType numBlocks = partition.max()+1;
 
     //the global weight of each block for each weight
     std::vector<std::vector<ValueType>> blockWeights = getGlobalBlockWeight( nodeWeightsV, partition );
@@ -2350,13 +2349,14 @@ std::vector<double> GraphUtils<IndexType,ValueType>::getMaxImbalancePerBlock(
         //calculate the imbalance for every block; hardcode to double
     std::vector<std::vector<double>> imbalancesPerBlock(numWeights, std::vector<double>(numBlocks));
     //only the maximum imbalance
-    std::vector<double> maxImbalancePerBlock(numBlocks, std::numeric_limits<double>::lowest() );
+    std::vector<std::pair<double,IndexType>> maxImbalancePerBlock(numBlocks, std::make_pair(std::numeric_limits<double>::lowest(),-1) );
     for (IndexType w=0; w<numWeights; w++) {
         for (IndexType b=0; b<numBlocks; b++) {
             ValueType optWeight = targetBlockWeights[w][b];
             imbalancesPerBlock[w][b] = (ValueType(blockWeights[w][b] - optWeight)/optWeight);
-            if( imbalancesPerBlock[w][b]>maxImbalancePerBlock[b] ) {
-                maxImbalancePerBlock[b] = imbalancesPerBlock[w][b];
+            if( imbalancesPerBlock[w][b]>maxImbalancePerBlock[b].first ) {
+                maxImbalancePerBlock[b].first = imbalancesPerBlock[w][b];
+                maxImbalancePerBlock[b].second = w;
             }
         }
     }

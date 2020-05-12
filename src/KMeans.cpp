@@ -2424,7 +2424,6 @@ maxImbalancePerBlockForWeight[b] = w;
             }
 
             //calculate block weight and imbalance of the new candidate block if we add this point
-
             std::vector<double> newBlockImbalances(numWeights);
 
             //the old max imbalance for the new block
@@ -2480,7 +2479,7 @@ maxImbalancePerBlockForWeight[b] = w;
             maxImbalancePerBlock[bestBlock] = *std::max_element(bestBlockNewImbalances.begin(), bestBlockNewImbalances.end());
             maxImbalancePerBlock[myBlock] = thisBlockNewMaxImbalance;
 
-            localPart[thisInd] = bestBlock; 
+            localPart[thisInd] = bestBlock;
 
             //update values of the block weights and imbalances locally
             for (IndexType w=0; w<numWeights; w++) {
@@ -2502,7 +2501,7 @@ maxImbalancePerBlockForWeight[b] = w;
         //global sum needed
         if( (localI+1)%batchSize==0 or meDone ){
             //reset local block max weight imbalances
-            std::fill( maxImbalancePerBlock.begin(), maxImbalancePerBlock.end(), std::numeric_limits<double>::lowest() );  
+            std::fill( maxImbalancePerBlock.begin(), maxImbalancePerBlock.end(), std::numeric_limits<double>::lowest() );
 
             for (IndexType w=0; w<numWeights; w++) {
                 //sum all the differences for all blocks among PEs
@@ -2554,8 +2553,8 @@ maxImbalancePerBlockForWeight[b] = w;
 
     }//while
 
-    assert( std::min_element( localPart.begin(), localPart.end() ) >=0 );
-    assert( std::max_element( localPart.begin(), localPart.end() ) < settings.numBlocks );
+    assert( *std::min_element( localPart.begin(), localPart.end() ) >=0 );
+    assert( *std::max_element( localPart.begin(), localPart.end() ) < settings.numBlocks );
 
     // copy to DenseVector; TODO: a better way to do it?
     {

@@ -438,7 +438,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
             result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
         }else if (settings.initialPartition == ITI::Tool::geoKmeansBalance) {
             settings.keepMostBalanced = true;
-            settings.erodeInfluence = true;
+            settings.erodeInfluence = false;
             result = ITI::KMeans<IndexType,ValueType>::computePartition_targetBalance(coordinateCopy, nodeWeightCopy, blockSizes, result, settings, metrics);
         }else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart) {
 
@@ -534,10 +534,6 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 	//uncomment to store the first, geometric partition into a file that then can be visualized using matlab and GPI's code
 	//std::string filename = "geomPart.mtx";
 	//result.writeToFile( filename );
-	
-	if (nodeWeights.size() > 1) {
-		throw std::logic_error("Local refinement not yet implemented for multiple weights.");
-	}
 
     std::chrono::time_point<std::chrono::steady_clock> start =  std::chrono::steady_clock::now();	
 
@@ -606,6 +602,9 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 #endif
     } else if( settings.localRefAlgo==Tool::geographer){
     	SCAI_REGION("ParcoRepart.doLocalRefinement.multiLevelStep")
+        if (nodeWeights.size() > 1) {
+            throw std::logic_error("Local refinement not yet implemented for multiple weights.");
+        }
         std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
 
     	scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
@@ -627,7 +626,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 
         std::chrono::duration<double> LRtime = std::chrono::steady_clock::now() - start;
         metrics.MM["timeLocalRef"] = comm->max( LRtime.count() );
-    }else if( settings.localRefAlgo==Tool::geoRebalance){
+    }else if( settings.localRefAlgo==Tool::geoRebalance ){
         // vector of size k, each element represents the size of one block
         std::vector<std::vector<ValueType>> targetBlockWeights = commTree.getBalanceVectors();
         SCAI_ASSERT_EQ_ERROR( targetBlockWeights.size(), nodeWeights.size(), "Wrong number of weights");

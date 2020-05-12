@@ -424,13 +424,15 @@ public:
 
     /** Useful for multiple node weights, it returns the maximum imbalance for each block.
         Every block can have its maximum imbalance for a different node weight.
-        The returned vector has size equal the number of blocks.
+        The returned vector has size equal the number of blocks, return[i].first is the imbalance
+        value and return[i].second is the weight that has this imbalance for block i.
 
         @param[in] nodeWeightsV The node weights
         @param[in] targetBlockWeights The desired sizes per block per weight, targetBlockWeights.size()==numWeights
         @param[in] partition A partition of the input
+        @return The imbalance value and the weight that has this imbalance
     */
-    static std::vector<double> getMaxImbalancePerBlock(
+    static std::vector<std::pair<double,IndexType>> getMaxImbalancePerBlock(
         const std::vector<std::vector<ValueType>> &nodeWeightsV,
         const std::vector<std::vector<ValueType>> &targetBlockWeights,
         const scai::lama::DenseVector<IndexType> &partition);
