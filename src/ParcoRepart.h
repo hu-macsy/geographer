@@ -226,6 +226,7 @@ private:
 		CSRSparseMatrix<ValueType> &input,
 		std::vector<DenseVector<ValueType>> &coordinates,
 		std::vector<DenseVector<ValueType>> &nodeWeights,
+        CommTree<IndexType,ValueType> &commTree,
 		scai::dmemo::CommunicatorPtr comm,
 		Settings settings,
 		Metrics<ValueType>& metrics);

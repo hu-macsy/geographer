@@ -320,7 +320,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
                 metrics.MM["preliminaryImbalance"] = tmpMetrics.MM["finalImbalance"];
             }
 
-			doLocalRefinement( result,  input, coordinates, nodeWeights, comm, settings, metrics );
+			doLocalRefinement( result,  input, coordinates, nodeWeights, commTree, comm, settings, metrics );
 
         }
     } else {
@@ -524,6 +524,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
     CSRSparseMatrix<ValueType> &input,
     std::vector<DenseVector<ValueType>> &coordinates,
     std::vector<DenseVector<ValueType>> &nodeWeights,
+    CommTree<IndexType,ValueType> &commTree,
 	scai::dmemo::CommunicatorPtr comm,
     Settings settings,
 	Metrics<ValueType>& metrics){
@@ -626,6 +627,22 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 
         std::chrono::duration<double> LRtime = std::chrono::steady_clock::now() - start;
         metrics.MM["timeLocalRef"] = comm->max( LRtime.count() );
+    }else if( settings.localRefAlgo==Tool::geoRebalance){
+        // vector of size k, each element represents the size of one block
+        std::vector<std::vector<ValueType>> targetBlockWeights = commTree.getBalanceVectors();
+        SCAI_ASSERT_EQ_ERROR( targetBlockWeights.size(), nodeWeights.size(), "Wrong number of weights");
+        SCAI_ASSERT_EQ_ERROR( targetBlockWeights[0].size(), settings.numBlocks, "Wrong size of weights" );
+        if( targetBlockWeights.empty() ) {
+PRINT("why weights are empty??");
+            targetBlockWeights = std::vector<std::vector<ValueType> >(nodeWeights.size());
+            for (int i = 0; i < nodeWeights.size(); i++) {
+                ValueType weightSum = nodeWeights[i].sum();
+                targetBlockWeights[i].assign( settings.numBlocks, std::ceil(weightSum/settings.numBlocks) );
+            }
+        }
+        const ValueType localPointPerCent= 0.5;
+        IndexType numMovedNodes = ITI::LocalRefinement<IndexType, ValueType>::rebalance( input, coordinates, nodeWeights, targetBlockWeights, result, settings, localPointPerCent);
+PRINT(comm->getRank()<< ": moved " << numMovedNodes  << " nodes" );
     }else{
         throw std::runtime_error("Provided algorithm for local refinement is "+ to_string(settings.localRefAlgo) + " but is not currently supported. Pick geographer or parMetisRefine. \nAborting...");
     }

@@ -77,6 +77,7 @@ IndexType readInput(
         if (numReadNodeWeights == 0 and settings.numNodeWeights==0) {
             nodeWeights.resize(1);
             nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1.0);
+            settings.numNodeWeights=1;
         }
 
         if (settings.numNodeWeights > 0) {

@@ -31,6 +31,9 @@ std::ostream& ITI::operator<<( std::ostream& out, const ITI::Tool tool) {
     case Tool::geoMS:
         token = "geoMS";
         break;
+    case Tool::geoRebalance:
+        token = "geoRebalance";
+        break;
     case Tool::parMetisGraph:
         token = "parMetisGraph";
         break;
@@ -115,6 +118,8 @@ std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool) {
         tool = ITI::Tool::geoHierRepart;
     else if( token=="geoMS" or tokenLower=="geoms")
         tool = ITI::Tool::geoMS;
+    else if( token=="geoRebalance" or tokenLower=="georebalance")
+        tool = ITI::Tool::geoRebalance;
     else if( token=="parMetisGraph" or tokenLower=="parmetisgraph")
         tool = ITI::Tool::parMetisGraph;
     else if( token=="parMetisGeom" or tokenLower=="parmetisgeom" )
