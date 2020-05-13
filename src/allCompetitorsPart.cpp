@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
     if( tools.size()==0 ){
         wantedTools = allTools;
     } else {
-        for( std::vector<std::string>::iterator tool=tools.begin(); tool!=tools.end(); tool++) {    
+        for( std::vector<std::string>::iterator tool=tools.begin(); tool!=tools.end(); tool++) {
             wantedTools.push_back( to_tool(*tool) );
         }
     }

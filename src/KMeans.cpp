@@ -1852,7 +1852,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierarchicalPartition
         // TODO: inside computePartition, settings.numBlocks is not
         // used. We infer the number of new blocks from the groupOfCenters
         // maybe, set also numBlocks for clarity??
-PRINT0(numNodeWeights);
+
         //automatically partition for balance if more than one node weights
         if( numNodeWeights>1 ){
             partition = computePartition_targetBalance(coordinates, nodeWeights, targetBlockWeights, partition, settings, metrics);

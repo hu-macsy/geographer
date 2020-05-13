@@ -521,7 +521,7 @@ IndexType aux<IndexType, ValueType>::toMetisInterface(
             total += tpwgts[index];
         }
     }
-PRINT("* * * * * * * * * * * * * * * * * * * * * *");
+
     SCAI_ASSERT_LT_ERROR( std::abs(total-numWeights), 1e-6, "Wrong tpwgts assignment");
 
     return localN;
