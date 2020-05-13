@@ -443,7 +443,7 @@ IndexType aux<IndexType, ValueType>::toMetisInterface(
         total += tpwgts[i];
     }
 
-    SCAI_ASSERT_LT_ERROR( std::abs(total-numWeights), 1e-6, "Wrong tpwgts assignment");    
+    SCAI_ASSERT_LT_ERROR( std::abs(total-numWeights), 1e-6, "Wrong tpwgts assignment");
 
 
     // the xyz array for coordinates of size dim*localN contains the local coords
@@ -469,6 +469,64 @@ IndexType aux<IndexType, ValueType>::toMetisInterface(
 }//toMetisInterface
 //---------------------------------------------------------------------------------------
 
+//overloaded version with commTree
+template<typename IndexType, typename ValueType>
+IndexType aux<IndexType, ValueType>::toMetisInterface(
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const std::vector<scai::lama::DenseVector<ValueType>> &coords,
+    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+    const ITI::CommTree<IndexType,ValueType> &commTree,
+    const struct Settings &settings,
+    std::vector<IndexType>& vtxDist, 
+    std::vector<IndexType>& xadj,
+    std::vector<IndexType>& adjncy,
+    std::vector<ValueType>& vwgt,
+    std::vector<double>& tpwgts,
+    IndexType &wgtFlag,
+    IndexType &numWeights,
+    std::vector<double>& ubvec,
+    std::vector<double>& xyzLocal,
+    std::vector<IndexType>& options){
+    SCAI_REGION( "aux.toMetisInterface");
+
+    //create as without the commTree
+    const IndexType localN = aux<IndexType,ValueType>::toMetisInterface(
+        graph, coords, nodeWeights, settings, vtxDist, xadj, adjncy,
+        vwgt, tpwgts, wgtFlag, numWeights, ubvec, xyzLocal, options );
+
+    //overwrite only affected data
+
+    std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+    SCAI_ASSERT_EQ_ERROR( blockSizes.size(), numWeights, "Wrong number of weights");
+    SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of weights" );
+
+    // tpwgts: array of size numWeights*nparts, that is used to specify the fraction of
+    // vertex weight that should be distributed to each sub-domain for each balance
+    // constraint. Here we want equal sizes, so every value is 1/nparts.
+
+    //the total weight of all blocks for each weight
+    std::vector<ValueType> blockWeightsSum(numWeights);
+    for( int w=0; w<numWeights; w++ ){
+        blockWeightsSum[w] = std::accumulate( blockSizes[w].begin(), blockSizes[w].end(), 0.0 );
+    }
+
+    const IndexType nparts= settings.numBlocks; //metis naming
+    assert( tpwgts.size()== nparts*numWeights );
+
+    ValueType total = 0.0;
+    for( int w=0; w<numWeights; w++ ){
+        for(int k=0; k<nparts; k++){
+            int index = k*numWeights+w;
+            tpwgts[index] = blockSizes[w][k]/blockWeightsSum[w];
+            total += tpwgts[index];
+        }
+    }
+PRINT("* * * * * * * * * * * * * * * * * * * * * *");
+    SCAI_ASSERT_LT_ERROR( std::abs(total-numWeights), 1e-6, "Wrong tpwgts assignment");
+
+    return localN;
+}//toMetisInterface
+//---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 void ITI::aux<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input) {

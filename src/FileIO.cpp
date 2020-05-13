@@ -2419,16 +2419,17 @@ std::vector<std::vector<ValueType> > FileIO<IndexType, ValueType>::readBlockSize
         if(file.fail())
             throw std::runtime_error("File "+ filename+ " failed.");
 
-        //read first line, has the number of blocks
+        //read first line, has the number of blocks and number of weights
         std::string line;
         std::getline(file, line);
         std::stringstream ss;
         ss.str( line );
 
-        IndexType fileNumBlocks;
-        ss >> fileNumBlocks;
+        IndexType fileNumBlocks, fileNumWeights;
+        ss >> fileNumBlocks >> fileNumWeights;
         SCAI_ASSERT_EQ_ERROR( numBlocks, fileNumBlocks, "Number of blocks mismatch, given "<< numBlocks << " but the file has "<< fileNumBlocks );
-
+        SCAI_ASSERT_EQ_ERROR( numWeights, fileNumWeights, "Number of weights mismatch, given "<< numWeights << " but the file has "<< fileNumWeights );
+PRINT0("file has " << numBlocks << " blocks and " << numWeights << " weights");
         for(int i=0; i<numBlocks; i++) {
             bool read = !std::getline(file, line).fail();
 
@@ -2438,10 +2439,9 @@ std::vector<std::vector<ValueType> > FileIO<IndexType, ValueType>::readBlockSize
             std::stringstream ss;
             ss.str( line );
 
-            for (IndexType j = 0; j < numWeights; j++) {
+            for (IndexType j=0; j<numWeights; j++) {
                 ValueType bSize;
                 ss >> bSize;
-                //blockSizes.push_back(bSize);
                 blockSizes[j][i]= bSize;
             }
         }
@@ -2455,7 +2455,7 @@ std::vector<std::vector<ValueType> > FileIO<IndexType, ValueType>::readBlockSize
     }
 
     for (IndexType i = 0; i < numWeights; i++) {
-        comm->bcast( blockSizes[0].data(), numBlocks, 0);
+        comm->bcast( blockSizes[i].data(), numBlocks, 0);
     }
 
     return blockSizes;

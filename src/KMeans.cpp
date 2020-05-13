@@ -2556,8 +2556,8 @@ PRINT0("most imbalanced block is " << blockIndices[0] << " with weight " <<  max
 
     }//while
 
-    assert( std::min_element( localPart.begin(), localPart.end() ) >=0 );
-    assert( std::max_element( localPart.begin(), localPart.end() ) < settings.numBlocks );
+    assert( *std::min_element( localPart.begin(), localPart.end() ) >=0 );
+    assert( *std::max_element( localPart.begin(), localPart.end() ) < settings.numBlocks );
 
     // copy to DenseVector; TODO: a better way to do it?
     {
