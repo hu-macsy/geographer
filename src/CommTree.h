@@ -313,6 +313,13 @@ public:
         const std::vector<std::vector<ValueType>> &leafSizes,
         const std::vector<bool> &isWeightProp);
 
+
+    IndexType createHierHeterogeneous(
+        const std::vector<std::vector<ValueType>> &leafSizes,
+        const std::vector<bool> &isWeightProp,
+        const std::vector<IndexType> &levels);
+
+
     /** Creates a vector of leaves with only one hierarchy level, i.e., a flat
     tree. There can be multiple weights for each leaf.
 
@@ -321,6 +328,12 @@ public:
     @return A vector with all the leaves.
     **/
     std::vector<commNode> createLeaves( const std::vector<std::vector<ValueType>> &sizes);
+
+    /** Creates leaves according to the provided levels.
+    */
+    std::vector<commNode> createLeaves( 
+        const std::vector<std::vector<ValueType>> &sizes,
+        const std::vector<IndexType> &levels);
 
     /* Takes a level of the tree and creates the level above it by grouping together nodes that
      have the same last hierarchy index.

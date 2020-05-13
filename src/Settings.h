@@ -155,6 +155,7 @@ struct Settings {
     IndexType numBlocks = 2; 	///< number of blocks to partition to
     double epsilon = 0.03;		///< maximum allowed imbalance of the output partition
     bool repartition = false; 	///< set to true to respect the initial partition
+    std::vector<double> epsilons;
 
     ITI::Tool initialPartition = ITI::Tool::geoKmeans;			///< the tool to use to get the initial partition, \sa Tool
     //static const ITI::Tool initialMigration = ITI::Tool::geoSFC;///< pre-processing step to redistribute/migrate coordinates

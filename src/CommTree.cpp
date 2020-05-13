@@ -194,6 +194,20 @@ IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneous(
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
+IndexType CommTree<IndexType,ValueType>::createHierHeterogeneous(
+    const std::vector<std::vector<ValueType>> &leafSizes,
+    const std::vector<bool> &isWeightProp,
+    const std::vector<IndexType> &levels){
+
+    std::vector<commNode> leaves = createLeaves( leafSizes, levels);
+    *this = CommTree( leaves, isWeightProp);
+
+    return this->numNodes;
+
+}//createHierHeterogeneous
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
 std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType,ValueType>::createLeaves( const std::vector<std::vector<ValueType>> &sizes) {
     //sizes.size() = number of weights
     const IndexType numWeights = sizes.size();
@@ -214,6 +228,48 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
         leaves[i] = leafNode;
     }
 
+    return leaves;
+}
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType,ValueType>::createLeaves( 
+    const std::vector<std::vector<ValueType>> &sizes,
+    const std::vector<IndexType> &levels) {
+
+    typedef cNode<IndexType,ValueType> cNode;
+
+    const IndexType numWeights = sizes.size();
+    const IndexType numLevels = levels.size();
+    const IndexType numLeaves = std::accumulate( levels.begin(), levels.end(), 1, std::multiplies<IndexType>() );
+    //PRINT("There are " << numLevels << " levels of hierarchy with " << numLeaves << " leaves in total." );
+    SCAI_ASSERT_EQ_ERROR( sizes[0].size(), numLeaves, "number of leaves and block mismatch" );
+
+    std::vector<unsigned int> hierarchy( numLevels, 0 );
+    std::vector<cNode> leaves(numLeaves);
+
+    for(unsigned int i=0; i<numLeaves; i++) {
+
+        std::vector<ValueType> weights( numWeights );
+        for(int w=0; w<numWeights; w++){
+            weights[w] = sizes[w][i];
+        }
+        cNode node(hierarchy, weights );
+        leaves[i] = node;
+
+        //fix hierarchy label
+        hierarchy.back()++;
+
+        for( unsigned int h=numLevels-1; h>0; h--) {
+            SCAI_ASSERT_GT_ERROR( h, 0, "Hierarchy label construction error" );
+            if( hierarchy[h]>levels[h]-1 ) {
+                hierarchy[h]=0;
+                hierarchy[h-1]++;
+            } else {
+                break;
+            }
+        }
+    }
     return leaves;
 }
 //------------------------------------------------------------------------
