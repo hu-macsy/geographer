@@ -1347,7 +1347,7 @@ IndexType ITI::LocalRefinement<IndexType,ValueType>::rebalance(
         std::tie( interfaceNodes, roundMarkers ) = 
             ITI::GraphUtils<IndexType,ValueType>::localMultiSourceBFSWithRoundMarkers( graph, borderNodes, minBorderNodes );
     }
-PRINT( interfaceNodes.size() << " __ " << roundMarkers.size() << " +_+_ " << roundMarkers.back() );
+PRINT( interfaceNodes.size() << " __ " << roundMarkers.size() << " +_+ " << roundMarkers.back() );
 
     assert(interfaceNodes.size() <= localN);
     assert( interfaceNodes.size() >= minBorderNodes ||
@@ -1406,6 +1406,7 @@ for( IndexType i=0; i<firstRoundSize; i++){
         }
     };
 
+PRINT( comm->getRank() << ": " << *std::max_element( localPart.begin(), localPart.end() ) );
 for( int b=0; b<numBlocks; b++){
      PRINT0( b <<" ** " << maxImbalancePerBlock[b].first << ", for w " << maxImbalancePerBlock[b].second );
 }
@@ -1437,6 +1438,8 @@ for( int b=0; b<numBlocks; b++){
     //this has to be the same for all PE otherwise the global reduce step are not synchronized
     const IndexType numPointsToCheck = comm->min(localN);
 PRINT( comm->getRank() << ": numPointsToCheck " << numPointsToCheck << " , batchSize " << batchSize );
+
+    std::vector<bool> hasMoved(localN, false);
     bool meDone = false;
     bool allDone = false;
     IndexType localI = 0;
@@ -1460,7 +1463,10 @@ PRINT( comm->getRank() << ": numPointsToCheck " << numPointsToCheck << " , batch
         if( maxImbalancePerBlock[myBlock].first< -0.08 ){
             tryToMove = false;
         }
-PRINT0("will I move point " << thisInd  << "?  " << tryToMove );
+        if(hasMoved[thisInd]){//this point has already been moved, do not move it again
+            tryToMove = false;
+        }
+
         std::vector<ValueType> myWeights(numWeights);
         for (IndexType w=0; w<numWeights; w++) {
             myWeights[w] = nodeWeightsV[w][thisInd];
@@ -1469,29 +1475,37 @@ PRINT0("will I move point " << thisInd  << "?  " << tryToMove );
         //the effect that the removal of this point will have to its current block
         //these are this block's (the block this point belongs to) weight and imbalance
         //after the removal of this point
-//NOT both are needed
-        //std::vector<double> thisBlockNewWeights(numWeights);
+
         std::vector<double> thisBlockNewImbalances(numWeights);
-        std::pair<double,IndexType> thisBlockNewMaxImbalance = std::make_pair( std::numeric_limits<double>::min(), -1);
+        std::pair<double,IndexType> thisBlockNewMaxImbalance = std::make_pair( std::numeric_limits<double>::lowest(), -1);
 
         for (IndexType w=0; w<numWeights; w++) {
             ValueType optWeight = targetBlockWeights[w][myBlock];
             //thisBlockNewImbalances[w] = imbalancesPerBlock[w][myBlock] - myWeights[w]/optWeight;
-            ValueType thisBlockNewWeights = blockWeights[w][myBlock] - myWeights[w];
-            thisBlockNewImbalances[w] = (thisBlockNewWeights - optWeight)/optWeight;
-
+            ValueType thisBlockNewWeight = blockWeights[w][myBlock] - myWeights[w];
+            thisBlockNewImbalances[w] = (thisBlockNewWeight - optWeight)/optWeight;
+ValueType thisOldImbalance = (blockWeights[w][myBlock] - optWeight)/optWeight;
+SCAI_ASSERT_LE_ERROR( thisBlockNewImbalances[w], thisOldImbalance , " ha?");
             if( thisBlockNewImbalances[w]>thisBlockNewMaxImbalance.first ){
                 thisBlockNewMaxImbalance.first = thisBlockNewImbalances[w];
                 thisBlockNewMaxImbalance.second = w;
             }
         }
-        SCAI_ASSERT_LE_ERROR( thisBlockNewMaxImbalance.first, maxImbalancePerBlock[myBlock].first, "Since we remove, imbalance value should be reduced");
+        assert( thisBlockNewMaxImbalance.second!=-1 );
+        //if the max imbalance is realized by the same weight as before, then it should be lower
+        if( thisBlockNewMaxImbalance.second==maxImbalancePerBlock[myBlock].second ){
+            SCAI_ASSERT_LE_ERROR( thisBlockNewMaxImbalance.first, maxImbalancePerBlock[myBlock].first, "Since we remove, imbalance value should be reduced");
+        }
 
         //Get the blocks of all neighbors of this vertex. These are possible blocks
         //to move this vertex to
 
         std::set<IndexType> possibleBlocks;
         if( tryToMove ){
+PRINT0("will try to move point " << thisInd << " from block " << myBlock );
+for (IndexType w=0; w<numWeights; w++) {
+    PRINT0(myWeights[w]);
+}
             const IndexType beginCols = ia[thisInd];
             const IndexType endCols = ia[thisInd+1];
             assert(ja.size() >= endCols);
@@ -1513,10 +1527,11 @@ PRINT0("will I move point " << thisInd  << "?  " << tryToMove );
                     possibleBlocks.insert( neighborBlock);
                 }
             }
+if( possibleBlocks.size()==0 ) PRINT0( "all neighbors of " << thisInd << " are in the same block" );
         }
 
         IndexType bestBlock = myBlock;
-        std::pair<double,IndexType> bestBlockMaxNewImbalance = std::make_pair( std::numeric_limits<double>::min(), -1);
+        std::pair<double,IndexType> bestBlockMaxNewImbalance = std::make_pair( std::numeric_limits<double>::lowest(), -1);
         std::vector<double> bestBlockNewImbalances;
 
         for( IndexType candidateBlock : possibleBlocks ){
@@ -1524,17 +1539,17 @@ PRINT0("will I move point " << thisInd  << "?  " << tryToMove );
             //if( myBlock==candidateBlock) continue;
             assert( myBlock!=candidateBlock );
             //if candidate block is already too imbalanced
-//if( maxImbalancePerBlock[candidateBlock].first>settings.epsilon ) continue;
-PRINT("myBlock= " <<  myBlock << ", checking candidate block " << candidateBlock );
+if( maxImbalancePerBlock[candidateBlock].first>settings.epsilon ) continue;
+PRINT0("myBlock= " <<  myBlock << ", checking candidate block " << candidateBlock );
             //calculate block weight and imbalance of the new candidate block if we add this point
             std::vector<double> newBlockImbalances(numWeights);
-            std::pair<double,IndexType> maxNewImbalanceNewBlock = std::make_pair( std::numeric_limits<double>::min(), -1);
+            std::pair<double,IndexType> maxNewImbalanceNewBlock = std::make_pair( std::numeric_limits<double>::lowest(), -1);
 
             for (IndexType w=0; w<numWeights; w++) {
                 ValueType optWeight = targetBlockWeights[w][candidateBlock];
                 //will (possibly) add this point to the block, so add its weights
-                ValueType candidateBlockNewWeights = blockWeights[w][candidateBlock] + myWeights[w];
-                newBlockImbalances[w] = (candidateBlockNewWeights - optWeight)/optWeight;
+                ValueType candidateBlockNewWeight = blockWeights[w][candidateBlock] + myWeights[w];
+                newBlockImbalances[w] = (candidateBlockNewWeight - optWeight)/optWeight;
 
                 if(newBlockImbalances[w]>maxNewImbalanceNewBlock.first){
                     maxNewImbalanceNewBlock.first = newBlockImbalances[w];
@@ -1551,28 +1566,34 @@ PRINT("myBlock= " <<  myBlock << ", checking candidate block " << candidateBlock
             //
 
             //if this candidate block offers a better imbalance
-            if( bestBlockMaxNewImbalance.first>maxNewImbalanceNewBlock.first ){
+            if( maxNewImbalanceNewBlock.first>bestBlockMaxNewImbalance.first ){
                 //from all the moves that improve the imbalance, keep the one that improves it the most
                 //check also if the change in this possible block is less
                 bestBlockMaxNewImbalance = maxNewImbalanceNewBlock;
                 bestBlock = candidateBlock;
                 bestBlockNewImbalances = newBlockImbalances;
             }
-        }//for( IndexType candidateBlock : possibleBlocks){
-PRINT("myBlock= " <<  myBlock << ", best block " << bestBlock );
+        }//for( IndexType candidateBlock : possibleBlocks)
+        
+
         if( bestBlock!=myBlock ){
+PRINT0("myBlock= " <<  myBlock << ", best block " << bestBlock );
+            assert( bestBlockMaxNewImbalance.second!=-1 );
             //If the best move is not actually good, do not do it
             //This can happen if the candidate block is overweighted in another weight
             if( thisBlockNewMaxImbalance < bestBlockMaxNewImbalance ){
                 bestBlock=myBlock;
             }
+        }else{
+            assert( bestBlockMaxNewImbalance.second==-1 );
         }
 
         //if we actually found a block that improves the imbalance
         if( bestBlock!=myBlock ){
             //the new max imbalances
             assert( bestBlockNewImbalances.size()==numWeights );
-            maxImbalancePerBlock[bestBlock].first = std::numeric_limits<double>::min();
+            maxImbalancePerBlock[bestBlock].first = std::numeric_limits<double>::lowest();
+            maxImbalancePerBlock[bestBlock].second = -1;
             for( int w=0; w<numWeights; w++ ){
                 if(bestBlockNewImbalances[w]>maxImbalancePerBlock[bestBlock].first){
                     maxImbalancePerBlock[bestBlock].first = bestBlockNewImbalances[w];
@@ -1592,7 +1613,10 @@ PRINT("myBlock= " <<  myBlock << ", best block " << bestBlock );
             }
 
             numMoves++;
+            hasMoved[thisInd] = true;
+PRINT0("moved point " << thisInd << " from " << myBlock << " to " << bestBlock );
         }
+        assert( maxImbalancePerBlock[bestBlock].second!=-1 );
         //else no improvement was achieved
 
         //global sum needed
@@ -1615,13 +1639,14 @@ PRINT("myBlock= " <<  myBlock << ", best block " << bestBlock );
                         maxImbalancePerBlock[b].second = w;
                     }
                 }
-// for( int b=0; b<numBlocks; b++){
-//     PRINT0( b <<" ** " << maxImbalancePerBlock[b].first << ", for w " << maxImbalancePerBlock[b].second );
-// }
                 //reset local block weight differences
                 std::fill( blockWeightDifference[w].begin(), blockWeightDifference[w].end(), 0.0);
             }
-
+IndexType globMoves = comm->sum(numMoves);
+PRINT0("**** after global sum, verticed moved "<< globMoves );
+for( int b=0; b<numBlocks; b++){
+    PRINT0( b <<" ** " << maxImbalancePerBlock[b].first << ", for w " << maxImbalancePerBlock[b].second );
+}
             //TODO: check if resorting local points based on new global weights
             //and restarting would benefit
 /*

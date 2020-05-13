@@ -640,7 +640,7 @@ PRINT("why weights are empty??");
                 targetBlockWeights[i].assign( settings.numBlocks, std::ceil(weightSum/settings.numBlocks) );
             }
         }
-        const ValueType localPointPerCent= 0.5;
+        const ValueType localPointPerCent= 0.2;
         IndexType numMovedNodes = ITI::LocalRefinement<IndexType, ValueType>::rebalance( input, coordinates, nodeWeights, targetBlockWeights, result, settings, localPointPerCent);
 PRINT(comm->getRank()<< ": moved " << numMovedNodes  << " nodes" );
     }else{
