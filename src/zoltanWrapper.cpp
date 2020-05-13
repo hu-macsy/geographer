@@ -28,6 +28,7 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::partitio
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
     const bool nodeWeightsFlag,
     const Tool tool,
+    const ITI::CommTree<IndexType,ValueType> &commTree,
     const struct Settings &settings,
     Metrics<ValueType> &metrics) {
 
@@ -40,9 +41,9 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::partitio
     PRINT0("\t\tStarting the zoltan wrapper for partition with "<< algo);
 
     if(algo=="pulp"){
-        return zoltanWrapper<IndexType, ValueType>::zoltanCoreGraph( graph, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);
+        return zoltanWrapper<IndexType, ValueType>::zoltanCoreGraph( graph, nodeWeights, nodeWeightsFlag, algo, repart, commTree, settings, metrics);
     }else{
-        return zoltanWrapper<IndexType, ValueType>::zoltanCoreCoords( coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);
+        return zoltanWrapper<IndexType, ValueType>::zoltanCoreCoords( coords, nodeWeights, nodeWeightsFlag, algo, repart, commTree, settings, metrics);
     }
 }
 //---------------------------------------------------------------------------------------
@@ -64,8 +65,8 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::repartit
     assert( algo!="" );
 
     PRINT0("\t\tStarting the zoltan wrapper for repartition with " << algo);
-
-    return zoltanWrapper<IndexType, ValueType>::zoltanCoreCoords( coords, nodeWeights, nodeWeightsFlag, algo, repart, settings, metrics);
+const ITI::CommTree<IndexType,ValueType> commTree;
+    return zoltanWrapper<IndexType, ValueType>::zoltanCoreCoords( coords, nodeWeights, nodeWeightsFlag, algo, repart, commTree, settings, metrics);
 }
 //---------------------------------------------------------------------------------------
 
@@ -78,6 +79,7 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     const bool nodeWeightsFlag,
     const std::string algo,
     const bool repart,
+    const ITI::CommTree<IndexType,ValueType> &commTree,
     const struct Settings &settings,
     Metrics<ValueType> &metrics) {
 
@@ -179,6 +181,7 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     const bool nodeWeightsFlag,
     const std::string algo,
     const bool repart,
+    const ITI::CommTree<IndexType,ValueType> &commTree,
     const struct Settings &settings,
     Metrics<ValueType> &metrics){
 

@@ -25,7 +25,8 @@ public:
         const std::vector<scai::lama::DenseVector<ValueType>> &coords,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
         const bool nodeWeightsFlag,
-        const Tool tool,        
+        const Tool tool,
+        const ITI::CommTree<IndexType,ValueType> &commTree,
         const struct Settings &settings,
         Metrics<ValueType> &metrics);
     
@@ -62,6 +63,7 @@ private:
         const bool nodeWeightsFlag,
         const std::string algo,
         const bool repart,
+        const ITI::CommTree<IndexType,ValueType> &commTree,
         const struct Settings &settings,
         Metrics<ValueType> &metrics);
 
@@ -71,6 +73,7 @@ private:
         const bool nodeWeightsFlag,
         const std::string algo,
         const bool repart,
+        const ITI::CommTree<IndexType,ValueType> &commTree,
         const struct Settings &settings,
         Metrics<ValueType> &metrics);
 

@@ -227,8 +227,11 @@ PRINT0( nodeWeights.size() );
 
         std::chrono::time_point<std::chrono::steady_clock> beforeReport = std::chrono::steady_clock::now();
 
-        metricsVec[r].getMetrics(graph, partition, nodeWeights, settings );
-        metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
+        {
+            std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+            metricsVec[r].getMetrics(graph, partition, nodeWeights, settings, blockSizes );
+            metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
+        }
 
         std::chrono::duration<double> reportTime =  std::chrono::steady_clock::now() - beforeReport;
 

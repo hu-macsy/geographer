@@ -140,6 +140,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
     const bool nodeWeightsFlag,
     const Tool tool,
+    const ITI::CommTree<IndexType,ValueType> &commTree,
     const struct Settings &settings,
     Metrics<ValueType> &metrics) {
 
@@ -161,6 +162,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
         std::cout<<"\033[0m";
     }
 
+    assert( commTree.checkTree() );
 
     //-----------------------------------------------------
     //
@@ -197,7 +199,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
     std::vector<IndexType> options;
 
     IndexType newLocalN = aux<IndexType,ValueType>::toMetisInterface(
-        graph, coords, nodeWeights, settings, vtxDist, xadj, adjncy,
+        graph, coords, nodeWeights, commTree, settings, vtxDist, xadj, adjncy,
         vVwgt, tpwgts, wgtFlag, numWeights, ubvec, xyzLocal, options );
 
     if( newLocalN==-1){
@@ -391,7 +393,8 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::repart
         }
     }
 
-    scai::lama::DenseVector<IndexType> partition = parmetisWrapper<IndexType, ValueType>::partition( copyGraph, copyCoords, copyNodeWeights, nodeWeightsFlag, tool, settings, metrics);
+const ITI::CommTree<IndexType,ValueType> commTree;
+    scai::lama::DenseVector<IndexType> partition = parmetisWrapper<IndexType, ValueType>::partition( copyGraph, copyCoords, copyNodeWeights, nodeWeightsFlag, tool, commTree, settings, metrics);
 
     //because of the reindexing, we must redistribute the partition
     partition.redistribute( graph.getRowDistributionPtr() );

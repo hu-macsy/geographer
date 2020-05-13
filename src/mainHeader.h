@@ -77,6 +77,7 @@ IndexType readInput(
         if (numReadNodeWeights == 0 and settings.numNodeWeights==0) {
             nodeWeights.resize(1);
             nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1.0);
+            settings.numNodeWeights=1;
         }
 
         if (settings.numNodeWeights > 0) {
@@ -442,14 +443,14 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
         std::string blockSizesFile;
         //blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
         std::vector<std::vector<ValueType>> blockSizes;
-        std::vector<bool> isWeightProportional( settings.numNodeWeights ); //if false, then treat as an absolute value
+        std::vector<bool> isWeightProportional( settings.numNodeWeights, false ); //if false, then treat as an absolute value
 
         if( vm.count("blockSizesFile") and vm.count("topologyFile") ){
             throw std::invalid_argument("Two conflicting arguments are given: blockSizesFile and topologyFile. Pick one."  );
         }else if( vm.count("blockSizesFile") ){
             blockSizesFile = vm["blockSizesFile"].as<std::string>();
             blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks, settings.numNodeWeights );
-            isWeightProportional = {true, true };
+isWeightProportional = { true, true };
         }else{
             if( settings.numBlocks!= comm->getSize() ){
                 throw std::runtime_error("Provided argument topologyFile. This option only works when the number of calling processors equals the number of blocks. One solution is to not provide the numBLocks argument");
@@ -458,9 +459,7 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
             blockSizes = ITI::FileIO<IndexType, ValueType>::createBlockSizesFromTopology( blockSizesFile, settings.machine, comm );
             isWeightProportional = {true, false };
         }
-        
-        //blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
-        //std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks, settings.numNodeWeights );
+
         SCAI_ASSERT( blockSizes.size()==settings.numNodeWeights, "Wrong number of weights, should be " << settings.numNodeWeights << " but is " << blockSizes.size() );
         
         if (blockSizes.size() < nodeWeights.size()) {
@@ -483,9 +482,9 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
 
         for (IndexType i = 0; i < nodeWeights.size(); i++) {
             if( not isWeightProportional[i]){
-                const ValueType blockSizesSum  = std::accumulate( blockSizes[i].begin(), blockSizes[i].end(), 0);
+                const ValueType blockSizesSum  = std::accumulate( blockSizes[i].begin(), blockSizes[i].end(), 0.0);
                 const ValueType nodeWeightsSum = nodeWeights[i].sum();
-                SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
+                SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input for weight " << i );
             }
         }
 

@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
 
 #if ZOLTAN_FOUND
     Tpetra::ScopeGuard tscope(&argc, &argv);
-#endif   
+#endif
 
     // timing information
     std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
@@ -86,6 +86,14 @@ int main(int argc, char** argv) {
     IndexType N = readInput<ValueType>( vm, settings, comm, graph, coords, nodeWeights );
 
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
+
+    //---------------------------------------------------------------
+    //
+    // read the communication graph or the block sizes if provided
+    //
+    
+    ITI::CommTree<IndexType,ValueType> commTree = createCommTree( vm, settings, comm, nodeWeights);
+    commTree.adaptWeights( nodeWeights );
 
     //---------------------------------------------------------------------------------
     //
@@ -172,7 +180,7 @@ int main(int argc, char** argv) {
         for( int r=0; r<settings.repeatTimes; r++){
             metricsVec.push_back( Metrics<ValueType>( settings ) );
 
-            partition = partitioner->partition( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metricsVec[r]);
+            partition = partitioner->partition( graph, coords, nodeWeights, nodeWeightsUse, thisTool, commTree, settings, metricsVec[r]);
             
             // partition has the the same distribution as the graph rows
             SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
@@ -188,7 +196,8 @@ int main(int argc, char** argv) {
                 metricsVec[r] = metricsVec[r-1];
                 metricsVec[r].MM["timeTotal"] = runTime;
             }else{
-                metricsVec[r].getMetrics( graph, partition, nodeWeights, settings );
+                std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+                metricsVec[r].getMetrics( graph, partition, nodeWeights, settings, blockSizes );
             }
 
             PRINT0("time to get the partition with " << ITI::to_string(thisTool) << ": " << metricsVec[r].MM["timeTotal"] );
