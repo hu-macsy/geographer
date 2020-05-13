@@ -11,13 +11,18 @@
 using namespace ITI;
 
 template<typename ValueType>
-void Metrics<ValueType>::getMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings){
+void Metrics<ValueType>::getMetrics(
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const scai::lama::DenseVector<IndexType> &partition,
+    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+    struct Settings settings,
+    const std::vector<std::vector<ValueType>> &blockSizes){
 
     if( settings.metricsDetail=="all" ) {
-        getAllMetrics( graph, partition, nodeWeights, settings );
+        getAllMetrics( graph, partition, nodeWeights, settings, blockSizes);
     }
     if( settings.metricsDetail=="easy" ) {
-        getEasyMetrics( graph, partition, nodeWeights, settings );
+        getEasyMetrics( graph, partition, nodeWeights, settings, blockSizes );
     }
     if( settings.metricsDetail=="mapping" ) {
         const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
@@ -47,11 +52,16 @@ void Metrics<ValueType>::getMetrics(const scai::lama::CSRSparseMatrix<ValueType>
 //---------------------------------------------------------------------------
 
 template<typename ValueType>
-void Metrics<ValueType>::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
+void Metrics<ValueType>::getAllMetrics(
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const scai::lama::DenseVector<IndexType> &partition,
+    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+    struct Settings settings,
+    const std::vector<std::vector<ValueType>> &blockSizes ) {
 
     Settings tmpSettings = settings;
     settings.computeDiameter=false; //diameter will be computed inside getRedistRequiredMetrics
-    getEasyMetrics( graph, partition, nodeWeights, tmpSettings );
+    getEasyMetrics( graph, partition, nodeWeights, tmpSettings, blockSizes );
 
     scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     if (settings.numBlocks == comm->getSize()) {
@@ -111,7 +121,11 @@ void Metrics<ValueType>::printKMeansProfiling( std::ostream& out ) const {
 //---------------------------------------------------------------------------
 
 template<typename ValueType>
-void Metrics<ValueType>::getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
+void Metrics<ValueType>::getRedistMetrics( 
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const scai::lama::DenseVector<IndexType> &partition,
+    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+    struct Settings settings ) {
 
     getAllMetrics( graph, partition, nodeWeights, settings);
 
@@ -124,12 +138,23 @@ void Metrics<ValueType>::getRedistMetrics( const scai::lama::CSRSparseMatrix<Val
 //---------------------------------------------------------------------------
 
 template<typename ValueType>
-void Metrics<ValueType>::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
+void Metrics<ValueType>::getEasyMetrics( 
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const scai::lama::DenseVector<IndexType> &partition,
+    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+    struct Settings settings,
+    const std::vector<std::vector<ValueType>> &blockSizes ) {
 
     MM["finalCut"] = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
 
     for( unsigned int w=0; w<nodeWeights.size(); w++ ) {
-        imbalances.push_back(  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights[w]) );
+        if( blockSizes.size()==0 ){
+            //do not use block sizes as they are not given
+            imbalances.push_back(  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights[w]) );
+        }else{
+            assert( blockSizes[w].size()==settings.numBlocks );
+            imbalances.push_back(  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights[w], blockSizes[w]) );
+        }
         MM["finalImbalance_w"+std::to_string(w)] = imbalances.back();
     }
     MM["finalImbalance"] = *std::max_element( imbalances.begin(), imbalances.end() );
@@ -179,7 +204,10 @@ void Metrics<ValueType>::getEasyMetrics( const scai::lama::CSRSparseMatrix<Value
 //---------------------------------------------------------------------------
 
 template<typename ValueType>
-std::tuple<IndexType,IndexType,IndexType> Metrics<ValueType>::getDiameter( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings ) {
+std::tuple<IndexType,IndexType,IndexType> Metrics<ValueType>::getDiameter( 
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const scai::lama::DenseVector<IndexType> &partition,
+    struct Settings settings ) {
 
     std::chrono::time_point<std::chrono::high_resolution_clock> diameterStart = std::chrono::high_resolution_clock::now();
     IndexType maxBlockDiameter = 0;
@@ -244,7 +272,11 @@ std::tuple<IndexType,IndexType,IndexType> Metrics<ValueType>::getDiameter( const
 //---------------------------------------------------------------------------
 
 template<typename ValueType>
-void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueType>& graph, const scai::lama::DenseVector<IndexType>& partition, struct Settings settings, const IndexType repeatTimes ) {
+void Metrics<ValueType>::getRedistRequiredMetrics( 
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const scai::lama::DenseVector<IndexType> &partition,
+    struct Settings settings,
+    const IndexType repeatTimes ) {
 
     scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const IndexType N = graph.getNumRows();
@@ -349,7 +381,9 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
 /* Calculate the volume, aka the data that will be exchanged when redistributing from oldDist to newDist.
  */
 template<typename ValueType>
-std::pair<IndexType,IndexType> Metrics<ValueType>::getRedistributionVol( const scai::dmemo::DistributionPtr newDist, const scai::dmemo::DistributionPtr oldDist) {
+std::pair<IndexType,IndexType> Metrics<ValueType>::getRedistributionVol( 
+    const scai::dmemo::DistributionPtr newDist,
+    const scai::dmemo::DistributionPtr oldDist) {
 
     //const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::CommunicatorPtr comm = newDist->getCommunicatorPtr();
@@ -379,9 +413,9 @@ std::pair<IndexType,IndexType> Metrics<ValueType>::getRedistributionVol( const s
 
 template<typename ValueType>
 void Metrics<ValueType>::getMappingMetrics(
-    const scai::lama::CSRSparseMatrix<ValueType> blockGraph,
-    const scai::lama::CSRSparseMatrix<ValueType> PEGraph,
-    const std::vector<IndexType> mapping) {
+    const scai::lama::CSRSparseMatrix<ValueType> &blockGraph,
+    const scai::lama::CSRSparseMatrix<ValueType> &PEGraph,
+    const std::vector<IndexType> &mapping) {
 
     const IndexType N = blockGraph.getNumRows();
     //congestion is defined for every edge of the processor graph
@@ -495,9 +529,9 @@ void Metrics<ValueType>::getMappingMetrics(
 //---------------------------------------------------------------------------------------
 template<typename ValueType>
 void Metrics<ValueType>::getMappingMetrics(
-    const scai::lama::CSRSparseMatrix<ValueType> appGraph,
-    const scai::lama::DenseVector<IndexType> partition,
-    const scai::lama::CSRSparseMatrix<ValueType> PEGraph ) {
+    const scai::lama::CSRSparseMatrix<ValueType> &appGraph,
+    const scai::lama::DenseVector<IndexType> &partition,
+    const scai::lama::CSRSparseMatrix<ValueType> &PEGraph ) {
 
     const IndexType k = partition.max()+1;
     SCAI_ASSERT_EQ_ERROR( k, PEGraph.getNumRows(), "Max value in partition (aka, k) should be equal with the number of vertices of the PE graph." );

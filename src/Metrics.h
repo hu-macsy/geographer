@@ -81,7 +81,12 @@ public:
 
     */
 
-    void getMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings);
+    void getMetrics(
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const scai::lama::DenseVector<IndexType> &partition,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
+        struct Settings settings,
+        const std::vector<std::vector<ValueType>> &blockSizes = std::vector<std::vector<ValueType>>(0, std::vector<ValueType>(0,0)) );
 
 
     /** @brief Get all possible metrics.
@@ -91,7 +96,12 @@ public:
     @param[in] nodeWeights The weights for the vertices of the graph.
     @param[in] settings A Settings struct.
     */
-    void getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings );
+    void getAllMetrics(
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const scai::lama::DenseVector<IndexType> &partition,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        struct Settings settings,
+        const std::vector<std::vector<ValueType>> &blockSizes = std::vector<std::vector<ValueType>>(0, std::vector<ValueType>(0,0)) );
 
     /** @brief Get metrics that for the max and total redistribution volume
 
@@ -100,7 +110,11 @@ public:
     @param[in] nodeWeights The weights for the vertices of the graph.
     @param[in] settings A Settings struct.
     */
-    void getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings );
+    void getRedistMetrics( 
+        const scai::lama::CSRSparseMatrix<ValueType> &graph, 
+        const scai::lama::DenseVector<IndexType> &partition, 
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        struct Settings settings );
 
     /** @brief Get metrics that require some redistribution of the input data and thus are more time consuming.
 
@@ -109,7 +123,11 @@ public:
     @param[in] nodeWeights The weights for the vertices of the graph.
     @param[in] settings A Settings struct.
     */
-    void getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueType>& graph, const scai::lama::DenseVector<IndexType>& partition, struct Settings settings, const IndexType repeatTimes );
+    void getRedistRequiredMetrics( 
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const scai::lama::DenseVector<IndexType> &partition,
+        struct Settings settings,
+        const IndexType repeatTimes );
 
     /** @brief Get metrics that fast to get. These are: cut, imbalance, max and total communication volume,
     max and total number of boundary nodes per block, max and total percentage of boundary nodes over all nodes.
@@ -119,7 +137,12 @@ public:
     @param[in] nodeWeights The weights for the vertices of the graph.
     @param[in] settings A Settings struct.
     */
-    void getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings );
+    void getEasyMetrics( 
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const scai::lama::DenseVector<IndexType> &partition,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        struct Settings settings,
+        const std::vector<std::vector<ValueType>> &blockSizes = std::vector<std::vector<ValueType>>(0, std::vector<ValueType>(0,0)) );
 
     /** Get the diameter of maximum diameter for all blocks. If a block is disconnected the diameter is infinite.
 
@@ -130,7 +153,10 @@ public:
     @return first is maximum finite diameter, second is the harmonic mean of all the diameters (disconnected blocks that contribute
     an infinite diameter are taken into account), third is the number of disconnected blocks
     */
-    std::tuple<IndexType,IndexType,IndexType> getDiameter( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings );
+    std::tuple<IndexType,IndexType,IndexType> getDiameter( 
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const scai::lama::DenseVector<IndexType> &partition,
+        struct Settings settings );
 
     /** Calculate the redistribution volume between to distributions, i.e., the data that will be exchanged when redistributing from oldDist to newDist.
     We calculate the redistribution volume for all blocks and return the maximum (among all blocks) and the total, i.e. the sum of all volumes.
@@ -140,7 +166,9 @@ public:
 
     @return first is the maximum redistribution volume, second is the total redistribution volume.
      */
-    std::pair<IndexType,IndexType> getRedistributionVol( const scai::dmemo::DistributionPtr newDist, const scai::dmemo::DistributionPtr oldDist);
+    std::pair<IndexType,IndexType> getRedistributionVol( 
+        const scai::dmemo::DistributionPtr newDist,
+        const scai::dmemo::DistributionPtr oldDist);
 
     /** Get metrics concerning mapping. These are 3 metrics for: maximum congestion, maximum and average dilation
 
@@ -149,9 +177,9 @@ public:
     @param[in] mapping A mapping from blocks to PEs.
     **/
     void getMappingMetrics(
-        const scai::lama::CSRSparseMatrix<ValueType> blockGraph,
-        const scai::lama::CSRSparseMatrix<ValueType> PEGraph,
-        const std::vector<IndexType> mapping);
+        const scai::lama::CSRSparseMatrix<ValueType> &blockGraph,
+        const scai::lama::CSRSparseMatrix<ValueType> &PEGraph,
+        const std::vector<IndexType> &mapping);
 
     /** Given the input graph, a partition of the graph and the network, calculate the mapping metrics
     (internally, this calls getMappingMetrics). Internally, the identity mapping is assumed.
@@ -162,9 +190,9 @@ public:
 
     **/
     void getMappingMetrics(
-        const scai::lama::CSRSparseMatrix<ValueType> appGraph,
-        const scai::lama::DenseVector<IndexType> partition,
-        const scai::lama::CSRSparseMatrix<ValueType> PEGraph );
+        const scai::lama::CSRSparseMatrix<ValueType> &appGraph,
+        const scai::lama::DenseVector<IndexType> &partition,
+        const scai::lama::CSRSparseMatrix<ValueType> &PEGraph );
 
     //@{
     /** @name Print metrics
