@@ -1959,12 +1959,10 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
     //
     //calculate max imbalance of the input,  maybe the initial partition is balanced enough
     //
-PRINT0( settings.numNodeWeights );
+
     std::vector<ValueType> imbalances( settings.numNodeWeights, 1.0 );
     for(int w=0; w<settings.numNodeWeights; w++){
-PRINT0( w);
-        //imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, settings.numBlocks, nodeWeights[w], blockSizes[w] );
-imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, blockSizes[w].size(), nodeWeights[w], blockSizes[w] );
+        imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, blockSizes[w].size(), nodeWeights[w], blockSizes[w] );
         metrics.befRebImbalance.push_back( imbalances[w] );
         metrics.MM["befRebImbalance_w"+std::to_string(w)] = imbalances[w];
     }
@@ -2009,7 +2007,7 @@ imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, blockS
     DenseVector<IndexType> bestResult = result;
     
 settingsCopy.epsilons = std::vector<double>(settings.numNodeWeights, maxCurrImbalance );
-settingsCopy.epsilons[1] = settingsCopy.epsilons[1]*1.5;
+settingsCopy.epsilons[1] = settingsCopy.epsilons[1];
 
     const std::chrono::time_point<std::chrono::steady_clock> beforeRebalance =  std::chrono::steady_clock::now();
 
@@ -2049,7 +2047,7 @@ settingsCopy.epsilons[1] = settingsCopy.epsilons[1]*1.5;
         
         settingsCopy.epsilon -= imbaDelta;
 settingsCopy.epsilons[0] -= imbaDelta;
-settingsCopy.epsilons[1] -= imbaDelta*1.5;
+settingsCopy.epsilons[1] -= imbaDelta;
 
         std::chrono::duration<double> oneLoopDuration =  std::chrono::steady_clock::now() - oneLoopTime;
         ValueType maxLoopTime = comm->max( oneLoopDuration.count() );
@@ -2591,11 +2589,7 @@ PRINT0("most imbalanced block is " << blockIndices[0] << " with weight " <<  max
     }//while
 
     assert( *std::min_element( localPart.begin(), localPart.end() ) >=0 );
-<<<<<<< HEAD
-    assert( *std::max_element( localPart.begin(), localPart.end() ) < settings.numBlocks );
-=======
     assert( *std::max_element( localPart.begin(), localPart.end() ) < numBlocks );
->>>>>>> Dev-hierKM_multiweights
 
     // copy to DenseVector; TODO: a better way to do it?
     {

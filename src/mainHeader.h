@@ -487,9 +487,13 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
             }
         }
 
-        commTree.createFlatHeterogeneous( blockSizes, isWeightProportional );
+        if( settings.hierLevels.size()!=0 ){
+            commTree.createHierHeterogeneous( blockSizes, isWeightProportional, settings.hierLevels  );
+        }else{
+            commTree.createFlatHeterogeneous( blockSizes, isWeightProportional );
+        }
     }else if( settings.hierLevels.size()!=0 ){
-        if( settings.autoSetCpuMem){
+        if( settings.autoSetCpuMem ){
             //the number of process or cores in each compute node
             const int coresPerNode = settings.hierLevels.back(); 
             std::vector<std::vector<ValueType>> blockWeights = calculateLoadRequests<ValueType>(comm, coresPerNode);
