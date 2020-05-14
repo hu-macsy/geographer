@@ -31,16 +31,13 @@ public:
     std::vector< std::vector<std::pair<ValueType,ValueType>> > localRefDetails; // specific for local refinement profiilng
 
     // with multi node weights we also have multiple imbalances
-    std::vector<ValueType> imbalances;
-
-    std::vector<ValueType> befRebImbalance;
+    //std::vector<ValueType> imbalances;
 
     //MM, metrics map
     std::map<std::string,ValueType> MM = {
         {"timeMigrationAlgo",-1.0}, {"timeFirstDistribution",-1.0}, {"timeTotal",-1.0}, {"reportTime",-1.0},
         {"inputTime",-1.0}, {"timeFinalPartition",-1.0}, {"timeSecondDistribution",-1.0}, {"timePreliminary",-1.0}, {"timeLocalRef",-1.0},
         {"timeKmeans", -1.0}, {"timeKmeansRebalance", -1.0},
-        {"befRebImbalance", -1.0},
         {"preliminaryCut",-1.0}, {"preliminaryImbalance",-1.0}, {"finalCut",-1.0}, {"finalImbalance",-1.0}, {"maxBlockGraphDegree",-1.0},
         {"preliminaryMaxCommVol",-1.0},{"preliminaryTotalCommVol",-1.0},
         {"totalBlockGraphEdges",-1.0}, {"maxCommVolume",-1.0}, {"totalCommVolume",-1.0}, {"maxBoundaryNodes",-1.0}, {"totalBoundaryNodes",-1.0},

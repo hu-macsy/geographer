@@ -147,6 +147,8 @@ void Metrics<ValueType>::getEasyMetrics(
 
     MM["finalCut"] = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
 
+    std::vector<ValueType> imbalances;
+    
     for( unsigned int w=0; w<nodeWeights.size(); w++ ) {
         if( blockSizes.size()==0 ){
             //do not use block sizes as they are not given

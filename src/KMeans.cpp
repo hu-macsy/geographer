@@ -1863,12 +1863,10 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierarchicalPartition
         // used. We infer the number of new blocks from the groupOfCenters
         // maybe, set also numBlocks for clarity??
 
-        //automatically partition for balance if more than one node weights
-if( numNodeWeights>1 ){
-            partition = computePartition(coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics);
+        partition = computePartition(coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics);
+        
+        if( settings.initialPartition==ITI::Tool::geoHierBalance ){
             partition = computePartition_targetBalance(coordinates, nodeWeights, targetBlockWeights, partition, settings, metrics);
-        }else{
-            partition = computePartition(coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics);
         }
 
         // TODO: not really needed assertions
@@ -1949,6 +1947,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
 
     //get first result if given one is empty
     if ( result.size()==0 or result.max()==0 ){
+        PRINT0( "Preliminary partition not provided, will calculate it now" );
         Settings settingsCopy = settings;
         //settingsCopy.erodeInfluence = true;
         result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinates, nodeWeights, blockSizes, settingsCopy, metrics);
@@ -1960,15 +1959,12 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
     //calculate max imbalance of the input,  maybe the initial partition is balanced enough
     //
 
-    std::vector<ValueType> imbalances( settings.numNodeWeights, 1.0 );
+    std::vector<ValueType> imbalances( settings.numNodeWeights);
     for(int w=0; w<settings.numNodeWeights; w++){
         imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, blockSizes[w].size(), nodeWeights[w], blockSizes[w] );
-        metrics.befRebImbalance.push_back( imbalances[w] );
-        metrics.MM["befRebImbalance_w"+std::to_string(w)] = imbalances[w];
     }
 
     ValueType maxCurrImbalance = *std::max_element( imbalances.begin(), imbalances.end() );
-    metrics.MM["befRebImbalance"] = maxCurrImbalance;
     const ValueType targetImbalance = settings.epsilon;
     ValueType imbalanceDiff = maxCurrImbalance - targetImbalance;
 
@@ -2260,7 +2256,10 @@ IndexType KMeans<IndexType,ValueType>::rebalance(
     IndexType numBlocks = settings.numBlocks;
     const IndexType centersToUse = 6; //TODO: turn that to an user parameter?
     assert( targetBlockWeights.size()==numWeights);
-    if( settings.initialPartition==ITI::Tool::geoHierKM or settings.initialPartition==ITI::Tool::geoHierRepart){
+
+    //if we are doing some kind of hierarchical partition, the number of blocks is different in every level
+    // and is not always the final numbe of blocks
+    if( ITI::to_string(settings.initialPartition).rfind("geoHier",0)==0 ){
         numBlocks = targetBlockWeights[0].size();
     }
     SCAI_ASSERT_EQ_ERROR( targetBlockWeights[0].size(), numBlocks, "Possible reason is that the hierarchical kmeans is called." );
@@ -2297,26 +2296,19 @@ IndexType KMeans<IndexType,ValueType>::rebalance(
     std::vector<std::vector<double>> imbalancesPerBlock(numWeights, std::vector<double>(numBlocks));
     //only the maximum imbalance
     std::vector<double> maxImbalancePerBlock(numBlocks, std::numeric_limits<double>::lowest() );
-std::vector<double> maxImbalancePerBlockForWeight(numBlocks, std::numeric_limits<double>::lowest() );
 
-SCAI_ASSERT_EQ_ERROR( targetBlockWeights.size(), numWeights, "target block sizes, wrong number of weights" );
+    SCAI_ASSERT_EQ_ERROR( targetBlockWeights.size(), numWeights, "target block sizes, wrong number of weights" );
 
     for (IndexType w=0; w<numWeights; w++) {
-SCAI_ASSERT_EQ_ERROR( targetBlockWeights[w].size(), numBlocks, "block sizes, wrong number of weights" );
+        SCAI_ASSERT_EQ_ERROR( targetBlockWeights[w].size(), numBlocks, "block sizes, wrong number of blocks" );
         for (IndexType b=0; b<numBlocks; b++) {
             ValueType optWeight = targetBlockWeights[w][b];
             imbalancesPerBlock[w][b] = (ValueType(blockWeights[w][b] - optWeight)/optWeight);
             if( imbalancesPerBlock[w][b]>maxImbalancePerBlock[b] ) {
                 maxImbalancePerBlock[b] = imbalancesPerBlock[w][b];
-maxImbalancePerBlockForWeight[b] = w;
             }
         }
     }
-
-//PRINT0("max imbalance for block ");
-//for (IndexType b=0; b<numBlocks; b++) {
-//     PRINT0("\t" << b <<" is " << maxImbalancePerBlock[b] << " for weight " <<  maxImbalancePerBlockForWeight[b]);
-//}
 
     //sort blocks based on their maxImbalance
     //blockIndices[0] is the block with the highest imbalance
@@ -2386,10 +2378,9 @@ PRINT0("most imbalanced block is " << blockIndices[0] << " with weight " <<  max
     //here we store the difference to the block weight caused by each move
     std::vector<std::vector<ValueType>> blockWeightDifference(numWeights, std::vector<ValueType>(numBlocks, 0.0));
     
-    //const IndexType myBatchSize = IndexType ( ((ValueType)localN)*settings.batchPercent + 1);
     const IndexType myBatchSize = localN*settings.batchPercent + 1;
     //pick min across all processors;  this is needed so they all do the global sum together
-//PRINT( comm->getRank() << ": "<< localN << " , " << myBatchSize );
+
     IndexType batchSize = comm->min(myBatchSize);
 
     bool meDone = false;
@@ -2541,8 +2532,8 @@ PRINT0("most imbalanced block is " << blockIndices[0] << " with weight " <<  max
                 //sum all the differences for all blocks among PEs
                 comm->sumImpl(blockWeightDifference[w].data(), blockWeightDifference[w].data(), numBlocks, scai::common::TypeTraits<ValueType>::stype );
                 std::transform( blockWeights[w].begin(), blockWeights[w].end(), blockWeightDifference[w].begin(), blockWeights[w].begin(), std::plus<ValueType>() );
-  SCAI_ASSERT_EQ_ERROR( targetBlockWeights[w].size(), numBlocks, "block sizes, wrong number of blocks" );
-  SCAI_ASSERT_EQ_ERROR( blockWeights[w].size(), numBlocks, "block sizes, wrong number of blocks" );
+                SCAI_ASSERT_EQ_ERROR( targetBlockWeights[w].size(), numBlocks, "block sizes, wrong number of blocks" );
+                SCAI_ASSERT_EQ_ERROR( blockWeights[w].size(), numBlocks, "block sizes, wrong number of blocks" );
                 //recalculate imbalances after the new global blocks weights are summed
                 for (IndexType b=0; b<numBlocks; b++) {
                     ValueType optWeight = targetBlockWeights[w][b];
