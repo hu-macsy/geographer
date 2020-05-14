@@ -34,10 +34,9 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     // in order to reduce redistribution costs
     //
 
-    if( renumberPEs ) {
+    if( renumberPEs and partition.max()==numPEs-1) {
         scai::hmemo::ReadAccess<IndexType> rPart( partition.getLocalValues() );
-        //std::map<IndexType,IndexType> blockSizes;
-        //scai::lama::SparseVector<IndexType> blockSizes( numPEs, 0 );
+//SCAI_ASSERT_LT_ERROR( partition.max(), numPEs, "numPEs and numBlocks should agree" );
         std::vector<IndexType> blockSizes( numPEs, 0 );
         for (IndexType i = 0; i < localN; i++) {
             blockSizes[ rPart[i] ] += (IndexType) 1;
@@ -168,7 +167,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
         //instead of renumber the PEs, renumber the blocks
         std::vector<IndexType> blockRenumbering( numPEs ); //this should be k, but the whole functions works only when k=p
 
-        //if every PE got the same ID as the one laready has
+        //if every PE got the same ID as the one already has
         bool nothingChanged = true;
 
         //reverse the renumbering from PEs to blocks: if PE 3 claimed ID 5, then renumber block 5 to 3
@@ -179,7 +178,7 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
                 nothingChanged = false;
         }
 
-        //go over local partition and renumber if some IDs changes
+        //go over local partition and renumber if some IDs changed
         if( not nothingChanged ) {
             scai::hmemo::WriteAccess<IndexType> partAccess( partition.getLocalValues() );
             for( IndexType i=0; i<localN; i++) {

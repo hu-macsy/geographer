@@ -2428,7 +2428,9 @@ std::vector<std::vector<ValueType> > FileIO<IndexType, ValueType>::readBlockSize
         IndexType fileNumBlocks, fileNumWeights;
         ss >> fileNumBlocks >> fileNumWeights;
         SCAI_ASSERT_EQ_ERROR( numBlocks, fileNumBlocks, "Number of blocks mismatch, given "<< numBlocks << " but the file has "<< fileNumBlocks );
-        SCAI_ASSERT_EQ_ERROR( numWeights, fileNumWeights, "Number of weights mismatch, given "<< numWeights << " but the file has "<< fileNumWeights );
+        if( numWeights !=fileNumWeights){
+            throw std::runtime_error("Number of weights mismatch, given "+ std::to_string(numWeights) + " but the file has "+ std::to_string(fileNumWeights) );
+        }
         std::cout << "file " << filename << " has " << numBlocks << " blocks and " << numWeights << " weights" << std::endl;
 
         for(int i=0; i<numBlocks; i++) {
