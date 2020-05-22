@@ -442,14 +442,14 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
         std::string blockSizesFile;
         //blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
         std::vector<std::vector<ValueType>> blockSizes;
-        std::vector<bool> isWeightProportional( settings.numNodeWeights ); //if false, then treat as an absolute value
+        std::vector<bool> isWeightProportional;//( settings.numNodeWeights ); //if false, then treat as an absolute value
 
         if( vm.count("blockSizesFile") and vm.count("topologyFile") ){
             throw std::invalid_argument("Two conflicting arguments are given: blockSizesFile and topologyFile. Pick one."  );
         }else if( vm.count("blockSizesFile") ){
             blockSizesFile = vm["blockSizesFile"].as<std::string>();
             blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks, settings.numNodeWeights );
-            isWeightProportional = {true, true };
+            isWeightProportional = std::vector<bool>( settings.numNodeWeights, true );
         }else{
             if( settings.numBlocks!= comm->getSize() ){
                 throw std::runtime_error("Provided argument topologyFile. This option only works when the number of calling processors equals the number of blocks. One solution is to not provide the numBLocks argument");
