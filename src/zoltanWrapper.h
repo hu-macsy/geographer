@@ -88,6 +88,16 @@ private:
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
         const bool nodeWeightsFlag );
 
+    /** Calculate the relative wanted block sizes for each vertex weight
+        and apply them to the given problem.
+    */
+    template<typename Adapter>
+    static void setTargetedBlockWeights(
+        Zoltan2::PartitioningProblem<Adapter> *problem,
+        const ITI::CommTree<IndexType,ValueType> &commTree,
+        const IndexType numWeights,
+        const Settings settings);
+
     template<typename Adapter>
     static scai::lama::DenseVector<IndexType> runZoltanAlgo(
         Zoltan2::PartitioningProblem<Adapter> *problem,

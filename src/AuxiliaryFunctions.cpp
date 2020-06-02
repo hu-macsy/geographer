@@ -501,7 +501,7 @@ IndexType aux<IndexType, ValueType>::toMetisInterface(
 
     // tpwgts: array of size numWeights*nparts, that is used to specify the fraction of
     // vertex weight that should be distributed to each sub-domain for each balance
-    // constraint. Here we want equal sizes, so every value is 1/nparts.
+    // constraint. Here, perhaps we do NOT want equal sizes
 
     //the total weight of all blocks for each weight
     std::vector<ValueType> blockWeightsSum(numWeights);

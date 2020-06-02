@@ -155,11 +155,13 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     ///////////////////////////////////////////////////////////////////////
     // Create parameters
 
-    Teuchos::ParameterList params = setParams( algo, settings, repart, numWeights, thisPE);    
+    Teuchos::ParameterList params = setParams( algo, settings, repart, numWeights, thisPE);
 	params.set("objects_to_partition", "coordinates");
 
     Zoltan2::PartitioningProblem<inputAdapter_t> *problem =
         new Zoltan2::PartitioningProblem<inputAdapter_t>(ia, &params);
+
+    setTargetedBlockWeights(problem, commTree, numWeights, settings);
 
     if( comm->getRank()==0 )
         std::cout<< "About to call zoltan, algo " << algo << std::endl;
@@ -418,7 +420,56 @@ std::vector<std::vector<ValueType>> zoltanWrapper<IndexType, ValueType>::extract
     }
     return localWeights;
 }
+//---------------------------------------------------------------------------------------
 
+template<typename IndexType, typename ValueType>
+template<typename Adapter>
+void zoltanWrapper<IndexType, ValueType>::setTargetedBlockWeights(
+    Zoltan2::PartitioningProblem<Adapter> *problem,
+    const ITI::CommTree<IndexType,ValueType> &commTree,
+    const IndexType numWeights,
+    const Settings settings){
+
+    const IndexType numBlocks = settings.numBlocks;
+
+    // get the block sizes from the tree
+    std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+    SCAI_ASSERT_EQ_ERROR( blockSizes.size(), numWeights, "Wrong number of weights");
+    SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), numBlocks, "Wrong size of weights" );
+
+    //the total weight of all blocks for each weight
+    std::vector<ValueType> blockWeightsSum(numWeights);
+    for( int w=0; w<numWeights; w++ ){
+        blockWeightsSum[w] = std::accumulate( blockSizes[w].begin(), blockSizes[w].end(), 0.0 );
+    }
+
+    //the blockIDs should be distributed among the PEs but not replicated.
+    //
+    //here, we assume that numPEs==numBLocks and so, each PE holds only
+    //one element
+
+const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    //calculate the relative values for each weight
+    std::vector<typename Adapter::part_t> blockIDs(1); //(numBlocks,10);
+    blockIDs[0] = comm->getRank();
+
+// if( comm->getRank()==0 ){
+//     blockIDs.resize(numBlocks);
+//     std::iota( blockIDs.begin(), blockIDs.end(), 0);
+// }
+
+    //set targeted block weights 
+    for( int w=0; w<numWeights; w++){
+        std::vector<ValueType> targetBlockSizes(numBlocks);
+        for(int k=0; k<numBlocks; k++){
+            targetBlockSizes[k] = blockSizes[w][k]/blockWeightsSum[w];
+//PRINT(blockIDs.data()[k]);
+        }
+        problem->setPartSizesForCriteria( w, numBlocks, blockIDs.data(), targetBlockSizes.data() );
+//problem->setPartSizes( numBlocks, blockIDs.data(), targetBlockSizes.data() );
+    }
+
+}
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
