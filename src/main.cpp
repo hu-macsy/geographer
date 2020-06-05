@@ -181,7 +181,7 @@ int main(int argc, char** argv) {
     const scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( N ) );
 
     scai::lama::DenseVector<IndexType> partition;
-PRINT0( nodeWeights.size() );
+
     for( IndexType r=0; r<repeatTimes; r++) {
 
         // for the next runs the input is redistributed, so we must redistribute to the original distributions

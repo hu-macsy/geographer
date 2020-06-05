@@ -232,7 +232,7 @@ struct Settings {
     std::string KMBalanceMethod = "reb_lex";
     //IndexType batchSize = 100;              ///< after how many moves we calculate the global sum in KMeans::rebalance()
     double batchPercent = 0.01;          ///< calculate the batch size as a percentage of the number of local points
-    //bool manhattanDistance = false;
+    bool focusOnBalance = false;            ///< used in hierarchical versions to rebalance at every step
     std::vector<IndexType> hierLevels; 		///< for hierarchial kMeans, the number of blocks per level
 //std::string kMeansMshipSort = "lex";    ///< used in KMeans::rebalance() to sort vertices. Possible values are "lex" and "sqImba"
     //@}

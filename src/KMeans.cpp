@@ -1864,7 +1864,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierarchicalPartition
         // maybe, set also numBlocks for clarity??
 
         //automatically partition for balance if more than one node weights
-if( numNodeWeights>1 ){
+        if( settings.focusOnBalance ){
             partition = computePartition(coordinates, nodeWeights, targetBlockWeights, partition, groupOfCenters, settings, metrics);
             partition = computePartition_targetBalance(coordinates, nodeWeights, targetBlockWeights, partition, settings, metrics);
         }else{
@@ -1923,6 +1923,11 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierPlusRepart(
     const scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
     PRINT0("Finished hierarchical partition");
 
+    // if( nodeWeights.size()>1 ){
+    //     settings.maxKMeansIterations = 15;
+    //     settings.minSamplingNodes = -1;
+    //     settings.balanceIterations = 10;
+    // }
     // refine using a repartition step
 
     std::chrono::time_point<std::chrono::high_resolution_clock> repartStart = std::chrono::high_resolution_clock::now();
