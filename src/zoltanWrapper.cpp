@@ -172,7 +172,7 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     delete[] zoltanCoords;
  
     return partitionZoltan;
-}
+}//zoltanCoreCoords
 
 //---------------------------------------------------------------------------------------
 
@@ -298,13 +298,15 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::zoltanCo
     Zoltan2::PartitioningProblem<SparseGraphAdapter> *problem =
         new Zoltan2::PartitioningProblem<SparseGraphAdapter>( &grAdapter, &params);
 
+    setTargetedBlockWeights(problem, commTree, numWeights, settings);
+
     if( scaiComm->getRank()==0 )
         std::cout<< "About to call zoltan, algo " << algo << std::endl;
 
     scai::lama::DenseVector<IndexType> partitionZoltan = runZoltanAlgo( problem, dist, settings, scaiComm, metrics );
     return partitionZoltan;
 
-}
+}//zoltanCoreGraph
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
@@ -431,6 +433,14 @@ void zoltanWrapper<IndexType, ValueType>::setTargetedBlockWeights(
     const Settings settings){
 
     const IndexType numBlocks = settings.numBlocks;
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const IndexType myRank = comm->getRank();
+
+    if( comm->getSize()>numBlocks ){
+        if(myRank==0){
+            std::cout<<"\nWARNING: possible error, zoltan might complain when number of calling PEs is greater than the number of blocks\n" << std::endl;
+        }
+    }
 
     // get the block sizes from the tree
     std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
@@ -448,25 +458,28 @@ void zoltanWrapper<IndexType, ValueType>::setTargetedBlockWeights(
     //here, we assume that numPEs==numBLocks and so, each PE holds only
     //one element
 
-const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    //calculate the relative values for each weight
-    std::vector<typename Adapter::part_t> blockIDs(1); //(numBlocks,10);
-    blockIDs[0] = comm->getRank();
-
-// if( comm->getRank()==0 ){
-//     blockIDs.resize(numBlocks);
-//     std::iota( blockIDs.begin(), blockIDs.end(), 0);
-// }
-
-    //set targeted block weights 
-    for( int w=0; w<numWeights; w++){
-        std::vector<ValueType> targetBlockSizes(numBlocks);
-        for(int k=0; k<numBlocks; k++){
-            targetBlockSizes[k] = blockSizes[w][k]/blockWeightsSum[w];
-//PRINT(blockIDs.data()[k]);
+    //calculating all in PE 0
+    {
+        std::vector<typename Adapter::part_t> blockIDs;
+        if( myRank==0 ){
+            blockIDs.resize(numBlocks);
+            std::iota( blockIDs.begin(), blockIDs.end(), 0);
         }
-        problem->setPartSizesForCriteria( w, numBlocks, blockIDs.data(), targetBlockSizes.data() );
-//problem->setPartSizes( numBlocks, blockIDs.data(), targetBlockSizes.data() );
+
+        //set targeted block weights 
+        for( int w=0; w<numWeights; w++){
+            std::vector<typename Adapter::scalar_t> targetBlockSizes;
+            IndexType vectorSize=0;
+            if( myRank==0 ){
+                targetBlockSizes.resize(numBlocks);
+                for(int k=0; k<numBlocks; k++){
+                    targetBlockSizes[k] = blockSizes[w][k]/blockWeightsSum[w];
+                }
+                vectorSize=numBlocks;
+            }
+
+            problem->setPartSizesForCriteria( w, vectorSize, blockIDs.data(), targetBlockSizes.data() );
+        }
     }
 
 }
