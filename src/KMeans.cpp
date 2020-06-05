@@ -482,7 +482,6 @@ std::vector<std::vector<ValueType>> KMeans<IndexType,ValueType>::findCenters(
             }
 
             comm->sumImpl(result[d].data(), result[d].data(), k, scai::common::TypeTraits<ValueType>::stype);
-
         }
 
         allWeightsCenters[w]= result ;
@@ -525,6 +524,7 @@ std::vector<point<ValueType>> KMeans<IndexType,ValueType>::vectorTranspose(const
 
     return retPoints;
 }
+
 
 template<typename IndexType, typename ValueType>
 template<typename Iterator>
@@ -1012,8 +1012,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::assignBlocks(
     return assignment;
 }// assignBlocks
 
-/**
- */
+
 // WARNING: we do not use k as repartition assumes k=comm->getSize() and neither blockSizes and we assume
 // that every block has the same size
 
@@ -1923,11 +1922,6 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierPlusRepart(
     const scai::dmemo::CommunicatorPtr comm = coordinates[0].getDistributionPtr()->getCommunicatorPtr();
     PRINT0("Finished hierarchical partition");
 
-    // if( nodeWeights.size()>1 ){
-    //     settings.maxKMeansIterations = 15;
-    //     settings.minSamplingNodes = -1;
-    //     settings.balanceIterations = 10;
-    // }
     // refine using a repartition step
 
     std::chrono::time_point<std::chrono::high_resolution_clock> repartStart = std::chrono::high_resolution_clock::now();
@@ -1964,12 +1958,12 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
     //
     //calculate max imbalance of the input,  maybe the initial partition is balanced enough
     //
-PRINT0( settings.numNodeWeights );
+
     std::vector<ValueType> imbalances( settings.numNodeWeights, 1.0 );
     for(int w=0; w<settings.numNodeWeights; w++){
-PRINT0( w);
-        //imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, settings.numBlocks, nodeWeights[w], blockSizes[w] );
-imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, blockSizes[w].size(), nodeWeights[w], blockSizes[w] );
+        //second argument was numBlock but when called from the hierarchical kmeans, the number of blocks is different
+        //in earlier levels
+        imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, blockSizes[w].size(), nodeWeights[w], blockSizes[w] );
         metrics.befRebImbalance.push_back( imbalances[w] );
         metrics.MM["befRebImbalance_w"+std::to_string(w)] = imbalances[w];
     }
