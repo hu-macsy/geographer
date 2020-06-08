@@ -112,6 +112,7 @@ int main(int argc, char** argv) {
     ITI::CommTree<IndexType,ValueType> commTree = createCommTree( vm, settings, comm, nodeWeights);
     commTree.adaptWeights( nodeWeights );
 
+
     //---------------------------------------------------------------
     //
     // get previous partition, if set

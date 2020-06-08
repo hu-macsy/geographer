@@ -442,7 +442,7 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
         std::string blockSizesFile;
         //blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
         std::vector<std::vector<ValueType>> blockSizes;
-        std::vector<bool> isWeightProportional;//( settings.numNodeWeights ); //if false, then treat as an absolute value
+        std::vector<bool> isWeightProportional; //if false, then treat as an absolute value
 
         if( vm.count("blockSizesFile") and vm.count("topologyFile") ){
             throw std::invalid_argument("Two conflicting arguments are given: blockSizesFile and topologyFile. Pick one."  );
@@ -506,6 +506,8 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
     } else {
         commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
     }
+
+    commTree.checkTree();
 
     return commTree;
 }

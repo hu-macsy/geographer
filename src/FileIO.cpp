@@ -2455,7 +2455,7 @@ std::vector<std::vector<ValueType> > FileIO<IndexType, ValueType>::readBlockSize
     }
 
     for (IndexType i = 0; i < numWeights; i++) {
-        comm->bcast( blockSizes[0].data(), numBlocks, 0);
+        comm->bcast( blockSizes[i].data(), numBlocks, 0);
     }
 
     return blockSizes;
