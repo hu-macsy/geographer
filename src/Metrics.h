@@ -8,6 +8,7 @@
 #include <algorithm>
 
 #include "GraphUtils.h"
+#include "CommTree.h"
 
 namespace ITI {
 
@@ -81,7 +82,12 @@ public:
 
     */
 
-    void getMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings);
+    void getMetrics(
+        const scai::lama::CSRSparseMatrix<ValueType> graph,
+        const scai::lama::DenseVector<IndexType> partition,
+        const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights,
+        struct Settings settings,
+        const ITI::CommTree<IndexType,ValueType> commTree=ITI::CommTree<IndexType,ValueType>() );
 
 
     /** @brief Get all possible metrics.
@@ -91,7 +97,12 @@ public:
     @param[in] nodeWeights The weights for the vertices of the graph.
     @param[in] settings A Settings struct.
     */
-    void getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings );
+    void getAllMetrics(
+        const scai::lama::CSRSparseMatrix<ValueType> graph,
+        const scai::lama::DenseVector<IndexType> partition,
+        const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights,
+        struct Settings settings,
+        const ITI::CommTree<IndexType,ValueType> commTree=ITI::CommTree<IndexType,ValueType>() );
 
     /** @brief Get metrics that for the max and total redistribution volume
 
@@ -100,7 +111,11 @@ public:
     @param[in] nodeWeights The weights for the vertices of the graph.
     @param[in] settings A Settings struct.
     */
-    void getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings );
+    void getRedistMetrics( 
+        const scai::lama::CSRSparseMatrix<ValueType> graph,
+        const scai::lama::DenseVector<IndexType> partition,
+        const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights,
+        struct Settings settings );
 
     /** @brief Get metrics that require some redistribution of the input data and thus are more time consuming.
 
@@ -109,7 +124,11 @@ public:
     @param[in] nodeWeights The weights for the vertices of the graph.
     @param[in] settings A Settings struct.
     */
-    void getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueType>& graph, const scai::lama::DenseVector<IndexType>& partition, struct Settings settings, const IndexType repeatTimes );
+    void getRedistRequiredMetrics( 
+        const scai::lama::CSRSparseMatrix<ValueType>& graph,
+        const scai::lama::DenseVector<IndexType>& partition,
+        struct Settings settings,
+        const IndexType repeatTimes );
 
     /** @brief Get metrics that fast to get. These are: cut, imbalance, max and total communication volume,
     max and total number of boundary nodes per block, max and total percentage of boundary nodes over all nodes.
@@ -119,7 +138,12 @@ public:
     @param[in] nodeWeights The weights for the vertices of the graph.
     @param[in] settings A Settings struct.
     */
-    void getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings );
+    void getEasyMetrics( 
+        const scai::lama::CSRSparseMatrix<ValueType> graph,
+        const scai::lama::DenseVector<IndexType> partition,
+        const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights,
+        struct Settings settings,
+        const ITI::CommTree<IndexType,ValueType> commTree=ITI::CommTree<IndexType,ValueType>() );
 
     /** Get the diameter of maximum diameter for all blocks. If a block is disconnected the diameter is infinite.
 

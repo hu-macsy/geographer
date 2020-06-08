@@ -11,13 +11,18 @@
 using namespace ITI;
 
 template<typename ValueType>
-void Metrics<ValueType>::getMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings){
+void Metrics<ValueType>::getMetrics(
+    const scai::lama::CSRSparseMatrix<ValueType> graph,
+    const scai::lama::DenseVector<IndexType> partition,
+    const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights,
+    struct Settings settings,
+    const ITI::CommTree<IndexType,ValueType> commTree ){
 
     if( settings.metricsDetail=="all" ) {
-        getAllMetrics( graph, partition, nodeWeights, settings );
+        getAllMetrics( graph, partition, nodeWeights, settings, commTree );
     }
     if( settings.metricsDetail=="easy" ) {
-        getEasyMetrics( graph, partition, nodeWeights, settings );
+        getEasyMetrics( graph, partition, nodeWeights, settings, commTree );
     }
     if( settings.metricsDetail=="mapping" ) {
         const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
@@ -47,11 +52,16 @@ void Metrics<ValueType>::getMetrics(const scai::lama::CSRSparseMatrix<ValueType>
 //---------------------------------------------------------------------------
 
 template<typename ValueType>
-void Metrics<ValueType>::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
+void Metrics<ValueType>::getAllMetrics(
+    const scai::lama::CSRSparseMatrix<ValueType> graph,
+    const scai::lama::DenseVector<IndexType> partition,
+    const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights,
+    struct Settings settings,
+    const ITI::CommTree<IndexType,ValueType> commTree ) {
 
     Settings tmpSettings = settings;
     settings.computeDiameter=false; //diameter will be computed inside getRedistRequiredMetrics
-    getEasyMetrics( graph, partition, nodeWeights, tmpSettings );
+    getEasyMetrics( graph, partition, nodeWeights, tmpSettings, commTree );
 
     scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     if (settings.numBlocks == comm->getSize()) {
@@ -124,14 +134,30 @@ void Metrics<ValueType>::getRedistMetrics( const scai::lama::CSRSparseMatrix<Val
 //---------------------------------------------------------------------------
 
 template<typename ValueType>
-void Metrics<ValueType>::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
+void Metrics<ValueType>::getEasyMetrics( 
+    const scai::lama::CSRSparseMatrix<ValueType> graph,
+    const scai::lama::DenseVector<IndexType> partition,
+    const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights,
+    struct Settings settings,
+    const ITI::CommTree<IndexType,ValueType> commTree ) {
 
     MM["finalCut"] = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
+PRINT( commTree.getNumNodes() );
+    if( commTree.getNumNodes()==0 ){
+        for( unsigned int w=0; w<nodeWeights.size(); w++ ) {
+            imbalances.push_back(  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights[w]) );
+            MM["finalImbalance_w"+std::to_string(w)] = imbalances.back();
+        }
+    }else{
+        std::vector<std::vector<ValueType>> optWeights = commTree.getBalanceVectors();
+        assert( optWeights.size()==nodeWeights.size() );
 
-    for( unsigned int w=0; w<nodeWeights.size(); w++ ) {
-        imbalances.push_back(  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights[w]) );
-        MM["finalImbalance_w"+std::to_string(w)] = imbalances.back();
+        for( unsigned int w=0; w<nodeWeights.size(); w++ ) {
+            imbalances.push_back(  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights[w], optWeights[w]) );
+            MM["finalImbalance_w"+std::to_string(w)] = imbalances.back();
+        }
     }
+
     MM["finalImbalance"] = *std::max_element( imbalances.begin(), imbalances.end() );
 
     //TODO: getting the block graph probably fails for p>5000, removed this metric since we do not use it so much

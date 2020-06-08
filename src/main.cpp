@@ -228,7 +228,7 @@ int main(int argc, char** argv) {
 
         std::chrono::time_point<std::chrono::steady_clock> beforeReport = std::chrono::steady_clock::now();
 
-        metricsVec[r].getMetrics(graph, partition, nodeWeights, settings );
+        metricsVec[r].getMetrics(graph, partition, nodeWeights, settings, commTree );
         metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
 
         std::chrono::duration<double> reportTime =  std::chrono::steady_clock::now() - beforeReport;
