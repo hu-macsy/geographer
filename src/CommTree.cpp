@@ -317,6 +317,7 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
         [[maybe_unused]] IndexType size = createTreeFromLeaves( hierLevel );
 
         areWeightsAdaptedV = true;
+
     }
 }//adaptWeights
 
@@ -363,7 +364,8 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
         //not really needed
         SCAI_ASSERT_EQ_ERROR(
             std::accumulate( fatherNode.weights.begin(), fatherNode.weights.end(), 0.0),
-            std::accumulate( thisNode.weights.begin(), thisNode.weights.end(), 0.0), "Weights are not copied?"
+            std::accumulate( thisNode.weights.begin(), thisNode.weights.end(), 0.0), 
+            "Weights are not copied?"
         );
 
         for( unsigned int j=i+1; j<levelBelowsize; j++) {

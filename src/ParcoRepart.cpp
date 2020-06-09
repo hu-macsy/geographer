@@ -447,8 +447,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
                     or settings.initialPartition == ITI::Tool::geoHierBalance) {
 
             SCAI_ASSERT_ERROR( commTree.areWeightsAdapted(), "The weight of the tree are not adapted; should call tree.adaptWeights()" );
-            SCAI_ASSERT_EQ_ERROR( commTree.getNumLeaves(), settings.numBlocks, "The number of leaves and blocks should agree" );            
-            if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierBalance) {
+            SCAI_ASSERT_EQ_ERROR( commTree.getNumLeaves(), settings.numBlocks, "The number of leaves and blocks should agree" );
+            if (settings.initialPartition == ITI::Tool::geoHierKM) {
                 result = ITI::KMeans<IndexType,ValueType>::computeHierarchicalPartition( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
             }
             if (settings.initialPartition == ITI::Tool::geoHierRepart) {

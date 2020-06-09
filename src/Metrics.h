@@ -8,6 +8,7 @@
 #include <algorithm>
 
 #include "GraphUtils.h"
+#include "CommTree.h"
 
 namespace ITI {
 
@@ -150,10 +151,6 @@ public:
     @return first is maximum finite diameter, second is the harmonic mean of all the diameters (disconnected blocks that contribute
     an infinite diameter are taken into account), third is the number of disconnected blocks
     */
-    std::tuple<IndexType,IndexType,IndexType> getDiameter( 
-        const scai::lama::CSRSparseMatrix<ValueType> &graph,
-        const scai::lama::DenseVector<IndexType> &partition,
-        struct Settings settings );
 
     /** Calculate the redistribution volume between to distributions, i.e., the data that will be exchanged when redistributing from oldDist to newDist.
     We calculate the redistribution volume for all blocks and return the maximum (among all blocks) and the total, i.e. the sum of all volumes.

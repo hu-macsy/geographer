@@ -114,6 +114,7 @@ int main(int argc, char** argv) {
 //SCAI_ASSERT_EQ_ERROR( commTree.getNumHierLevels(), settings.hierLevels.size()+1, "?" );
     
 
+
     //---------------------------------------------------------------
     //
     // get previous partition, if set

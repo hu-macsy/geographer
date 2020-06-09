@@ -5,7 +5,6 @@
 
 namespace ITI {
 
-
 template<typename IndexType, typename ValueType>
 scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition(
     DenseVector<IndexType>& partition,

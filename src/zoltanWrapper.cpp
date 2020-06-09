@@ -510,4 +510,3 @@ template class zoltanWrapper<IndexType, double>;
 template class zoltanWrapper<IndexType, float>;
 
 }//namespace ITI
-

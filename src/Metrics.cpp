@@ -159,6 +159,7 @@ void Metrics<ValueType>::getEasyMetrics(
         }
         MM["finalImbalance_w"+std::to_string(w)] = imbalances.back();
     }
+
     MM["finalImbalance"] = *std::max_element( imbalances.begin(), imbalances.end() );
 
     //TODO: getting the block graph probably fails for p>5000, removed this metric since we do not use it so much

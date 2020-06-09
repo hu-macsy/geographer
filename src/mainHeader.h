@@ -509,6 +509,8 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
         commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
     }
 
+    commTree.checkTree();
+
     return commTree;
 }
 
