@@ -25,8 +25,8 @@ std::ostream& ITI::operator<<( std::ostream& out, const ITI::Tool tool) {
     case Tool::geoHierRepart:
         token = "geoHierRepart";
         break;
-    case Tool::geoHierBalance:
-        token = "geoHierBalance";
+    case Tool::geoKmeansBalance:
+        token = "geoKmeansBalance";
         break;
     case Tool::geoMS:
         token = "geoMS";
@@ -114,8 +114,8 @@ std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool) {
         tool = ITI::Tool::geoHierKM;
     else if( token=="geoHierRepart" or tokenLower=="geohierrepart")
         tool = ITI::Tool::geoHierRepart;
-    else if( token=="geoHierBalance" or tokenLower=="geohierbalance")
-        tool = ITI::Tool::geoHierBalance;
+    else if( token=="geoKmeansBalance" or tokenLower=="geokmeansbalance")
+        tool = ITI::Tool::geoKmeansBalance;
     else if( token=="geoMS" or tokenLower=="geoms")
         tool = ITI::Tool::geoMS;
     else if( token=="geomRebalance" or tokenLower=="geomrebalance")
