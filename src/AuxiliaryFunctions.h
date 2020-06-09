@@ -18,6 +18,7 @@
 
 #include "GraphUtils.h"
 #include "Settings.h"
+#include "CommTree.h"
 
 
 namespace ITI {
@@ -372,6 +373,25 @@ public:
         std::vector<double>& xyzLocal,
         std::vector<IndexType>& options);
 
+    /** Overloaded version with commTree
+    \overload
+    */
+    static IndexType toMetisInterface(
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const std::vector<scai::lama::DenseVector<ValueType>> &coords,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        const ITI::CommTree<IndexType,ValueType> &commTree,
+        const struct Settings &settings,
+        std::vector<IndexType>& vtxDist, 
+        std::vector<IndexType>& xadj,
+        std::vector<IndexType>& adjncy,
+        std::vector<ValueType>& vwgt,
+        std::vector<double>& tpwgts,
+        IndexType &wgtFlag,
+        IndexType &numWeights,
+        std::vector<double>& ubvec,
+        std::vector<double>& xyzLocal,
+        std::vector<IndexType>& options);
 
     /**
      * Iterates over the local part of the adjacency matrix and counts local edges.
