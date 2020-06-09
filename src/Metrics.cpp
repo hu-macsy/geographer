@@ -142,7 +142,7 @@ void Metrics<ValueType>::getEasyMetrics(
     const ITI::CommTree<IndexType,ValueType> commTree ) {
 
     MM["finalCut"] = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
-PRINT( commTree.getNumNodes() );
+
     if( commTree.getNumNodes()==0 ){
         for( unsigned int w=0; w<nodeWeights.size(); w++ ) {
             imbalances.push_back(  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights[w]) );
