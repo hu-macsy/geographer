@@ -187,10 +187,10 @@ bool ITI::Settings::checkValidity(const scai::dmemo::CommunicatorPtr comm ) {
     }
     if( initialMigration==Tool::unknown or initialPartition==Tool::unknown){
         this->isValid = false;
-        if( initialMigration==Tool::unknown and comm->getRank()==0){
+        if( initialMigration==Tool::unknown ){
             throw std::runtime_error("provided tool for initialMigration is not known");
         }
-        if( initialPartition==Tool::unknown and comm->getRank()==0){
+        if( initialPartition==Tool::unknown ){
             throw std::runtime_error("provided tool for initialPartition is not known");
         }
         return false;
