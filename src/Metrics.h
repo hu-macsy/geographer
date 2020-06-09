@@ -32,7 +32,7 @@ public:
     std::vector< std::vector<std::pair<ValueType,ValueType>> > localRefDetails; // specific for local refinement profiilng
 
     // with multi node weights we also have multiple imbalances
-    //std::vector<ValueType> imbalances;
+    std::vector<ValueType> befRebImbalance;
 
     //MM, metrics map
     std::map<std::string,ValueType> MM = {
@@ -187,6 +187,13 @@ public:
         const scai::lama::CSRSparseMatrix<ValueType> &appGraph,
         const scai::lama::DenseVector<IndexType> &partition,
         const scai::lama::CSRSparseMatrix<ValueType> &PEGraph );
+
+    /* Calculate the max diameter of the blocks.
+    */
+    std::tuple<IndexType,IndexType,IndexType> getDiameter( 
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const scai::lama::DenseVector<IndexType> &partition,
+        struct Settings settings );
 
     //@{
     /** @name Print metrics
