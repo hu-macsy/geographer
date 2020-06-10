@@ -1994,7 +1994,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
     }
 
     const IndexType numTries = 5;
-    const ValueType imbaDelta = imbalanceDiff/numTries; //how much to reduce epsilon
+    const ValueType imbaDelta = imbalanceDiff/(numTries+1); //how much to reduce epsilon
     ValueType pointPerCent = 0.005;
     ValueType maxMinImbalance = maxCurrImbalance;
 
@@ -2007,7 +2007,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
 
     DenseVector<IndexType> bestResult = result;
     
-    settingsCopy.epsilons = std::vector<double>(settings.numNodeWeights, maxCurrImbalance*1.2 );
+    settingsCopy.epsilons = std::vector<double>(settings.numNodeWeights, maxCurrImbalance-imbaDelta);
     //settingsCopy.epsilons[1] = settingsCopy.epsilons[1]*1.5;
 
     const std::chrono::time_point<std::chrono::steady_clock> beforeRebalance =  std::chrono::steady_clock::now();
