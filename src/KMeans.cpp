@@ -1962,16 +1962,18 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
     //
 
     std::vector<ValueType> imbalances( settings.numNodeWeights, 1.0 );
+
     for(int w=0; w<settings.numNodeWeights; w++){
         //second argument was numBlock but when called from the hierarchical kmeans, the number of blocks is different
         //in earlier levels
         imbalances[w] = GraphUtils<IndexType,ValueType>::computeImbalance(result, blockSizes[w].size(), nodeWeights[w], blockSizes[w] );
+
         metrics.befRebImbalance.push_back( imbalances[w] );
         metrics.MM["befRebImbalance_w"+std::to_string(w)] = imbalances[w];
     }
 
     ValueType maxCurrImbalance = *std::max_element( imbalances.begin(), imbalances.end() );
-	metrics.MM["befRebImbalance"] = maxCurrImbalance;
+    metrics.MM["befRebImbalance"] = maxCurrImbalance;
     const ValueType targetImbalance = settings.epsilon;
     ValueType imbalanceDiff = maxCurrImbalance - targetImbalance;
 
@@ -2015,8 +2017,13 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computePartition_targetBalan
     for(int i=0; i<numTries; i++){
         if( myRank==0 ){
             std::cout <<"Repartition for epsilon(s)= ";
-            for( double e : settingsCopy.epsilons )  std::cout<< e << ", " ;
-            std::cout << std::endl;
+            //if( settingsCopy.epsilons.size()>0 ){
+                for( double e : settingsCopy.epsilons )  std::cout<< e << ", " ;
+                std::cout << std::endl;
+            //}else{
+            //    std::cout<< settings.epsilon << std::endl;
+            //}
+            
         }
         std::chrono::time_point<std::chrono::steady_clock> oneLoopTime =  std::chrono::steady_clock::now();
 

@@ -66,7 +66,7 @@ public:
 
     /**@brief Default constructor
     */
-    Metrics( ) {	}
+    Metrics( ) {    }
 
     
     Metrics operator=(const Metrics &m) {

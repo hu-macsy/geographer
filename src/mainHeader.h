@@ -74,10 +74,15 @@ IndexType readInput(
             settings.numNodeWeights = 2;
         }
 
-        if (numReadNodeWeights == 0 and settings.numNodeWeights==0) {
-            nodeWeights.resize(1);
-            nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1.0);
-            settings.numNodeWeights=1;
+        // user did not specify number of weights to use
+        if( settings.numNodeWeights==0 ){
+            if ( numReadNodeWeights==0 ) {
+                nodeWeights.resize(1);
+                nodeWeights[0] = fill<DenseVector<ValueType>>(rowDistPtr, 1.0);
+                settings.numNodeWeights=1;
+            }else if ( numReadNodeWeights>0 ) {
+                settings.numNodeWeights = numReadNodeWeights;
+            }
         }
 
         if (settings.numNodeWeights > 0) {
