@@ -1388,7 +1388,7 @@ for( IndexType i=0; i<firstRoundSize; i++){
     rPart.release();
 
     //sort lexicographically: first by the imbalance of the block this point belongs to.
-    //  if they are in the same block or the imbalance is the same, sort by membership
+    //  if they are in the same block or the imbalance is the same, sort the worst weight
     auto lexSort = [&](int i, int j)->bool{
         const IndexType blockI = localPart[i];
         const IndexType blockJ = localPart[j];
@@ -1446,7 +1446,7 @@ PRINT( comm->getRank() << ": numPointsToCheck " << numPointsToCheck << " , batch
     IndexType numMoves = 0;
 
 //TODO: if the minimum number of points to check is agreed, can this be turned into a for loop?
-// even if we restart? WEll, in the end we should use a priority queue
+// even if we restart? Well, in the end we should use a priority queue
     while( not allDone ){
         const IndexType thisInd = localIndices[localI];
         const IndexType myBlock = localPart[thisInd];
@@ -1649,6 +1649,7 @@ for( int b=0; b<numBlocks; b++){
 }
             //TODO: check if resorting local points based on new global weights
             //and restarting would benefit
+//Actually, resorting (or a priority queue) is needed as the most imbalanced block or weight changes
 /*
             if(thisRun<maxNumRestarts){
                 std::sort(indices.begin(), indices.end(), sortFunction );
