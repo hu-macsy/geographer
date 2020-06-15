@@ -267,7 +267,7 @@ public:
         return hierarchyLevels;
     }
 
-    bool areWeightsAdapted(){
+    bool areWeightsAdapted() const{
         return areWeightsAdaptedV;
     }
 

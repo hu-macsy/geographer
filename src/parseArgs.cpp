@@ -33,6 +33,7 @@ Options populateOptions() {
     ("topologyFile", "read system topology  from file: a line per processor with CPU, MEM and number of cores", value<std::string>())
     ("blockSizesFile", "file to read the block sizes for every block", value<std::string>() )
     ("autoSetCpuMem", "if set, geographer will gather cpu and memory info and use them to build a heterogeneous communication tree used for partitioning")
+    ("w2UpperBound", "if true, when given a file with the block sizes or the topology, treat the second weight as an upper bound (usually, this is used so the second weight corresponds to the memory capacity of the PEs)")
     ("processPerNode", "the number of processes per compute node. Is used with autoSetCpuMem to determine the internal cpu/core ID within a compute node and query the cpu frequency.",  value<IndexType>())
     ("mappingRenumbering", "map blocks to PEs using the SFC index of the block's center. This works better when PUs are numbered consecutively." )
     //repartitioning
@@ -207,6 +208,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.setAutoSettings = vm.count("autoSettings");
     settings.mappingRenumbering = vm.count("mappingRenumbering");
     settings.autoSetCpuMem = vm.count("autoSetCpuMem");
+    settings.w2UpperBound = vm.count("w2UpperBound");
 
     //28/11/19, deprecate storeInfo parameter. Leaving it as an option for backwards compatibility.    
     //if outFile was provided but storeInfo was not given as an argument

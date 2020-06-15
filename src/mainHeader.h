@@ -99,7 +99,7 @@ IndexType readInput(
                 }
                 if (comm->getRank() == 0) {
                     std::cout << "Read " << numReadNodeWeights << " weights per node but " << settings.numNodeWeights << " weights were specified, padding with "
-                              << settings.numNodeWeights - numReadNodeWeights << " uniform weights. " << std::endl;
+                              << settings.numNodeWeights - numReadNodeWeights << " unit weights. " << std::endl;
                 }
             }
         }
@@ -185,7 +185,7 @@ IndexType readInput(
 
     }else{
         std::cout << "No input file was given. Call again with --graphFile, --quadTreeFile" << std::endl;
-        return 126;        
+        return 126;
     }
 
     if( not aux<IndexType,ValueType>::checkConsistency( graph, coords, nodeWeights, settings) ){
@@ -441,9 +441,14 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
         throw std::runtime_error("You should provide either a file for a communication graph OR a file for block sizes. Not both.");
     }
 
+    //
+    // Check different cases: if we are given a topology file of not, if we have hierarchy level or not;
+    //
+
     if(vm.count("PEgraphFile")) {
         throw std::logic_error("Reading of communication trees not yet implemented here.");
         //commTree =  FileIO<IndexType, ValueType>::readPETree( settings.PEGraphFile );
+
     } else if( vm.count("blockSizesFile") or vm.count("topologyFile") ) {
         std::string blockSizesFile;
         //blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
@@ -491,12 +496,35 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
                 SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input for weight " << i );
             }
         }
+        //for the option to work, graph vertices must have 2 uniform, unit weights.
+        //Here, since the weights are identical, we contract them in one weight.
+        if( settings.w2UpperBound ){
+            SCAI_ASSERT_EQ_ERROR( nodeWeights.size(), 2 , 
+                "Option w2UpperBound is set, vertex weights must have 2 weights but they have "<< nodeWeights.size() );
+            SCAI_ASSERT_EQ_ERROR( nodeWeights[0].l1Norm(), nodeWeights[1].l1Norm() , 
+                "Option w2UpperBound is set, but vertex weights are not identical ");
+            SCAI_ASSERT_EQ_ERROR( nodeWeights[0].l2Norm(), nodeWeights[1].l2Norm() , 
+                "Option w2UpperBound is set, but vertex weights are not identical ");
+            SCAI_ASSERT_EQ_ERROR( nodeWeights[0].max(), nodeWeights[1].max() , 
+                "Option w2UpperBound is set, but vertex weights are not identical ");
 
-        if( settings.hierLevels.size()!=0 ){
-            commTree.createHierHeterogeneous( blockSizes, isWeightProportional, settings.hierLevels  );
+            //if weights look identical, discard one of them
+            MSG0("Option w2UpperBound is set and node weights look identical, will discard the second weight");
+            nodeWeights.resize(1);
+            const IndexType N = nodeWeights[0].size();
+
+            std::vector<std::vector<ValueType>> memBlockSizes(1);
+            SCAI_ASSERT_EQ_ERROR( blockSizes.size(), 2, "Need 2 weights per PE");
+            memBlockSizes[0]= aux<IndexType, ValueType>::blockSizesForMemory( blockSizes, N, N*1.1 );
+            commTree.createFlatHeterogeneous( memBlockSizes, {false} );
         }else{
-            commTree.createFlatHeterogeneous( blockSizes, isWeightProportional );
+            if( settings.hierLevels.size()!=0 ){
+                commTree.createHierHeterogeneous( blockSizes, isWeightProportional, settings.hierLevels );
+            }else{
+                commTree.createFlatHeterogeneous( blockSizes, isWeightProportional );
+            }
         }
+
     }else if( settings.hierLevels.size()!=0 ){
         if( settings.autoSetCpuMem ){
             //the number of process or cores in each compute node

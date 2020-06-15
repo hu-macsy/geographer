@@ -14,7 +14,6 @@
 
 namespace ITI {
 
-
 //initialize static leaf counter
 template <typename IndexType, typename ValueType>
 unsigned int ITI::CommTree<IndexType,ValueType>::commNode::leafCount = 0;
@@ -323,7 +322,7 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
 
 //------------------------------------------------------------------------
 
-//WARNING: Needed that 'typename' to compile...
+
 template <typename IndexType, typename ValueType>
 std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType, ValueType>::createLevelAbove( const std::vector<commNode> &levelBelow ) {
 

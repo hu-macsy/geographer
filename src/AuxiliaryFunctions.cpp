@@ -696,7 +696,89 @@ bool aux<IndexType, ValueType>::alignDistributions(
     }
     return willRedistribute;
 }//alignDistributions
+//------------------------------------------------------------------------
 
+//Force that vertices have equal, unit weights by accepting the input size as a number, not the node weights.
+//In this case, the input load is equal the size of the graph.
+
+template <typename IndexType, typename ValueType>
+std::vector<ValueType> aux<IndexType, ValueType>::blockSizesForMemory( 
+    const std::vector<std::vector<ValueType>> &inBlockSizes,
+    const IndexType inputSize,
+    const IndexType maxMemoryCapacity ) {
+
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const IndexType myRank = comm->getRank();
+
+    // if( commTree.isProportional[1] and maxMemoryCapacity==0){
+    //     throw std::logic_error( "Memory per PE is given as a percentage but the maximum memory of the system is not given");
+    // }
+
+    //first weight is computational speed and its sum is the total computational speed of the system
+    //the total memory capacity is needed if memory is given as a percentage
+    SCAI_ASSERT_EQ_ERROR( inBlockSizes.size(), 2, 
+        "We need 2 weights per PE for computational load and memory. Was a description of the system provided? use option --blockSizesFile or --topologyFile" );
+
+    const IndexType numBlocks = inBlockSizes[0].size();
+    std::vector<IndexType> blockIndices( numBlocks );
+    std::iota( blockIndices.begin(), blockIndices.end(), 0 );
+
+    auto cpuOverMem = [&](IndexType i, IndexType j)->bool{
+        const ValueType iCpuOverMem = inBlockSizes[0][i]/inBlockSizes[1][i];
+        const ValueType jCpuOverMem = inBlockSizes[0][j]/inBlockSizes[1][j];;
+        return iCpuOverMem>jCpuOverMem;
+    };
+
+    std::sort( blockIndices.begin(), blockIndices.end(), cpuOverMem );
+
+    const ValueType totalCompSpeed = std::accumulate( inBlockSizes[0].begin(), inBlockSizes[0].end(), 0.0 );
+    const ValueType totalMemCapacity = std::accumulate( inBlockSizes[1].begin(), inBlockSizes[1].end(), 0.0 );
+    if(myRank==0){
+        std::cout <<"total computational speed of the system is "<< totalCompSpeed << " and memory " << totalMemCapacity << std::endl;
+    }
+    
+    ValueType assignedLoad = 0.0; //for debugging
+    ValueType speedLeft = totalCompSpeed;
+    ValueType loadLeft = inputSize;
+
+    std::vector<ValueType> retBlockSizes(numBlocks);
+
+    for( auto i : blockIndices){
+        const std::vector<ValueType> &thisBlock = { inBlockSizes[0][i], inBlockSizes[1][i]};
+
+        const ValueType thisCompSpeedPerCent = thisBlock[0]/speedLeft;
+        //we add the percentage this block need to take from the excess load so far.
+        const ValueType optWeight = thisCompSpeedPerCent*loadLeft;
+
+        //memory constraint can be given as a percentage or an absolute number
+        ValueType memCapacity=0.0;
+        if( maxMemoryCapacity>0 ) {
+            memCapacity = thisBlock[1]/totalMemCapacity*maxMemoryCapacity;
+        }else{
+            memCapacity = thisBlock[1];
+        }
+
+        ValueType excessLoad = 0;
+        //if the opt weight fits
+        if( optWeight<memCapacity ){
+            retBlockSizes[i] = optWeight; //give the optimum
+        }else{
+            retBlockSizes[i] = memCapacity; //fill it
+            excessLoad = optWeight-memCapacity;
+PRINT0("excess load is " << excessLoad );
+        }
+        speedLeft -= thisBlock[0];
+        loadLeft -= retBlockSizes[i];
+        assignedLoad += retBlockSizes[i];
+
+PRINT0( "block " << i << ", optWeight= " << optWeight << ", memCapacity= " << memCapacity <<", assigned= " << retBlockSizes[i] );
+    }//for blockIndices
+
+    SCAI_ASSERT_EQ_ERROR( (IndexType) assignedLoad, inputSize, "Not all load was distributed, input does not fit to system");
+
+    return retBlockSizes;
+}
+//------------------------------------------------------------------------
 
 template class aux<IndexType, double>;
 //template class aux<long long unsigned int, double>; //required for the parhip wrapper

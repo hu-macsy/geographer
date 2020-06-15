@@ -223,6 +223,15 @@ ITI::Settings ITI::Settings::setDefault( const scai::lama::CSRSparseMatrix<Value
     return retSet;
 }
 
+
+void ITI::MSG0( const std::string message ){
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    if( comm->getRank()==0) {
+       std::cout<< message << std::endl;
+    }
+}
+
+
 //instantiation
 template ITI::Settings ITI::Settings::setDefault<double>( const scai::lama::CSRSparseMatrix<double>& graph );
 template ITI::Settings ITI::Settings::setDefault( const scai::lama::CSRSparseMatrix<float>& graph );

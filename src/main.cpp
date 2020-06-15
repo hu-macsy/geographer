@@ -43,7 +43,6 @@
 
 //----------------------------------------------------------------------------
 
-//void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);
 
 int main(int argc, char** argv) {
 
@@ -90,7 +89,7 @@ int main(int argc, char** argv) {
 
     // total number of points
     const IndexType N = readInput<ValueType>( vm, settings, comm, graph, coordinates, nodeWeights );
-    
+
     if( settings.setAutoSettings ){
         settings = settings.setDefault( graph );
     }
@@ -111,9 +110,6 @@ int main(int argc, char** argv) {
     
     ITI::CommTree<IndexType,ValueType> commTree = createCommTree( vm, settings, comm, nodeWeights);
     commTree.adaptWeights( nodeWeights );
-//SCAI_ASSERT_EQ_ERROR( commTree.getNumHierLevels(), settings.hierLevels.size()+1, "?" );
-    
-
 
     //---------------------------------------------------------------
     //

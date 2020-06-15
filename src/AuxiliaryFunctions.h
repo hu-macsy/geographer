@@ -254,16 +254,6 @@ public:
         return std::pow( distance, 1.0/2.0);
     }
 
-//------------------------------------------------------------------------------
-    /* TODO: implement or remove
-    static std::tuple<IndexType, IndexType, IndexType> index2Point( const IndexType index, const  std::vector<IndexType> numPoints, const dimension){
-
-    	if( dimension==2 )
-    		return index2_2DPoint()
-    	else if( dimension==3 )
-    		return index2_3DPoint()
-    }
-    */
 
     /** Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
      * of the index in 3D. The return value is not the coordinates of the point!
@@ -301,6 +291,21 @@ public:
 
         return std::make_tuple(xIndex, yIndex);
     }
+
+
+    /** In this version, the second weight per PU is treated as an upper bound.
+    The tree nodes (aka PUs) should have 2 weights, the first is treated as the computational
+    power of this node and the second as the memory and memory is treated as an upper bound
+    for the block size.
+
+    @return A vector of size k, as the number of leaf nodes, with the feasible block size
+    for every leaf/PE.
+    */
+
+    static std::vector<ValueType> blockSizesForMemory(
+        const std::vector<std::vector<ValueType>> &inBlockSizes,
+        const IndexType inputSize,
+        const IndexType maxMemoryCapacity=0 );
 
 
 //------------------------------------------------------------------------------
