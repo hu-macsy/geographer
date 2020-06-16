@@ -7,7 +7,9 @@
 #include "config.h"
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl //not happy with these macros
+//#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl //not happy with these macros
+#define MSG0( msg ) std::stringstream ss; ss << msg; print_message( ss.str() );
+#define PRINT0( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 
 namespace ITI {
 
@@ -217,8 +219,6 @@ struct Settings {
     /** @name Tuning parameters balanced K-Means
     */
     //@{
-//TODO?: in the heterogenous and hierarchical case, minSamplingNodes
-//makes more sense to be a percentage of the nodes, not a number. Or not?
     IndexType minSamplingNodes = 100;		///< the starting number of sampled nodes. If set to -1, all nodes are considered from the start
 
     double influenceExponent = 0.5;
@@ -229,13 +229,11 @@ struct Settings {
     bool freezeBalancedInfluence = false;
     bool erodeInfluence = false;
     bool keepMostBalanced = false;
-//bool KMBalanceUseRebalance = false;
     std::string KMBalanceMethod = "reb_lex";
     //IndexType batchSize = 100;              ///< after how many moves we calculate the global sum in KMeans::rebalance()
     double batchPercent = 0.01;          ///< calculate the batch size as a percentage of the number of local points
     bool focusOnBalance = false;            ///< used in hierarchical versions to rebalance at every step
     std::vector<IndexType> hierLevels; 		///< for hierarchial kMeans, the number of blocks per level
-//std::string kMeansMshipSort = "lex";    ///< used in KMeans::rebalance() to sort vertices. Possible values are "lex" and "sqImba"
     //@}
 
     /** @name Parameters for multisection
@@ -382,7 +380,9 @@ struct Settings {
 }; //struct Settings
 
 
-void MSG0( const std::string message );
+void print_message( const std::string message );
+
+//void MSG0( const std::stringstream stream );
 
 
 struct int_pair {

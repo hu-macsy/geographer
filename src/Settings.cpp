@@ -138,7 +138,8 @@ std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool) {
         tool = ITI::Tool::zoltanXPulp;
     else if( token=="zoltanSFC" or tokenLower=="zoltansfc")
         tool = ITI::Tool::zoltanSFC;
-    else if( token=="parhipFastMesh" or tokenLower=="parhipfastmesh" )
+    else if( token=="parhipFastMesh" or tokenLower=="parhipfastmesh" 
+            or token=="parHip" or tokenLower=="parhip" )
         tool = ITI::Tool::parhipFastMesh;
     else if( token=="parhipUltraFastMesh" or tokenLower=="parhipultrafastmesh")
         tool = ITI::Tool::parhipUltraFastMesh;
@@ -224,7 +225,7 @@ ITI::Settings ITI::Settings::setDefault( const scai::lama::CSRSparseMatrix<Value
 }
 
 
-void ITI::MSG0( const std::string message ){
+void ITI::print_message( const std::string message ){
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     if( comm->getRank()==0) {
        std::cout<< message << std::endl;

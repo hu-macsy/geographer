@@ -765,19 +765,20 @@ std::vector<ValueType> aux<IndexType, ValueType>::blockSizesForMemory(
         }else{
             retBlockSizes[i] = memCapacity; //fill it
             excessLoad = optWeight-memCapacity;
-PRINT0("excess load is " << excessLoad );
+            MSG0("in " << __FUNCTION__ << ", block " << i << ", optWeight= " << optWeight << ", memCapacity= " << memCapacity << 
+                ", assigned= " << retBlockSizes[i] << ", excess load is " << excessLoad );
         }
         speedLeft -= thisBlock[0];
         loadLeft -= retBlockSizes[i];
         assignedLoad += retBlockSizes[i];
 
-PRINT0( "block " << i << ", optWeight= " << optWeight << ", memCapacity= " << memCapacity <<", assigned= " << retBlockSizes[i] );
     }//for blockIndices
 
-    SCAI_ASSERT_EQ_ERROR( (IndexType) assignedLoad, inputSize, "Not all load was distributed, input does not fit to system");
+    //all input is assigned; take care of floating errors
+    SCAI_ASSERT_LT_ERROR( std::abs(assignedLoad-inputSize), 5, "Not all load was distributed, input does not fit to system");
 
     return retBlockSizes;
-}
+}//blockSizesForMemory
 //------------------------------------------------------------------------
 
 template class aux<IndexType, double>;
