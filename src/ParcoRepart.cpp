@@ -377,10 +377,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
     Settings settings,
     Metrics<ValueType>& metrics){
     
-	SCAI_REGION( "ParcoRepart.initialPartition" )
+    SCAI_REGION( "ParcoRepart.initialPartition" )
 
-	const IndexType k = settings.numBlocks;
-	std::chrono::time_point<std::chrono::steady_clock> beforeInitPart =  std::chrono::steady_clock::now();
+    const IndexType k = settings.numBlocks;
+    std::chrono::time_point<std::chrono::steady_clock> beforeInitPart =  std::chrono::steady_clock::now();
 
     //to be returned
     DenseVector<IndexType> result;
@@ -615,7 +615,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
             }
         }
 
-    	scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
+        scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
 
         if( settings.setAutoSettings ){
             IndexType localCutNodes = halo.getLocalIndexes().size(); 
@@ -630,7 +630,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
             }
         }
 
-    	ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights[0], coordinates, halo, settings, metrics);
+        ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights[0], coordinates, halo, commTree, settings, metrics);
 
     }else if( settings.localRefAlgo==Tool::geomRebalance ){
         SCAI_REGION("ParcoRepart.doLocalRefinement.geomRebalance")

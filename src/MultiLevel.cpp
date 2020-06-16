@@ -13,7 +13,15 @@ using scai::hmemo::HArray;
 namespace ITI {
 
 template<typename IndexType, typename ValueType>
-DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSRSparseMatrix<ValueType> &input, DenseVector<IndexType> &part, DenseVector<ValueType> &nodeWeights, std::vector<DenseVector<ValueType>> &coordinates, const HaloExchangePlan& halo, Settings settings, Metrics<ValueType>& metrics) {
+DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(
+    CSRSparseMatrix<ValueType> &input,
+    DenseVector<IndexType> &part,
+    DenseVector<ValueType> &nodeWeights,
+    std::vector<DenseVector<ValueType>> &coordinates,
+    const HaloExchangePlan& halo,
+    const CommTree<IndexType,ValueType> &commTree,
+    Settings settings,
+    Metrics<ValueType>& metrics) {
 
     SCAI_REGION( "MultiLevel.multiLevelStep" );
     scai::dmemo::CommunicatorPtr comm = input.getRowDistributionPtr()->getCommunicatorPtr();
@@ -90,7 +98,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
         settingscopy.multiLevelRounds -= settings.coarseningStepsBetweenRefinement;
         SCAI_REGION_END( "MultiLevel.multiLevelStep.prepareRecursiveCall" )
         // recursive call
-        DenseVector<IndexType> coarseOrigin = multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, coarseHalo, settingscopy, metrics);
+        DenseVector<IndexType> coarseOrigin = multiLevelStep(coarseGraph, coarsePart, coarseWeights, coarseCoords, coarseHalo, commTree, settingscopy, metrics);
         SCAI_ASSERT_DEBUG(coarseOrigin.getDistribution().isEqual(coarseGraph.getRowDistribution()), "Distributions inconsistent.");
         //SCAI_ASSERT_DEBUG(scai::dmemo::Redistributor(coarseOrigin.getLocalValues(), coarseOrigin.getDistributionPtr()).getTargetDistributionPtr()->isEqual(*oldCoarseDist), "coarseOrigin invalid");
 
@@ -166,7 +174,7 @@ DenseVector<IndexType> ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(CSR
             }
             */
 
-            std::vector<ValueType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(input, part, nodesWithNonLocalNeighbors, nodeWeights, coordinates, distances, origin, communicationScheme, settings);
+            std::vector<ValueType> gainPerRound = LocalRefinement<IndexType, ValueType>::distributedFMStep(input, part, nodesWithNonLocalNeighbors, nodeWeights, coordinates, distances, origin, commTree, communicationScheme, settings);
             gain = 0;
             for (ValueType roundGain : gainPerRound) gain += roundGain;
 

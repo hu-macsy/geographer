@@ -511,11 +511,12 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
             //if weights look identical, discard one of them
             MSG0("Option w2UpperBound is set and node weights look identical, will discard the second weight");
             nodeWeights.resize(1);
+            settings.numNodeWeights = 1;
             const IndexType N = nodeWeights[0].size();
 
             std::vector<std::vector<ValueType>> memBlockSizes(1);
             SCAI_ASSERT_EQ_ERROR( blockSizes.size(), 2, "Need 2 weights per PE");
-memBlockSizes[0]= aux<IndexType, ValueType>::blockSizesForMemory( blockSizes, N, N*1.1 );
+            memBlockSizes[0]= aux<IndexType, ValueType>::blockSizesForMemory( blockSizes, N, N*1.1 );
             if( settings.hierLevels.size()!=0 ){
                 commTree.createHierHeterogeneous( memBlockSizes, {false}, settings.hierLevels );
             }else{

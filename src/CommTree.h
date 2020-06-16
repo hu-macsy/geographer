@@ -194,7 +194,7 @@ public:
 
     /** @brief Default constructor.
     */
-//TODO: remove?
+
     CommTree();
 
     /**	@brief Constructor to create tree from a vector of leaves.
