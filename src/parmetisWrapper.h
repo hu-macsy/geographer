@@ -21,7 +21,8 @@ public:
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-        const scai::lama::DenseVector<IndexType> partition,
+        const scai::lama::DenseVector<IndexType> &partition,
+        const ITI::CommTree<IndexType,ValueType> &commTree,
         struct Settings &settings,
         Metrics<ValueType> &metrics
     );

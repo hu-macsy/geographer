@@ -535,7 +535,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
     CSRSparseMatrix<ValueType> &input,
     std::vector<DenseVector<ValueType>> &coordinates,
     std::vector<DenseVector<ValueType>> &nodeWeights,
-    CommTree<IndexType,ValueType> commTree,
+    CommTree<IndexType,ValueType> &commTree,
 	scai::dmemo::CommunicatorPtr comm,
     Settings settings,
 	Metrics<ValueType>& metrics){
@@ -556,7 +556,7 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
             [[maybe_unused]] bool didRedistribution = aux<IndexType,ValueType>::alignDistributions( input, coordinates, nodeWeights, result, settings );
 
             parmetisWrapper<IndexType,ValueType> parMetis;
-            result =  parMetis.refine( input, coordinates, nodeWeights, result, settings, metrics );
+            result =  parMetis.refine( input, coordinates, nodeWeights, result, commTree, settings, metrics );
             
         }else{
             //TODO: with constexpr this is not even compiled; does it make sense to have it here or should it be removed?
@@ -576,8 +576,11 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
             for(int w=0; w<nodeWeights.size(); w++ ){
                 copyWeights[w].assign( nodeWeights[w] );
             }
+            CommTree<IndexType,real_t> copyCommTree;
+            copyCommTree.copyFrom( commTree );
+
             parmetisWrapper<IndexType,real_t> parMetis;
-            result =  parMetis.refine( copyGraph, copyCoords, copyWeights, result, settings, copyMetrics );
+            result =  parMetis.refine( copyGraph, copyCoords, copyWeights, result, copyCommTree, settings, copyMetrics );
             
         }
         if( not std::is_same<ValueType,real_t>() ){

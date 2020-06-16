@@ -610,7 +610,9 @@ bool CommTree<IndexType, ValueType>::checkTree( bool allTests ) const {
     return true;
 }
 
+
 //to force instantiation
 template class CommTree<IndexType, double>;
 template class CommTree<IndexType, float>;
+
 }//ITI

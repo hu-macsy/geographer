@@ -11,7 +11,8 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::refine
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coords,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-        const scai::lama::DenseVector<IndexType> partition,
+        const scai::lama::DenseVector<IndexType> &partition,
+        const ITI::CommTree<IndexType,ValueType> &commTree,
         struct Settings &settings,
         Metrics<ValueType> &metrics
     ){
@@ -57,7 +58,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::refine
     std::vector<IndexType> options;
 
     aux<IndexType,ValueType>::toMetisInterface(
-        graph, coords, nodeWeights, settings, vtxDist, xadj, adjncy,
+        graph, coords, nodeWeights, commTree, settings, vtxDist, xadj, adjncy,
         vVwgt, tpwgts, wgtFlag, numWeights, ubvec, xyzLocal, options );
 
     SCAI_ASSERT_EQ_ERROR( tpwgts.size(), numWeights*settings.numBlocks, "Wrong tpwgts size" );

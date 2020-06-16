@@ -67,7 +67,7 @@ public:
         @param[in] isLeaf If this node is a leaf or not
         */
         commNode( std::vector<unsigned int> hier, std::vector<ValueType> allWeights, bool isLeaf=true)
-            :	hierarchy(hier),
+            : hierarchy(hier),
               numChildren(0),
               weights(allWeights),
               isLeaf(isLeaf)
@@ -86,7 +86,7 @@ public:
         /** Default constructor for non-leaf nodes.
         */
         commNode()
-            :	hierarchy( std::vector<unsigned int>(1,1)), //TODO: is this right?
+            : hierarchy( std::vector<unsigned int>(1,1)), //TODO: is this right?
               numChildren(0), //TODO: check
               numCores(0),
               isLeaf(false)
@@ -265,6 +265,10 @@ public:
     */
     IndexType getNumHierLevels() const {
         return hierarchyLevels;
+    }
+
+    std::vector<bool> getIfWeightsAreProportional() const {
+        return isProportional;
     }
 
     bool areWeightsAdapted() const{
@@ -447,7 +451,19 @@ public:
     */
     bool checkTree( bool allTests=false ) const;
 
-
+    /** Copy from other tree and convert the ValueType
+    */
+    template<typename ValueType2>
+    void copyFrom( const CommTree<IndexType,ValueType2> &otherTree ){
+        this->hierarchyLevels = otherTree.getNumHierLevels();
+        this->numNodes = otherTree.getNumNodes();
+        this->numLeaves = otherTree.getNumLeaves();
+        this->numWeights = otherTree.getNumWeights();
+        this->areWeightsAdaptedV = otherTree.areWeightsAdapted();
+        this->isProportional = otherTree.getIfWeightsAreProportional();
+        typedef typename ITI::CommTree<IndexType,ValueType2>::commNode commNode2;
+        std::vector<commNode2> leaves = otherTree.getLeaves();
+    }
 
 private:
 

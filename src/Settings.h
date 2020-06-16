@@ -7,9 +7,8 @@
 #include "config.h"
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-//#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl //not happy with these macros
-#define MSG0( msg ) std::stringstream ss; ss << msg; print_message( ss.str() );
-#define PRINT0( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
+#define MSG0( msg ) {std::stringstream ss; ss << msg; print_message( ss.str() );}
+#define PRINT0( msg ) {std::stringstream ss; ss<< __FILE__<< ", "<< __LINE__ << ": "<< msg; print_message( ss.str() );}
 
 namespace ITI {
 
