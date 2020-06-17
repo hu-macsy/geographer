@@ -395,11 +395,8 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
     const IndexType weightsSize = nodeWeights.getDistributionPtr()->getGlobalSize();
 
     const bool weighted = (weightsSize != 0);
-    //if an optBlockSizes vector is give, then we do not have homogeneous blocks weights
-    const bool homogeneous = (optBlockSizes.size()==0);
 
     scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
-
     SCAI_ASSERT_EQ_ERROR(weighted, comm->any(weighted), "inconsistent input!");
 
     ValueType minWeight, maxWeight;
@@ -412,57 +409,20 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
         minWeight = 1;
         maxWeight = 1;
     }
-
     if (maxWeight <= 0) {
         throw std::runtime_error("Node weight vector given, but all weights non-positive.");
     }
-
     if (minWeight < 0) {
         throw std::runtime_error("Negative node weights not supported.");
     }
 
-    //TODO: is this needed here? remove or wrap around settings.debugMode?
-    const IndexType minK = part.min();
-    const IndexType maxK = part.max();
+    std::vector<ValueType> globalSubsetSizes = getBlocksWeights( part, k, nodeWeights);
+    assert( globalSubsetSizes.size()==k );
 
-    if (minK < 0) {
-        throw std::runtime_error("Block id " + std::to_string(minK) + " found in partition with supposedly " + std::to_string(k) + " blocks.");
-    }
+    const ValueType maxBlockSize = *std::max_element(globalSubsetSizes.begin(), globalSubsetSizes.end());
 
-    if (maxK >= k) {
-        throw std::runtime_error("Block id " + std::to_string(maxK) + " found in partition with supposedly " + std::to_string(k) + " blocks.");
-    }
-
-    std::vector<ValueType> subsetSizes(k, 0.0);
-    scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
-    scai::hmemo::ReadAccess<ValueType> localWeight(nodeWeights.getLocalValues());
-    assert(localPart.size() == localN);
-
-    //calculate weight of each block and global weight sum
-    ValueType weightSum = 0.0;
-    for (IndexType i = 0; i < localN; i++) {
-        IndexType partID = localPart[i];
-        ValueType weight = weighted ? localWeight[i] : 1;
-        subsetSizes[partID] += weight;
-        weightSum += weight;
-    }
-
-    std::vector<ValueType> globalSubsetSizes(k);
-    const bool isReplicated = part.getDistribution().isReplicated();
-    SCAI_ASSERT_EQ_ERROR(isReplicated, comm->any(isReplicated), "inconsistent distribution!");
-
-    if (isReplicated) {
-        SCAI_ASSERT_EQUAL_ERROR(localN, globalN);
-    }
-
-    if (!isReplicated) {
-        //sum block sizes over all processes
-        comm->sumImpl( globalSubsetSizes.data(), subsetSizes.data(), k, scai::common::TypeTraits<ValueType>::stype);
-    } else {
-        globalSubsetSizes = subsetSizes;
-    }
-
-    ValueType maxBlockSize = *std::max_element(globalSubsetSizes.begin(), globalSubsetSizes.end());
+    //if an optBlockSizes vector is give, then we do not have homogeneous blocks weights
+    const bool homogeneous = (optBlockSizes.size()==0);
 
     //to be returned
     ValueType imbalance;
@@ -470,7 +430,8 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
     if (weighted) {
         if( homogeneous) {
             //get global weight sum
-            weightSum = comm->sum(weightSum);
+            //weightSum = comm->sum(weightSum);
+            const ValueType weightSum = std::accumulate( globalSubsetSizes.begin(), globalSubsetSizes.end(), 0.0 );
             ValueType optSize = weightSum / k + (maxWeight - minWeight);
             assert(maxBlockSize >= optSize);
 
@@ -496,6 +457,69 @@ ValueType GraphUtils<IndexType,ValueType>::computeImbalance(
     return imbalance;
 }
 
+//---------------------------------------------------------------------------------------
+
+template<typename IndexType, typename ValueType>
+std::vector<ValueType>  GraphUtils<IndexType,ValueType>::getBlocksWeights(
+    const scai::lama::DenseVector<IndexType> &part,
+    const IndexType numBlocks,
+    const scai::lama::DenseVector<ValueType> &nodeWeights
+){
+    
+    const IndexType globalN = part.getDistributionPtr()->getGlobalSize();
+    const IndexType localN = part.getDistributionPtr()->getLocalSize();
+    const IndexType weightsSize = nodeWeights.getDistributionPtr()->getGlobalSize();
+
+    const bool weighted = (weightsSize != 0);
+
+    scai::dmemo::CommunicatorPtr comm = part.getDistributionPtr()->getCommunicatorPtr();
+    SCAI_ASSERT_EQ_ERROR(weighted, comm->any(weighted), "inconsistent input!");
+
+    //TODO: is this needed here? remove or wrap around settings.debugMode?
+
+    const IndexType minK = part.min();
+    const IndexType maxK = part.max();
+    if (minK < 0) {
+        throw std::runtime_error("Block id " + std::to_string(minK) + " found in partition with supposedly " + std::to_string(numBlocks) + " blocks.");
+    }
+    if (maxK >= numBlocks) {
+        throw std::runtime_error("Block id " + std::to_string(maxK) + " found in partition with supposedly " + std::to_string(numBlocks) + " blocks.");
+    }
+
+    std::vector<ValueType> subsetSizes(numBlocks, 0.0);
+    scai::hmemo::ReadAccess<IndexType> localPart(part.getLocalValues());
+    scai::hmemo::ReadAccess<ValueType> localWeight(nodeWeights.getLocalValues());
+    assert(localPart.size() == localN);
+
+    //calculate weight of each block and global weight sum
+    ValueType weightSum = 0.0;
+    for (IndexType i = 0; i < localN; i++) {
+        IndexType partID = localPart[i];
+        ValueType weight = weighted ? localWeight[i] : 1;
+        subsetSizes[partID] += weight;
+        weightSum += weight;
+    }
+
+    std::vector<ValueType> globalSubsetSizes(numBlocks);
+    const bool isReplicated = part.getDistribution().isReplicated();
+    SCAI_ASSERT_EQ_ERROR(isReplicated, comm->any(isReplicated), "inconsistent distribution!");
+
+    if (isReplicated) {
+        SCAI_ASSERT_EQUAL_ERROR(localN, globalN);
+    }
+
+    if (!isReplicated) {
+        //sum block sizes over all processes
+        comm->sumImpl( globalSubsetSizes.data(), subsetSizes.data(), numBlocks, scai::common::TypeTraits<ValueType>::stype);
+    } else {
+        globalSubsetSizes = subsetSizes;
+    }
+
+ValueType globWsum = std::accumulate( globalSubsetSizes.begin(), globalSubsetSizes.end(), 0.0 );
+SCAI_ASSERT_EQ_ERROR( globWsum, comm->sum(weightSum), " global sum mismatch" );
+
+    return globalSubsetSizes;
+}
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>

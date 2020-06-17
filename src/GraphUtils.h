@@ -115,6 +115,12 @@ public:
         const scai::lama::DenseVector<ValueType> &nodeWeights = scai::lama::DenseVector<ValueType>(0,0),
         const std::vector<ValueType> &blockSizes = std::vector<ValueType>(0,0));
 
+
+    static std::vector<ValueType> getBlocksWeights(
+        const scai::lama::DenseVector<IndexType> &part,
+        const IndexType numBlocks,
+        const scai::lama::DenseVector<ValueType> &nodeWeights = scai::lama::DenseVector<ValueType>(0,0)
+        );
     /**
      * @brief Builds a halo containing all non-local neighbors.
      *
