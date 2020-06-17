@@ -1892,7 +1892,7 @@ DenseVector<IndexType> KMeans<IndexType,ValueType>::computeHierarchicalPartition
             imbalances[i] = ITI::GraphUtils<IndexType, ValueType>::computeImbalance(partition, totalNumNewBlocks, nodeWeights[i], targetBlockWeights[i]);
         }
 
-        PRINT0("\nFinished hierarchy level " << h <<", partitioned into " << totalNumNewBlocks << " blocks and imbalance is:");
+        MSG0("\nFinished hierarchy level " << h <<", partitioned into " << totalNumNewBlocks << " blocks and imbalance is:");
         if (comm->getRank()==0) {
             for (IndexType i = 0; i < imbalances.size(); i++) {
                 std::cout<< " " << imbalances[i] <<std::endl;

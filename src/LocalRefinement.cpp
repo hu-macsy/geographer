@@ -709,7 +709,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 
             if (gainOverBalance) {
                 firstComparisonPair = {-firstQueue.inspectMin().first.first, blockSizes.first};
-                firstComparisonPair = {-secondQueue.inspectMin().first.first, blockSizes.second};
+                secondComparisonPair = {-secondQueue.inspectMin().first.first, blockSizes.second};
             } else {
                 firstComparisonPair = {blockSizes.first, -firstQueue.inspectMin().first.first};
                 secondComparisonPair = {blockSizes.second, -secondQueue.inspectMin().first.first};
