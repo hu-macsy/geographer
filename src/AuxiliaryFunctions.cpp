@@ -35,7 +35,6 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
 
     if( renumberPEs and partition.max()==numPEs-1) {
         scai::hmemo::ReadAccess<IndexType> rPart( partition.getLocalValues() );
-//SCAI_ASSERT_LT_ERROR( partition.max(), numPEs, "numPEs and numBlocks should agree" );
         std::vector<IndexType> blockSizes( numPEs, 0 );
         for (IndexType i = 0; i < localN; i++) {
             blockSizes[ rPart[i] ] += (IndexType) 1;
@@ -113,7 +112,9 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
             }
             SCAI_ASSERT_LE_ERROR( preference, numBlocksOwned, "index out of bounds" );
 
-            //PRINT( thisPE <<": claims ID " << allClaimedIDs[thisPE] << " with size " << allClaimedSizes[thisPE] );
+            if( settings.debugMode ) {
+                PRINT( thisPE <<": claims ID " << allClaimedIDs[thisPE] << " with size " << allClaimedSizes[thisPE] );
+            }
 
             //global sum to gather all claimed IDs for all PEs
             comm->sumImpl( allClaimedIDs.data(), allClaimedIDs.data(), numPEs, scai::common::TypeTraits<IndexType>::stype );
@@ -172,7 +173,9 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
         //reverse the renumbering from PEs to blocks: if PE 3 claimed ID 5, then renumber block 5 to 3
         for( IndexType i=0; i<numPEs; i++) {
             blockRenumbering[ finalMapping[i] ] = i;
-            //PRINT0("block " << finalMapping[i] << " is mapped to " << i );
+            if( settings.debugMode ) {
+                MSG0("block " << finalMapping[i] << " is mapped to " << i );
+            }
             if( finalMapping[i]!=i )
                 nothingChanged = false;
         }
@@ -685,11 +688,7 @@ bool aux<IndexType, ValueType>::alignDistributions(
     }
 
     if( willRedistribute ){
-        //TODO: is this redistribution needed?
-        //redistribute
-        //scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, false, true);        
 
-        //TODO?: can also redistribute everything based on a block or genBlock distribution
         const scai::dmemo::DistributionPtr newGenBlockDist = GraphUtils<IndexType, ValueType>::genBlockRedist(graph);
         
         aux<IndexType,ValueType>::redistributeInput( newGenBlockDist, partition, graph, coords, nodeWeights);

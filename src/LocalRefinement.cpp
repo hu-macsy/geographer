@@ -116,6 +116,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
         PRINT0("number of rounds/loops: " << communicationScheme.size() );
     }
 
+
     //main loop, one iteration for each color of the graph coloring
     for (IndexType color = 0; color < communicationScheme.size(); color++) {
         SCAI_REGION( "LocalRefinement.distributedFMStep.loop" )
@@ -350,10 +351,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
             of PEs involved is low so it makes sense to precompute the distances.
             Maybe distances can be computed here and given as an input
             */
-PRINT0( "my size " << blockSizes.first << ", max= " << maxBlockSizes.first << " ## partner "<< partner << ", size " << blockSizes.first << ", max "<< maxBlockSizes.second );
-if( localBlockID==4 ){
-PRINT( "4: my size " << blockSizes.first << ", max= " << maxBlockSizes.first << " ## partner "<< partner << ", size " << blockSizes.first << ", max "<< maxBlockSizes.second );
-}
+
             ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, borderRegionIDs, borderNodeWeights, assignedToSecondBlock, maxBlockSizes, blockSizes, tieBreakingKeys, settings);
 
             {

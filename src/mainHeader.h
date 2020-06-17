@@ -516,7 +516,7 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
 
             std::vector<std::vector<ValueType>> memBlockSizes(1);
             SCAI_ASSERT_EQ_ERROR( blockSizes.size(), 2, "Need 2 weights per PE");
-            memBlockSizes[0]= aux<IndexType, ValueType>::blockSizesForMemory( blockSizes, N, N*1.1 );
+memBlockSizes[0]= aux<IndexType, ValueType>::blockSizesForMemory( blockSizes, N, N*1.1 );
             if( settings.hierLevels.size()!=0 ){
                 commTree.createHierHeterogeneous( memBlockSizes, {false}, settings.hierLevels );
             }else{

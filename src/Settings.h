@@ -181,7 +181,7 @@ struct Settings {
     std::string callingCommand;         ///< the complete calling command used
     bool autoSetCpuMem = false;         ///< if set, geographer will gather cpu and memory info and use them for partitioning
     IndexType processPerNode = 24;      ///< the number of processes per compute node. Is used with autoSetCpuMem to determine the cpu ID
-    bool w2UpperBound = false;          ///< when given a file with the block sizes or the topology, treat the second weight as an upper bound (usually, this is used so the second weight corresponds to the memory capacity of the PEs)
+    bool w2UpperBound = false;          ///< when given a file with the block sizes or the topology, treat the second weight as an upper bound(usually, this is used so the second weight corresponds to the memory capacity of the PEs)
     //@}
 
     /** @name Mesh generation settings

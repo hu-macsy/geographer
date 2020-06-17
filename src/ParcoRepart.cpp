@@ -594,12 +594,20 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
         if (nodeWeights.size() > 1) {
             throw std::logic_error("Local refinement not yet implemented for multiple weights.");
         }
+
         /*
          * redistribute to prepare for geographer's local refinement
          */
         bool useRedistributor = true;
-        aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, useRedistributor);
-        
+        bool renumberPEs = true;
+
+        //if we have heterogeneous system, renumbering should not happen as it may swap blocks with different max allowed sizes
+        if( not commTree.isHomogeneous() ){
+            renumberPEs = false;
+        }
+
+        aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, useRedistributor, renumberPEs);
+
         std::chrono::duration<double> redistTime =  std::chrono::steady_clock::now() - start;
         //now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
         metrics.MM["timeSecondDistribution"] = redistTime.count();
