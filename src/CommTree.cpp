@@ -564,6 +564,25 @@ void CommTree<IndexType, ValueType>::print() const {
     }
 
 }//print()
+
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+bool CommTree<IndexType, ValueType>::isHomogeneous( ) const {
+
+    const std::vector<cNode<IndexType,ValueType>>& leaves = this->getLeaves();
+    const cNode<IndexType,ValueType> baseLeaf = leaves[0];
+
+    //bool isHomogeneous = true;
+
+    for( cNode<IndexType,ValueType> leaf : leaves ){
+        if( not (leaf==baseLeaf) ){
+            return false;
+        }
+    }
+    return true;
+}//checkIfHomogeneous
+
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>

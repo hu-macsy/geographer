@@ -275,6 +275,10 @@ public:
         return areWeightsAdaptedV;
     }
 
+    /** Check if the system if homogeneous or heterogeneous. That is, if all weights in all leaves
+    are (nearly) identical, then the system is homogeneous.
+    */
+    bool isHomogeneous() const;
 
     /** Creates a homogeneous tree with levels.size() number of levels
     and each node in level i has levels[i] children. \sa CommTree()
@@ -491,7 +495,6 @@ private:
     bool areWeightsAdaptedV = false;		///< if relative weights are adapted, \sa adaptWeights
 /// if isProportional[i] is true, then weight i is proportional and if false, weight i is absolute; isProportional.size()=numWeights
     std::vector<bool> isProportional;
-
 
 //------------------------------------------------------------------------
 
