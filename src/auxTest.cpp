@@ -142,7 +142,9 @@ TYPED_TEST (auxTest, testInitialPartitions) {
     uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
     scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
     Metrics<ValueType> metrics(settings);
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, halo, settings, metrics);
+    typename ITI::CommTree<IndexType,ValueType>::CommTree commTree;
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(
+        graph, pixeledPartition, uniformWeights, coordinates, halo, commTree, settings, metrics);
     if(dimensions==2) {
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"finalWithPixel");
     }
@@ -193,7 +195,7 @@ TYPED_TEST (auxTest, testInitialPartitions) {
     uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
     halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
 
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, halo, settings, metrics);
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, halo, commTree, settings, metrics);
     if(dimensions==2) {
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"finalWithHilbert");
     }
