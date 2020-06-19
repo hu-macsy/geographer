@@ -182,6 +182,7 @@ struct Settings {
     bool autoSetCpuMem = false;         ///< if set, geographer will gather cpu and memory info and use them for partitioning
     IndexType processPerNode = 24;      ///< the number of processes per compute node. Is used with autoSetCpuMem to determine the cpu ID
     bool w2UpperBound = false;          ///< when given a file with the block sizes or the topology, treat the second weight as an upper bound(usually, this is used so the second weight corresponds to the memory capacity of the PEs)
+    bool useMemFromFile = false;        ///< when a topology or block sizes file is given, if true, use the actual values in the file for memory. otherwise set the max memory to 1.2*number of graph rows.
     //@}
 
     /** @name Mesh generation settings

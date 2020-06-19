@@ -433,7 +433,8 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
     const cxxopts::ParseResult& vm,
     Settings& settings,
     const scai::dmemo::CommunicatorPtr& comm,
-    std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights){
+    std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights,
+    const IndexType numEdges=0){
 
     ITI::CommTree<IndexType,ValueType> commTree;
 
@@ -516,7 +517,24 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
 
             std::vector<std::vector<ValueType>> memBlockSizes(1);
             SCAI_ASSERT_EQ_ERROR( blockSizes.size(), 2, "Need 2 weights per PE");
-memBlockSizes[0]= aux<IndexType, ValueType>::blockSizesForMemory( blockSizes, N, N*1.1 );
+
+            if( not settings.useMemFromFile ){
+                memBlockSizes[0]= aux<IndexType, ValueType>::blockSizesForMemory( blockSizes, N, N*1.2 );
+            }else{
+                //use the actual values of memory from the file; they must be turned from GB to number of points
+                const int unitSize = std::max( sizeof(ValueType), sizeof(IndexType) );
+                //const IndexType inputSize = numEdges/unitSize + 2*N/unitSize; //to avoid overflow
+                ValueType totalMem = 0;
+
+                //convert GB to "number of vertices"
+                SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Block sizes not given for all PEs");
+                for( IndexType p=0; p<settings.numBlocks; p++){
+                    blockSizes[1][p] = blockSizes[1][p]*1e9/unitSize;
+                    totalMem += blockSizes[1][p];
+                }
+                memBlockSizes[0]= aux<IndexType, ValueType>::blockSizesForMemory( blockSizes, N, totalMem );
+            }
+
             if( settings.hierLevels.size()!=0 ){
                 commTree.createHierHeterogeneous( memBlockSizes, {false}, settings.hierLevels );
             }else{

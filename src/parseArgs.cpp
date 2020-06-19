@@ -35,6 +35,7 @@ Options populateOptions() {
     ("autoSetCpuMem", "if set, geographer will gather cpu and memory info and use them to build a heterogeneous communication tree used for partitioning")
     ("w2UpperBound", "if true, when given a file with the block sizes or the topology, treat the second weight as an upper bound (usually, this is used so the second weight corresponds to the memory capacity of the PEs)")
     ("processPerNode", "the number of processes per compute node. Is used with autoSetCpuMem to determine the internal cpu/core ID within a compute node and query the cpu frequency.",  value<IndexType>())
+    ("useMemFromFile", "when a topology or block sizes file is given, if true, use the actual values in the file for memory. otherwise set the max memory to 1.2*number of graph rows.")
     ("mappingRenumbering", "map blocks to PEs using the SFC index of the block's center. This works better when PUs are numbered consecutively." )
     //repartitioning
     ("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
@@ -209,6 +210,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.mappingRenumbering = vm.count("mappingRenumbering");
     settings.autoSetCpuMem = vm.count("autoSetCpuMem");
     settings.w2UpperBound = vm.count("w2UpperBound");
+    settings.useMemFromFile = vm.count("useMemFromFile");
 
     //28/11/19, deprecate storeInfo parameter. Leaving it as an option for backwards compatibility.    
     //if outFile was provided but storeInfo was not given as an argument
