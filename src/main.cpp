@@ -286,10 +286,8 @@ int main(int argc, char** argv) {
 
     if (repeatTimes > 1) {
         if (comm->getRank() == 0) {
-			std::cout<< "\n Average metrics for all runs:" << std::endl;
-            std::cout<<  "\033[1;36m";
+            std::cout<< "\n Average metrics for all runs:" << std::endl;
             aggrMetrics.print( std::cout );
-            std::cout << " \033[0m";
         }
     }
 
