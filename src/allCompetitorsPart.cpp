@@ -222,11 +222,8 @@ int main(int argc, char** argv) {
 
         if( thisPE==0 ) {
             printInfo( std::cout, comm, settings);
-            std::cout << "\nFinished tool" << std::endl;
-            std::cout << "\033[1;36m";
-            std::cout << "\n---> " << ITI::to_string(thisTool);
-            std::cout<<  "\033[0m" << std::endl;
-
+            std::cout << "\nFinished tool: " << ITI::to_string(thisTool) << std::endl;
+            
             aggrMetrics.print( std::cout );
 
             // write in a file
@@ -243,6 +240,7 @@ int main(int argc, char** argv) {
                     std::cout<< "\n\tWARNING: Could not open file " << outFile << " informations not stored.\n"<< std::endl;
                 }
             }
+            std::cout<< "###" << std::endl;
         }
 
         if( outFile!="-" and settings.storePartition ) {
