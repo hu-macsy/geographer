@@ -302,7 +302,8 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
             const ValueType scalingFactor = sumNodeWeights / sumHierWeights;
 
             if( not isProportional[i] ) {
-                SCAI_ASSERT_GE_ERROR( sumHierWeights, sumNodeWeights, "Provided node weights do not fit in the given tree for weight " << i );
+                //+1 for rounding errors
+                SCAI_ASSERT_GE_ERROR( sumHierWeights+1, sumNodeWeights, "Provided node weights do not fit in the given tree for weight " << i );
             } else {
                 //go over the nodes and adapt the weights
                 for( commNode& node : hierLevel ) {

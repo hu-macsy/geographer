@@ -741,6 +741,7 @@ std::vector<ValueType> aux<IndexType, ValueType>::blockSizesForMemory(
     ValueType loadLeft = inputSize;
 
     std::vector<ValueType> retBlockSizes(numBlocks);
+    bool filledFastPEs = false; //the fast PEs are filled first
 
     for( auto i : blockIndices){
         const std::vector<ValueType> &thisBlock = { inBlockSizes[0][i], inBlockSizes[1][i]};
@@ -761,7 +762,13 @@ std::vector<ValueType> aux<IndexType, ValueType>::blockSizesForMemory(
         //if the opt weight fits
         if( optWeight<memCapacity ){
             retBlockSizes[i] = optWeight; //give the optimum
+            if(not filledFastPEs){
+                //print that only once
+                MSG0("in " << __FUNCTION__ << ", from block " << i << " and on, blocks get their optWeight= " << optWeight );
+            }
+            filledFastPEs = true;
         }else{
+            assert(not filledFastPEs);
             retBlockSizes[i] = memCapacity; //fill it
             excessLoad = optWeight-memCapacity;
             MSG0("in " << __FUNCTION__ << ", block " << i << ", optWeight= " << optWeight << ", memCapacity= " << memCapacity << 
