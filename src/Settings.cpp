@@ -225,10 +225,14 @@ ITI::Settings ITI::Settings::setDefault( const scai::lama::CSRSparseMatrix<Value
 }
 
 
-void ITI::print_message( const std::string message ){
+void ITI::print_message( const std::string message, IndexType rank){
     const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    if( comm->getRank()==0) {
-       std::cout<< message << std::endl;
+
+    if( rank==-1 ){
+        rank = comm->getRank();
+    }
+    if( comm->getRank()==rank ) {
+       std::cout<< "PE " << rank << ": " << message << std::endl;
     }
 }
 

@@ -7,8 +7,9 @@
 #include "config.h"
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-#define MSG0( msg ) {std::stringstream ss; ss << msg; print_message( ss.str() );}
-#define PRINT0( msg ) {std::stringstream ss; ss<< __FILE__<< ", "<< __LINE__ << ": "<< msg; print_message( ss.str() );}
+#define MSG( msg, rank ) {std::stringstream ss; ss << msg; print_message( ss.str(), rank );}
+#define MSG0( msg ) {std::stringstream ss; ss << msg; print_message( ss.str(), 0 );}
+#define PRINT0( msg ) {std::stringstream ss; ss<< __FILE__<< ", "<< __LINE__ << ": "<< msg; print_message( ss.str(), 0 );}
 
 namespace ITI {
 
@@ -380,7 +381,7 @@ struct Settings {
 }; //struct Settings
 
 
-void print_message( const std::string message );
+void print_message( const std::string message, IndexType rank=-1 );
 
 //void MSG0( const std::stringstream stream );
 

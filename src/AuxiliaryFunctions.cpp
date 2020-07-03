@@ -739,6 +739,7 @@ std::vector<ValueType> aux<IndexType, ValueType>::blockSizesForMemory(
     ValueType assignedLoad = 0.0; //for debugging
     ValueType speedLeft = totalCompSpeed;
     ValueType loadLeft = inputSize;
+    ValueType prevAssignedWeight = 0;
 
     std::vector<ValueType> retBlockSizes(numBlocks);
     bool filledFastPEs = false; //the fast PEs are filled first
@@ -777,6 +778,11 @@ std::vector<ValueType> aux<IndexType, ValueType>::blockSizesForMemory(
         speedLeft -= thisBlock[0];
         loadLeft -= retBlockSizes[i];
         assignedLoad += retBlockSizes[i];
+
+        if( std::abs(retBlockSizes[i]-prevAssignedWeight) > 0.01 ){
+            MSG0("new assigned weight= " << retBlockSizes[i] << " for block " << i );
+            prevAssignedWeight = retBlockSizes[i];
+        }
 
     }//for blockIndices
 

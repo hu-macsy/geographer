@@ -288,7 +288,7 @@ std::string getOutFileName( const Settings& settings, const std::string& toolNam
 
 //taken from 
 //https://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
-unsigned long getFreeRam(const scai::dmemo::CommunicatorPtr& comm){
+unsigned long long getFreeRam(const scai::dmemo::CommunicatorPtr& comm, bool printMessage=false){
 
     struct sysinfo memInfo;
     const IndexType rank = comm->getRank();
@@ -329,7 +329,8 @@ unsigned long getFreeRam(const scai::dmemo::CommunicatorPtr& comm){
         return i;
     };
 
-    auto getValue = [&](){ //Note: this value is in KB!
+    //Note: this value is in KB!
+    auto getValue = [&](){ 
         FILE* file = fopen("/proc/self/status", "r");
         int result = -1;
         char line[128];
@@ -344,12 +345,17 @@ unsigned long getFreeRam(const scai::dmemo::CommunicatorPtr& comm){
         return result;
     };
 
-    PRINT( rank <<  ": totalPhysMem: " << (totalPhysMem/mb) << 
+    const double memIuse = getValue()/kb;
+
+    if( printMessage ){
+        MSG0( "totalPhysMem: " << (totalPhysMem/mb) << 
                 " MB, physMemUsed: " << physMemUsed/mb << 
-                " MB, free ram: " << freeRam/mb <<
-                " MB, shared ram: " << sharedRam/mb <<
-                " MB, buffered   ram: " << buffRam/mb <<
-                " MB, I am using: " << getValue()/kb << " MB" );
+                " MB, free ram: " << freeRam/mb);
+        MSG(    //" MB, shared ram: " << sharedRam/mb <<
+                //" MB, buffered ram: " << buffRam/mb << " MB, " <<
+                "I am using: " << memIuse << " MB",
+                rank );
+    }
 
     return freeRam;
 }

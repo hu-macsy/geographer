@@ -7,6 +7,7 @@
 
 #include "Metrics.h"
 #include "FileIO.h"
+#include "GraphUtils.h"
 
 using namespace ITI;
 

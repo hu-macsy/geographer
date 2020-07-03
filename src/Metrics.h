@@ -7,7 +7,6 @@
 #include <chrono>
 #include <algorithm>
 
-#include "GraphUtils.h"
 #include "CommTree.h"
 
 namespace ITI {

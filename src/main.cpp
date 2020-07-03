@@ -245,7 +245,7 @@ int main(int argc, char** argv) {
             auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
             std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
             std::cout.precision(oldprecision);
-            metricsVec[r].printHorizontal2( std::cout ); //TODO: remove?
+            metricsVec[r].printHorizontal2( std::cout );  //TODO: remove?
         }
 
         //---------------------------------------------------------------
@@ -390,7 +390,9 @@ int main(int argc, char** argv) {
         PRINT0("PE graph stored in " << filename );
     }
 
-    //getFreeRam(comm);
+    MSG0( "" );
+    comm->synchronize();
+    getFreeRam(comm, true);
     
     if (vm.count("callExit")) {
         //this is needed for supermuc
