@@ -13,6 +13,7 @@
 #include "Metrics.h"
 #include "MeshGenerator.h"
 #include "parseArgs.h"
+#include "CommTree.h"
 
 namespace ITI{
 
@@ -288,7 +289,7 @@ std::string getOutFileName( const Settings& settings, const std::string& toolNam
 
 //taken from 
 //https://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
-unsigned long long getFreeRam(const scai::dmemo::CommunicatorPtr& comm, bool printMessage=false){
+unsigned long long getFreeRam(const scai::dmemo::CommunicatorPtr& comm, double& myMem, bool printMessage=false){
 
     struct sysinfo memInfo;
     const IndexType rank = comm->getRank();
@@ -345,7 +346,7 @@ unsigned long long getFreeRam(const scai::dmemo::CommunicatorPtr& comm, bool pri
         return result;
     };
 
-    const double memIuse = getValue()/kb;
+    /*const double*/ myMem = getValue()/kb;
 
     if( printMessage ){
         MSG0( "totalPhysMem: " << (totalPhysMem/mb) << 
@@ -353,7 +354,7 @@ unsigned long long getFreeRam(const scai::dmemo::CommunicatorPtr& comm, bool pri
                 " MB, free ram: " << freeRam/mb);
         MSG(    //" MB, shared ram: " << sharedRam/mb <<
                 //" MB, buffered ram: " << buffRam/mb << " MB, " <<
-                "I am using: " << memIuse << " MB",
+                "I am using: " << myMem << " MB",
                 rank );
     }
 
@@ -417,7 +418,8 @@ std::vector<std::vector<vType>> calculateLoadRequests(const scai::dmemo::Communi
 
     //memory
     //TODO: remove hardcoded long int size
-    const unsigned long myFreeRam = getFreeRam(comm)/sizeof(long int); //value returned in bytes; convert to vertex size 
+    [[maybe_unused]] double myRam;
+    const unsigned long myFreeRam = getFreeRam(comm,myRam)/sizeof(long int); //value returned in bytes; convert to vertex size 
 
     std::vector<vType> allFreeRam(numPEs, 0.0);
     allFreeRam[rank] = (vType) myFreeRam;

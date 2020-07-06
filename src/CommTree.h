@@ -142,7 +142,7 @@ public:
             return not (*this==c);
         }
 
-//TODO: these are only leaf nodes or all the nodes of the subtree?
+        //TODO: these are only leaf nodes or all the nodes of the subtree?
         /* @brief Return the number of all ancestors this node has.
         */
         //TODO: probably children should be removed but this function is needed
@@ -486,14 +486,12 @@ private:
     */
     std::vector<std::vector<commNode>> tree;
 
-//must be known how many levels the tree has
-//(well, it can inferred but it is just easier)
     IndexType hierarchyLevels; 			///< how many hierarchy levels exist, hierarchyLevels = tree.size()
     IndexType numNodes;					///< all the nodes of the tree
     IndexType numLeaves;				///< the leafs of the tree
     IndexType numWeights;				///< how many weights each node has
     bool areWeightsAdaptedV = false;		///< if relative weights are adapted, \sa adaptWeights
-/// if isProportional[i] is true, then weight i is proportional and if false, weight i is absolute; isProportional.size()=numWeights
+    /// if isProportional[i] is true, then weight i is proportional and if false, weight i is absolute; isProportional.size()=numWeights
     std::vector<bool> isProportional;
 
 //------------------------------------------------------------------------

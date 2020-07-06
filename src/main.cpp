@@ -390,9 +390,26 @@ int main(int argc, char** argv) {
         PRINT0("PE graph stored in " << filename );
     }
 
-    MSG0( "" );
+    
+    {   //print memory usage information
+        //redistribute to get the correct memory usage
+        aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coordinates, nodeWeights, settings, true, false);
+        MSG0( "" );
+        double memIuse;
+        getFreeRam(comm, memIuse, false);
+        int myRank= comm->getRank() ;
+        const std::vector<cNode<IndexType,ValueType>> leaves = commTree.getLeaves();
+        SCAI_ASSERT_EQ_ERROR( leaves.size(), comm->getSize(), "leaves size mismatch" );
+        SCAI_ASSERT_EQ_ERROR( commTree.getNumWeights(), 2, "leaves weights size mismatch" );
+        for( int i=0; i<comm->getSize(); i++){
+            if( myRank==i ){
+                MSG( "I use " << memIuse << " MB of RAM and my assigned block weight is " << 
+                    leaves[comm->getRank()].weights[0] << ", local num values " << graph.getLocalNumValues(), myRank);
+            }
+            comm->synchronize();
+        }
+    }
     comm->synchronize();
-    getFreeRam(comm, true);
     
     if (vm.count("callExit")) {
         //this is needed for supermuc

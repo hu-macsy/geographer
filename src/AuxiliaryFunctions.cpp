@@ -780,7 +780,7 @@ std::vector<ValueType> aux<IndexType, ValueType>::blockSizesForMemory(
         assignedLoad += retBlockSizes[i];
 
         if( std::abs(retBlockSizes[i]-prevAssignedWeight) > 0.01 ){
-            MSG0("new assigned weight= " << retBlockSizes[i] << " for block " << i );
+            MSG0("new assigned weight= " << retBlockSizes[i] << " for block " << i << ", optWeight= " << optWeight << ", memCapacity= " << memCapacity);
             prevAssignedWeight = retBlockSizes[i];
         }
 
