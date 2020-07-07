@@ -390,8 +390,8 @@ int main(int argc, char** argv) {
         PRINT0("PE graph stored in " << filename );
     }
 
-    
-    {   //print memory usage information
+    //print memory usage information. The message is too long for more PUs
+    if( comm->getSize()<100 ){   
         //redistribute to get the correct memory usage
         aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coordinates, nodeWeights, settings, true, false);
         MSG0( "" );
@@ -409,7 +409,6 @@ int main(int argc, char** argv) {
             comm->synchronize();
         }
     }
-    comm->synchronize();
     
     if (vm.count("callExit")) {
         //this is needed for supermuc
