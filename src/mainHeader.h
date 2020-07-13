@@ -475,7 +475,7 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
             }
             blockSizesFile = vm["topologyFile"].as<std::string>();
             blockSizes = ITI::FileIO<IndexType, ValueType>::createBlockSizesFromTopology( blockSizesFile, settings.machine, comm );
-            isWeightProportional = {true, false };
+            isWeightProportional = {true, true };
         }
 
         SCAI_ASSERT( blockSizes.size()==settings.numNodeWeights, "Wrong number of weights, should be " << settings.numNodeWeights << " but is " << blockSizes.size() );
