@@ -43,7 +43,6 @@
 
 //----------------------------------------------------------------------------
 
-//void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);
 
 int main(int argc, char** argv) {
 
@@ -81,6 +80,8 @@ int main(int argc, char** argv) {
     //
     // generate or read graph and coordinates
     //
+    
+    std::chrono::time_point<std::chrono::steady_clock> beforeRead = std::chrono::steady_clock::now();
 
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<scai::lama::DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
@@ -91,58 +92,24 @@ int main(int argc, char** argv) {
 
     if( settings.setAutoSettings ){
         settings = settings.setDefault( graph );
-        if( !settings.isValid )
-               return -1;
+    }
+    settings.isValid = settings.checkValidity(comm);
+    if( !settings.isValid ){
+       throw std::runtime_error("Settings struct is not valid, check the input parameter values.");
+    }
+
+    std::chrono::duration<double> readTime =  std::chrono::steady_clock::now() - beforeRead;
+    if( comm->getRank()==0) {
+        std::cout << "Time to read/create input: " << readTime.count() << std::endl;
     }
 
     //---------------------------------------------------------------
     //
     // read the communication graph or the block sizes if provided
     //
-    std::string blockSizesFile;
-
-    if( vm.count("PEgraphFile") and vm.count("blockSizesFile") ) {
-        throw std::runtime_error("You should provide either a file for a communication graph OR a file for block sizes. Not both.");
-    }
-
-    ITI::CommTree<IndexType,ValueType> commTree;
-
-    if(vm.count("PEgraphFile")) {
-        throw std::logic_error("Reading of communication trees not yet implemented here.");
-        //commTree =  FileIO<IndexType, ValueType>::readPETree( settings.PEGraphFile );
-    } else if( vm.count("blockSizesFile") ) {
-        //blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
-        blockSizesFile = vm["blockSizesFile"].as<std::string>();
-        std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
-        if (blockSizes.size() < nodeWeights.size()) {
-            throw std::invalid_argument("Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
-                                        + "but nodes have " + std::to_string(nodeWeights.size()) + " weights.");
-        }
-
-        if (blockSizes.size() > nodeWeights.size()) {
-            blockSizes.resize(nodeWeights.size());
-            if (comm->getRank() == 0) {
-                std::cout << "Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
-                          + "but nodes have " + std::to_string(nodeWeights.size()) + " weights. Discarding surplus block sizes." << std::endl;
-            }
-        }
-
-        for (IndexType i = 0; i < nodeWeights.size(); i++) {
-            const ValueType blockSizesSum  = std::accumulate( blockSizes[i].begin(), blockSizes[i].end(), 0);
-            const ValueType nodeWeightsSum = nodeWeights[i].sum();
-            SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
-        }
-
-        commTree.createFlatHeterogeneous( blockSizes );
-    }else if( settings.hierLevels.size()!=0 ){
-        const IndexType numWeights = nodeWeights.size();
-        commTree.createFromLevels(settings.hierLevels, numWeights );
-    } else {
-        commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
-    }
-
+    
+    ITI::CommTree<IndexType,ValueType> commTree = createCommTree( vm, settings, comm, nodeWeights);
     commTree.adaptWeights( nodeWeights );
-
 
     //---------------------------------------------------------------
     //
@@ -171,7 +138,6 @@ int main(int argc, char** argv) {
 
     comm->synchronize();
     std::chrono::duration<double> inputTime = std::chrono::steady_clock::now() - startTime;
-
     assert(N > 0);
 
     if (settings.repartition && comm->getSize() == settings.numBlocks) {
@@ -260,8 +226,11 @@ int main(int argc, char** argv) {
 
         std::chrono::time_point<std::chrono::steady_clock> beforeReport = std::chrono::steady_clock::now();
 
-        metricsVec[r].getMetrics(graph, partition, nodeWeights, settings );
-        metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
+        {
+            std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+            metricsVec[r].getMetrics(graph, partition, nodeWeights, settings, blockSizes );
+            metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
+        }
 
         std::chrono::duration<double> reportTime =  std::chrono::steady_clock::now() - beforeReport;
 
@@ -276,7 +245,7 @@ int main(int argc, char** argv) {
             auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
             std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
             std::cout.precision(oldprecision);
-            metricsVec[r].printHorizontal2( std::cout ); //TODO: remove?
+            metricsVec[r].printHorizontal2( std::cout );  //TODO: remove?
         }
 
         //---------------------------------------------------------------
@@ -317,10 +286,8 @@ int main(int argc, char** argv) {
 
     if (repeatTimes > 1) {
         if (comm->getRank() == 0) {
-			std::cout<< "\n Average metrics for all runs:" << std::endl;
-            std::cout<<  "\033[1;36m";
+            std::cout<< "\n Average metrics for all runs:" << std::endl;
             aggrMetrics.print( std::cout );
-            std::cout << " \033[0m";
         }
     }
 
@@ -353,13 +320,23 @@ int main(int argc, char** argv) {
                 //
 
                 //printVectorMetrics( metricsVec, outF );
-                std::cout<< "Output information written to file " << outFile << " in total time " << totalT << std::endl;
-            }	else	{
+                std::cout<< "Output information written to file " << outFile  << std::endl;
+            }else{
                 std::cout<< "Could not open file " << outFile << " information not stored"<< std::endl;
             }
         }
     }
 
+    if( comm->getRank()==0) {
+        std::cout<< "Total time " << totalT << std::endl;
+    }
+
+    if( settings.outFile=="-" and settings.storePartition ){
+        settings.outFile = ITI::to_string(settings.initialPartition)+"_"+std::to_string(settings.numBlocks);
+        if( comm->getRank()==0 ) {
+            std::cout << "WARNING: partition file name not specified, setting it to " << settings.outFile << std::endl;
+        }
+    }
 
     if( settings.outFile!="-" and settings.storePartition ) {
         std::chrono::time_point<std::chrono::steady_clock> beforePartWrite = std::chrono::steady_clock::now();
@@ -413,6 +390,26 @@ int main(int argc, char** argv) {
         PRINT0("PE graph stored in " << filename );
     }
 
+    //print memory usage information. The message is too long for more PUs
+    if( comm->getSize()<100 ){   
+        //redistribute to get the correct memory usage
+        aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coordinates, nodeWeights, settings, true, false);
+        MSG0( "" );
+        double memIuse;
+        getFreeRam(comm, memIuse, false);
+        int myRank= comm->getRank() ;
+        const std::vector<cNode<IndexType,ValueType>> leaves = commTree.getLeaves();
+        SCAI_ASSERT_EQ_ERROR( leaves.size(), comm->getSize(), "leaves size mismatch" );
+        SCAI_ASSERT_EQ_ERROR( commTree.getNumWeights(), 2, "leaves weights size mismatch" );
+        for( int i=0; i<comm->getSize(); i++){
+            if( myRank==i ){
+                MSG( "I use " << memIuse << " MB of RAM and my assigned block weight is " << 
+                    leaves[comm->getRank()].weights[0] << ", local num values " << graph.getLocalNumValues(), myRank);
+            }
+            comm->synchronize();
+        }
+    }
+    
     if (vm.count("callExit")) {
         //this is needed for supermuc
         std::exit(0);

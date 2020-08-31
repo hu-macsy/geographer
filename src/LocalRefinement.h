@@ -4,17 +4,15 @@
 #include <scai/lama/matrix/all.hpp>
 #include <scai/lama/Vector.hpp>
 #include <scai/lama/storage/MatrixStorage.hpp>
-
 #include <scai/dmemo/HaloExchangePlan.hpp>
-
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
-
 #include <scai/tracing.hpp>
 
 #include <assert.h>
 
 #include "Settings.h"
-#include "PrioQueue.h"
+#include "CommTree.h"
+
 
 namespace ITI {
 
@@ -70,6 +68,7 @@ public:
         std::vector<DenseVector<ValueType>> &coordinates,
         std::vector<ValueType> &distances,
         DenseVector<IndexType> &origin,
+        const ITI::CommTree<IndexType,ValueType> &commTree,
         const std::vector<DenseVector<IndexType>>& communicationScheme,
         Settings settings
     );
@@ -159,8 +158,8 @@ private:
         const std::vector<IndexType>& borderRegionIDs,
         const std::vector<ValueType>& nodeWeights,
         std::vector<bool>& assignedToSecondBlock,
-        const std::pair<IndexType, IndexType> blockCapacities,
-        std::pair<IndexType, IndexType>& blockSizes,
+        const std::pair<ValueType, ValueType> blockCapacities,
+        std::pair<ValueType, ValueType>& blockSizes,
         const std::vector<ValueType>& tieBreakingKeys,
         Settings settings
     );

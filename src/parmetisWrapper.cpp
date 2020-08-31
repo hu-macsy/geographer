@@ -11,7 +11,8 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::refine
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coords,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-        const scai::lama::DenseVector<IndexType> partition,
+        const scai::lama::DenseVector<IndexType> &partition,
+        const ITI::CommTree<IndexType,ValueType> &commTree,
         struct Settings &settings,
         Metrics<ValueType> &metrics
     ){
@@ -41,14 +42,14 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::refine
     // tpwgts: array that is used to specify the fraction of
     // vertex weight that should be distributed to each sub-domain for each balance constraint.
     // Here we want equal sizes, so every value is 1/nparts; size = ncons*nparts 
-    std::vector<ValueType> tpwgts;
+    std::vector<real_t> tpwgts;
 
     // the xyz array for coordinates of size dim*localN contains the local coords
-    std::vector<ValueType> xyzLocal;    
+    std::vector<double> xyzLocal;    
 
     // ubvec: array of size ncon to specify imbalance for every vertex weigth.
     // 1 is perfect balance and nparts perfect imbalance. Here 1 for now
-    std::vector<ValueType> ubvec;
+    std::vector<real_t> ubvec;
 
     //local number of edges; number of node weights; flag about edge and vertex weights 
     IndexType numWeights=0, wgtFlag=0;
@@ -57,7 +58,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::refine
     std::vector<IndexType> options;
 
     aux<IndexType,ValueType>::toMetisInterface(
-        graph, coords, nodeWeights, settings, vtxDist, xadj, adjncy,
+        graph, coords, nodeWeights, commTree, settings, vtxDist, xadj, adjncy,
         vVwgt, tpwgts, wgtFlag, numWeights, ubvec, xyzLocal, options );
 
     SCAI_ASSERT_EQ_ERROR( tpwgts.size(), numWeights*settings.numBlocks, "Wrong tpwgts size" );
@@ -140,6 +141,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
     const bool nodeWeightsFlag,
     const Tool tool,
+    const ITI::CommTree<IndexType,ValueType> &commTree,
     const struct Settings &settings,
     Metrics<ValueType> &metrics) {
 
@@ -161,6 +163,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
         std::cout<<"\033[0m";
     }
 
+    assert( commTree.checkTree() );
 
     //-----------------------------------------------------
     //
@@ -181,14 +184,14 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
     // tpwgts: array that is used to specify the fraction of
     // vertex weight that should be distributed to each sub-domain for each balance constraint.
     // Here we want equal sizes, so every value is 1/nparts; size = ncons*nparts 
-    std::vector<ValueType> tpwgts;
+    std::vector<double> tpwgts;
 
     // the xyz array for coordinates of size dim*localN contains the local coords
-    std::vector<ValueType> xyzLocal;
+    std::vector<double> xyzLocal;
 
     // ubvec: array of size ncon to specify imbalance for every vertex weigth.
     // 1 is perfect balance and nparts perfect imbalance. Here 1 for now
-    std::vector<ValueType> ubvec;
+    std::vector<double> ubvec;
 
     //local number of edges; number of node weights; flag about edge and vertex weights 
     IndexType numWeights=0, wgtFlag=0;
@@ -197,7 +200,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
     std::vector<IndexType> options;
 
     IndexType newLocalN = aux<IndexType,ValueType>::toMetisInterface(
-        graph, coords, nodeWeights, settings, vtxDist, xadj, adjncy,
+        graph, coords, nodeWeights, commTree, settings, vtxDist, xadj, adjncy,
         vVwgt, tpwgts, wgtFlag, numWeights, ubvec, xyzLocal, options );
 
     if( newLocalN==-1){
@@ -391,7 +394,8 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::repart
         }
     }
 
-    scai::lama::DenseVector<IndexType> partition = parmetisWrapper<IndexType, ValueType>::partition( copyGraph, copyCoords, copyNodeWeights, nodeWeightsFlag, tool, settings, metrics);
+const ITI::CommTree<IndexType,ValueType> commTree;
+    scai::lama::DenseVector<IndexType> partition = parmetisWrapper<IndexType, ValueType>::partition( copyGraph, copyCoords, copyNodeWeights, nodeWeightsFlag, tool, commTree, settings, metrics);
 
     //because of the reindexing, we must redistribute the partition
     partition.redistribute( graph.getRowDistributionPtr() );
@@ -400,6 +404,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::repart
 }
 
 template class parmetisWrapper<IndexType, real_t>;
-//template class parmetisWrapper<IndexType, float>;
+template class parmetisWrapper<IndexType, float>;
+
 
 }//namespace ITI

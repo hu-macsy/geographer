@@ -142,7 +142,9 @@ TYPED_TEST (auxTest, testInitialPartitions) {
     uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
     scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
     Metrics<ValueType> metrics(settings);
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, halo, settings, metrics);
+    typename ITI::CommTree<IndexType,ValueType>::CommTree commTree;
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(
+        graph, pixeledPartition, uniformWeights, coordinates, halo, commTree, settings, metrics);
     if(dimensions==2) {
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"finalWithPixel");
     }
@@ -193,7 +195,7 @@ TYPED_TEST (auxTest, testInitialPartitions) {
     uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
     halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
 
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, halo, settings, metrics);
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, halo, commTree, settings, metrics);
     if(dimensions==2) {
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"finalWithHilbert");
     }
@@ -624,13 +626,13 @@ TYPED_TEST (auxTest, testMetisInterface) {
     // tpwgts: array that is used to specify the fraction of
     // vertex weight that should be distributed to each sub-domain for each balance constraint.
     // Here we want equal sizes, so every value is 1/nparts; size = ncons*nparts 
-    std::vector<ValueType> tpwgts;
+    std::vector<double> tpwgts;
 
     // the xyz array for coordinates of size dim*localN contains the local coords
-    std::vector<ValueType> xyzLocal;
+    std::vector<double> xyzLocal;
     // ubvec: array of size ncon to specify imbalance for every vertex weigth.
     // 1 is perfect balance and nparts perfect imbalance. Here 1 for now
-    std::vector<ValueType> ubvec;
+    std::vector<double> ubvec;
 
     //local number of edges; number of node weights; flag about edge and vertex weights 
     IndexType numWeights=0, wgtFlag=0;

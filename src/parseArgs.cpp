@@ -30,7 +30,12 @@ Options populateOptions() {
     ("seed", "random seed, default is current time", value<double>()->default_value(std::to_string(time(NULL))))
     //mapping
     ("PEgraphFile", "read communication graph from file", value<std::string>())
+    ("topologyFile", "read system topology  from file: a line per processor with CPU, MEM and number of cores", value<std::string>())
     ("blockSizesFile", "file to read the block sizes for every block", value<std::string>() )
+    ("autoSetCpuMem", "if set, geographer will gather cpu and memory info and use them to build a heterogeneous communication tree used for partitioning")
+    ("w2UpperBound", "if true, when given a file with the block sizes or the topology, treat the second weight as an upper bound (usually, this is used so the second weight corresponds to the memory capacity of the PEs)")
+    ("processPerNode", "the number of processes per compute node. Is used with autoSetCpuMem to determine the internal cpu/core ID within a compute node and query the cpu frequency.",  value<IndexType>())
+    ("useMemFromFile", "when a topology or block sizes file is given, if true, use the actual values in the file for memory. otherwise set the max memory to 1.2*number of graph rows.")
     ("mappingRenumbering", "map blocks to PEs using the SFC index of the block's center. This works better when PUs are numbered consecutively." )
     //repartitioning
     ("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
@@ -62,7 +67,10 @@ Options populateOptions() {
     ("balanceIterations", "Tuning parameter for K-Means", value<IndexType>())
     ("maxKMeansIterations", "Tuning parameter for K-Means", value<IndexType>())
     ("tightenBounds", "Tuning parameter for K-Means")
+    ("keepMostBalanced", "Tuning parameter for K-Means. When activated, k-means will return the solution with the minimum balance that was found.")
     ("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
+    ("KMBalanceMethod", "used in KMeans to partition targeting for a better imbalance. Possible values are 'repart', 'reb_lex' and 'reb_sqImba'. First repartition, the two other apply a rebalance method and repartition.", value<std::string>())
+    ("focusOnBalance", "Used in hierarchical versions of K-Means to rebalance at every step.")
     // using '/' to separate the lines breaks the output message
     ("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3,4,10 there are 3 levels. In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
     //output
@@ -80,6 +88,7 @@ Options populateOptions() {
     ("noComputeDiameter", "Compute diameter of resulting block files.")
     ("maxDiameterRounds", "abort diameter algorithm after that many BFS rounds", value<IndexType>())
     ("maxCGIterations", "max number of iterations of the CG solver in metrics",  value<IndexType>())
+    ("CGResidual", "solution precision of the CG solver in metrics",  value<double>())
     ("metricsDetail", "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV", value<std::string>())
     ("autoSettings", "Set some settings automatically to some values possibly overwriting some user passed parameters. ", value<bool>() )
     ("partition", "file of partition (typically used by tools/analyzePartition)", value<std::string>())
@@ -159,6 +168,9 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (!vm.count("influenceExponent")) {
         settings.influenceExponent = 1.0/settings.dimensions;
     }
+    if (vm.count("metricsDetail")) {
+        settings.metricsDetail = vm["metricsDetail"].as<std::string>();
+    }
 
     if( vm.count("metricsDetail") ) {
         if( not (settings.metricsDetail=="no" or settings.metricsDetail=="easy" or settings.metricsDetail=="all" or settings.metricsDetail=="mapping") ) {
@@ -181,7 +193,9 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     //settings.storeInfo = vm.count("storeInfo");
     settings.storePartition = vm.count("storePartition");
     settings.erodeInfluence = vm.count("erodeInfluence");
+    settings.focusOnBalance = vm.count("focusOnBalance");
     settings.tightenBounds = vm.count("tightenBounds");
+    settings.keepMostBalanced = vm.count("keepMostBalanced");
     settings.noRefinement = vm.count("noRefinement");
     settings.useDiffusionCoordinates = vm.count("useDiffusionCoordinates");
     settings.gainOverBalance = vm.count("gainOverBalance");
@@ -194,6 +208,9 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.writePEgraph = vm.count("writePEgraph");
     settings.setAutoSettings = vm.count("autoSettings");
     settings.mappingRenumbering = vm.count("mappingRenumbering");
+    settings.autoSetCpuMem = vm.count("autoSetCpuMem");
+    settings.w2UpperBound = vm.count("w2UpperBound");
+    settings.useMemFromFile = vm.count("useMemFromFile");
 
     //28/11/19, deprecate storeInfo parameter. Leaving it as an option for backwards compatibility.    
     //if outFile was provided but storeInfo was not given as an argument
@@ -213,12 +230,15 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("coordFormat")) {
         settings.coordFormat = vm["coordFormat"].as<ITI::Format>();
     }
+
     if (vm.count("PEgraphFile")) {
         settings.PEGraphFile = vm["PEgraphFile"].as<std::string>();
     }
+
     if (vm.count("numNodeWeights")) {
         settings.numNodeWeights = vm["numNodeWeights"].as<IndexType>();
     }
+
     if (vm.count("dimensions")) {
         settings.dimensions = vm["dimensions"].as<IndexType>();
     }
@@ -243,9 +263,10 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("epsilon")) {
         settings.epsilon = vm["epsilon"].as<double>();
     }
-    if (vm.count("blockSizesFile")) {
-        settings.blockSizesFile = vm["blockSizesFile"].as<std::string>();
-    }
+
+    if (vm.count("processPerNode")) {
+        settings.processPerNode = vm["processPerNode"].as<IndexType>();
+    }    
     if ( vm.count("initialMigration") ){
         std::string s = vm["initialMigration"].as<std::string>();
         settings.initialMigration = to_tool(s);        
@@ -338,6 +359,18 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         }
     }
 
+    if( vm.count("KMBalanceMethod") ) {
+        settings.KMBalanceMethod = vm["KMBalanceMethod"].as<std::string>();
+        if( not (settings.KMBalanceMethod=="repart" 
+            or settings.KMBalanceMethod=="reb_sqImba"
+            or settings.KMBalanceMethod=="reb_lex") ) {
+            if(comm->getRank() ==0 ) {
+                std::cout<<"WARNING: wrong value for parameter KMBalanceMethod= " << settings.KMBalanceMethod << ". Setting to reb_lex" <<std::endl;
+                settings.KMBalanceMethod="lex";
+            }
+        }
+    }
+
     if (vm.count("repeatTimes")) {
         settings.repeatTimes = vm["repeatTimes"].as<IndexType>();
     }
@@ -346,10 +379,11 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     }
     if (vm.count("maxCGIterations")) {
         settings.maxCGIterations = vm["maxCGIterations"].as<IndexType>();
-    }    
-    if (vm.count("metricsDetail")) {
-        settings.metricsDetail = vm["metricsDetail"].as<std::string>();
     }
+    if (vm.count("CGResidual")) {
+        settings.CGResidual = vm["CGResidual"].as<double>();
+    }
+
 
     /*** consistency checks ***/
     if (vm.count("previousPartition")) {

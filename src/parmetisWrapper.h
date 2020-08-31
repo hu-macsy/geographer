@@ -9,7 +9,7 @@ public:
 
 /** @brief Class for external partitioning parmetis tool.
 */
-
+ 
     /** Given the input (graph, coordinates, node weights) and a partition
     of the input, apply local refinement.
 
@@ -21,7 +21,8 @@ public:
         const scai::lama::CSRSparseMatrix<ValueType> &graph,
         const std::vector<scai::lama::DenseVector<ValueType>> &coordinates,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-        const scai::lama::DenseVector<IndexType> partition,
+        const scai::lama::DenseVector<IndexType> &partition,
+        const ITI::CommTree<IndexType,ValueType> &commTree,
         struct Settings &settings,
         Metrics<ValueType> &metrics
     );
@@ -47,7 +48,7 @@ public:
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
         const bool nodeWeightsFlag,
         const Tool tool,
-        //int parMetisGeom,
+        const ITI::CommTree<IndexType,ValueType> &commTree,
         const struct Settings &settings,
         Metrics<ValueType> &metrics);
 

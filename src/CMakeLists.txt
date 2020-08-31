@@ -42,7 +42,7 @@ find_library( PARHIP_LIB libparhip.a libparhip.so HINTS "${PARHIP_BASE}" "${PARH
 
 
 ###
-### define libraries and executables
+### define libraries and exectables
 ###
 
 
@@ -56,7 +56,7 @@ if(Zoltan2_FOUND OR PARMETIS_LIB OR PARHIP_LIB )
         
         set(ZOLTAN_WRAP_CPP zoltanWrapper.cpp)
         set(ZOLTAN_WRAP_H zoltanWrapper.h)
-        set(ZOLTAN_INCLUDES ${Zoltan2_INCLUDE_DIRS} ${Zoltan2_TPL_INCLUDE_DIRS})
+        set(ZOLTAN_INCLUDES ${Zoltan2_INCLUDE_DIRS} ${Zoltan2_TPL_INCLUDE_DIRS}) 
         set(ZOLTAN_LIBS ${Zoltan2_LIBRARIES} ${Zoltan2_TPL_LIBRARIES} )
     else()
         message(WARNING "zoltan was not found")
@@ -130,7 +130,7 @@ if(Zoltan2_FOUND OR PARMETIS_LIB OR PARHIP_LIB )
     
     install(TARGETS wrappers EXPORT wrappers DESTINATION "${LIB_DEST}") 
     install(TARGETS allCompetitors DESTINATION "${BIN_DEST}") # executable
-    install(FILES Wrappers.h ${PARMETIS_WRAP_H} ${ZOLTAN_WRAP_H} ${PARHIP_H} DESTINATION "${HEADER_DEST}")   
+    install(FILES Wrappers.h ${PARMETIS_WRAP_H} ${ZOLTAN_WRAP_H} ${PARHIP_WRAP_H} DESTINATION "${HEADER_DEST}")   
 else()
     #message( "Some of the packages Zoltan2, metis or parmetis were not found.\nSet it in the CMakeLists.txt file by editing the line 'FIND_PACKAGE(Zoltan2 ...)'")
 endif()

@@ -18,7 +18,7 @@
 
 #include "GraphUtils.h"
 #include "Settings.h"
-
+#include "CommTree.h"
 
 namespace ITI {
 
@@ -113,6 +113,7 @@ public:
 //------------------------------------------------------------------------------
 
     /** Overloaded version where node weights are an HArray.
+    \overload
     */
 
     static void writeHeatLike_local_2D(scai::hmemo::HArray<IndexType> input, IndexType sideLen, const std::string filename) {
@@ -225,7 +226,7 @@ public:
         IndexType row1 = pixel1%sideLen;
         IndexType row2 = pixel2%sideLen;
 
-        return std::abs(col1-col2) + std::abs(row1-row2);;
+        return absDiff(col1, col2) + absDiff(row1, row2);;
     }
 
 
@@ -238,7 +239,7 @@ public:
         IndexType row1 = pixel1%sideLen;
         IndexType row2 = pixel2%sideLen;
 
-        return std::pow( ValueType (std::pow(std::abs(col1-col2),2) + std::pow(std::abs(row1-row2),2)), 0.5);
+        return std::pow( ValueType (std::pow(absDiff(col1, col2),2) + std::pow(absDiff(row1, row2),2)), 0.5);
     }
 
 //template<T>
@@ -253,16 +254,6 @@ public:
         return std::pow( distance, 1.0/2.0);
     }
 
-//------------------------------------------------------------------------------
-    /* TODO: implement or remove
-    static std::tuple<IndexType, IndexType, IndexType> index2Point( const IndexType index, const  std::vector<IndexType> numPoints, const dimension){
-
-    	if( dimension==2 )
-    		return index2_2DPoint()
-    	else if( dimension==3 )
-    		return index2_3DPoint()
-    }
-    */
 
     /** Given a (global) index and the size for each dimension (numPpoints.size()=3) calculates the position
      * of the index in 3D. The return value is not the coordinates of the point!
@@ -300,6 +291,21 @@ public:
 
         return std::make_tuple(xIndex, yIndex);
     }
+
+
+    /** In this version, the second weight per PU is treated as an upper bound.
+    The tree nodes (aka PUs) should have 2 weights, the first is treated as the computational
+    power of this node and the second as the memory and memory is treated as an upper bound
+    for the block size.
+
+    @return A vector of size k, as the number of leaf nodes, with the feasible block size
+    for every leaf/PE.
+    */
+
+    static std::vector<ValueType> blockSizesForMemory(
+        const std::vector<std::vector<ValueType>> &inBlockSizes,
+        const IndexType inputSize,
+        const IndexType maxMemoryCapacity=0 );
 
 
 //------------------------------------------------------------------------------
@@ -365,13 +371,32 @@ public:
         std::vector<IndexType>& xadj,
         std::vector<IndexType>& adjncy,
         std::vector<ValueType>& vwgt,
-        std::vector<ValueType>& tpwgts,
+        std::vector<double>& tpwgts,
         IndexType &wgtFlag,
         IndexType &numWeights,
-        std::vector<ValueType>& ubvec,
-        std::vector<ValueType>& xyzLocal,
+        std::vector<double>& ubvec,
+        std::vector<double>& xyzLocal,
         std::vector<IndexType>& options);
 
+    /** @brief Overloaded version with commTree
+        \overload
+    */
+    static IndexType toMetisInterface(
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const std::vector<scai::lama::DenseVector<ValueType>> &coords,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+        const ITI::CommTree<IndexType,ValueType> &commTree,
+        const struct Settings &settings,
+        std::vector<IndexType>& vtxDist, 
+        std::vector<IndexType>& xadj,
+        std::vector<IndexType>& adjncy,
+        std::vector<ValueType>& vwgt,
+        std::vector<double>& tpwgts,
+        IndexType &wgtFlag,
+        IndexType &numWeights,
+        std::vector<double>& ubvec,
+        std::vector<double>& xyzLocal,
+        std::vector<IndexType>& options);
 
     /**
      * Iterates over the local part of the adjacency matrix and counts local edges.
@@ -399,7 +424,11 @@ public:
         scai::lama::DenseVector<IndexType>& partition,
         const Settings settings);
 
-	
+    static IndexType absDiff(const IndexType& a, const IndexType& b) {
+        return (a > b) ? (a - b) : (b - a);
+    }
+
+
 private:
 
 //------------------------------------------------------------------------------

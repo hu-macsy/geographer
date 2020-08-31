@@ -5,7 +5,6 @@
 
 namespace ITI {
 
-
 template<typename IndexType, typename ValueType>
 scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition(
     DenseVector<IndexType>& partition,
@@ -34,10 +33,8 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
     // in order to reduce redistribution costs
     //
 
-    if( renumberPEs ) {
+    if( renumberPEs and partition.max()==numPEs-1) {
         scai::hmemo::ReadAccess<IndexType> rPart( partition.getLocalValues() );
-        //std::map<IndexType,IndexType> blockSizes;
-        //scai::lama::SparseVector<IndexType> blockSizes( numPEs, 0 );
         std::vector<IndexType> blockSizes( numPEs, 0 );
         for (IndexType i = 0; i < localN; i++) {
             blockSizes[ rPart[i] ] += (IndexType) 1;
@@ -115,7 +112,9 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
             }
             SCAI_ASSERT_LE_ERROR( preference, numBlocksOwned, "index out of bounds" );
 
-            //PRINT( thisPE <<": claims ID " << allClaimedIDs[thisPE] << " with size " << allClaimedSizes[thisPE] );
+            if( settings.debugMode ) {
+                PRINT( thisPE <<": claims ID " << allClaimedIDs[thisPE] << " with size " << allClaimedSizes[thisPE] );
+            }
 
             //global sum to gather all claimed IDs for all PEs
             comm->sumImpl( allClaimedIDs.data(), allClaimedIDs.data(), numPEs, scai::common::TypeTraits<IndexType>::stype );
@@ -168,18 +167,20 @@ scai::dmemo::DistributionPtr aux<IndexType,ValueType>::redistributeFromPartition
         //instead of renumber the PEs, renumber the blocks
         std::vector<IndexType> blockRenumbering( numPEs ); //this should be k, but the whole functions works only when k=p
 
-        //if every PE got the same ID as the one laready has
+        //if every PE got the same ID as the one already has
         bool nothingChanged = true;
 
         //reverse the renumbering from PEs to blocks: if PE 3 claimed ID 5, then renumber block 5 to 3
         for( IndexType i=0; i<numPEs; i++) {
             blockRenumbering[ finalMapping[i] ] = i;
-            //PRINT0("block " << finalMapping[i] << " is mapped to " << i );
+            if( settings.debugMode ) {
+                MSG0("block " << finalMapping[i] << " is mapped to " << i );
+            }
             if( finalMapping[i]!=i )
                 nothingChanged = false;
         }
 
-        //go over local partition and renumber if some IDs changes
+        //go over local partition and renumber if some IDs changed
         if( not nothingChanged ) {
             scai::hmemo::WriteAccess<IndexType> partAccess( partition.getLocalValues() );
             for( IndexType i=0; i<localN; i++) {
@@ -296,11 +297,11 @@ IndexType aux<IndexType, ValueType>::toMetisInterface(
     std::vector<IndexType>& xadj,
     std::vector<IndexType>& adjncy,
     std::vector<ValueType>& vwgt,
-    std::vector<ValueType>& tpwgts,
+    std::vector<double>& tpwgts,
     IndexType &wgtFlag,
     IndexType &numWeights,
-    std::vector<ValueType>& ubvec,
-    std::vector<ValueType>& xyzLocal,
+    std::vector<double>& ubvec,
+    std::vector<double>& xyzLocal,
     std::vector<IndexType>& options){
     SCAI_REGION( "aux.toMetisInterface");
 
@@ -443,7 +444,7 @@ IndexType aux<IndexType, ValueType>::toMetisInterface(
         total += tpwgts[i];
     }
 
-    SCAI_ASSERT_LT_ERROR( std::abs(total-numWeights), 1e-6, "Wrong tpwgts assignment");    
+    SCAI_ASSERT_LT_ERROR( std::abs(total-numWeights), 1e-6, "Wrong tpwgts assignment");
 
 
     // the xyz array for coordinates of size dim*localN contains the local coords
@@ -469,6 +470,64 @@ IndexType aux<IndexType, ValueType>::toMetisInterface(
 }//toMetisInterface
 //---------------------------------------------------------------------------------------
 
+//overloaded version with commTree
+template<typename IndexType, typename ValueType>
+IndexType aux<IndexType, ValueType>::toMetisInterface(
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const std::vector<scai::lama::DenseVector<ValueType>> &coords,
+    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+    const ITI::CommTree<IndexType,ValueType> &commTree,
+    const struct Settings &settings,
+    std::vector<IndexType>& vtxDist, 
+    std::vector<IndexType>& xadj,
+    std::vector<IndexType>& adjncy,
+    std::vector<ValueType>& vwgt,
+    std::vector<double>& tpwgts,
+    IndexType &wgtFlag,
+    IndexType &numWeights,
+    std::vector<double>& ubvec,
+    std::vector<double>& xyzLocal,
+    std::vector<IndexType>& options){
+    SCAI_REGION( "aux.toMetisInterface");
+
+    //create as without the commTree
+    const IndexType localN = aux<IndexType,ValueType>::toMetisInterface(
+        graph, coords, nodeWeights, settings, vtxDist, xadj, adjncy,
+        vwgt, tpwgts, wgtFlag, numWeights, ubvec, xyzLocal, options );
+
+    //overwrite only affected data
+
+    std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+    SCAI_ASSERT_EQ_ERROR( blockSizes.size(), numWeights, "Wrong number of weights");
+    SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of weights" );
+
+    // tpwgts: array of size numWeights*nparts, that is used to specify the fraction of
+    // vertex weight that should be distributed to each sub-domain for each balance
+    // constraint. Here, perhaps we do NOT want equal sizes
+
+    //the total weight of all blocks for each weight
+    std::vector<ValueType> blockWeightsSum(numWeights);
+    for( int w=0; w<numWeights; w++ ){
+        blockWeightsSum[w] = std::accumulate( blockSizes[w].begin(), blockSizes[w].end(), 0.0 );
+    }
+
+    const IndexType nparts= settings.numBlocks; //metis naming
+    assert( tpwgts.size()== nparts*numWeights );
+
+    ValueType total = 0.0;
+    for( int w=0; w<numWeights; w++ ){
+        for(int k=0; k<nparts; k++){
+            int index = k*numWeights+w;
+            tpwgts[index] = blockSizes[w][k]/blockWeightsSum[w];
+            total += tpwgts[index];
+        }
+    }
+
+    SCAI_ASSERT_LT_ERROR( std::abs(total-numWeights), 1e-6, "Wrong tpwgts assignment");
+
+    return localN;
+}//toMetisInterface
+//---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
 void ITI::aux<IndexType, ValueType>::checkLocalDegreeSymmetry(const CSRSparseMatrix<ValueType> &input) {
@@ -629,21 +688,113 @@ bool aux<IndexType, ValueType>::alignDistributions(
     }
 
     if( willRedistribute ){
-        //TODO: is this redistribution needed?
-        //redistribute
-        //scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition( partition, graph, coords, nodeWeights, settings, false, true);        
 
-        //TODO?: can also redistribute everything based on a block or genBlock distribution
         const scai::dmemo::DistributionPtr newGenBlockDist = GraphUtils<IndexType, ValueType>::genBlockRedist(graph);
         
         aux<IndexType,ValueType>::redistributeInput( newGenBlockDist, partition, graph, coords, nodeWeights);
     }
     return willRedistribute;
 }//alignDistributions
+//------------------------------------------------------------------------
 
+//Force that vertices have equal, unit weights by accepting the input size as a number, not the node weights.
+//In this case, the input load is equal the size of the graph.
+
+template <typename IndexType, typename ValueType>
+std::vector<ValueType> aux<IndexType, ValueType>::blockSizesForMemory( 
+    const std::vector<std::vector<ValueType>> &inBlockSizes,
+    const IndexType inputSize,
+    const IndexType maxMemoryCapacity ) {
+
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+    const IndexType myRank = comm->getRank();
+
+    // if( commTree.isProportional[1] and maxMemoryCapacity==0){
+    //     throw std::logic_error( "Memory per PE is given as a percentage but the maximum memory of the system is not given");
+    // }
+
+    //first weight is computational speed and its sum is the total computational speed of the system
+    //the total memory capacity is needed if memory is given as a percentage
+    SCAI_ASSERT_EQ_ERROR( inBlockSizes.size(), 2, 
+        "We need 2 weights per PE for computational load and memory. Was a description of the system provided? use option --blockSizesFile or --topologyFile" );
+
+    const IndexType numBlocks = inBlockSizes[0].size();
+    std::vector<IndexType> blockIndices( numBlocks );
+    std::iota( blockIndices.begin(), blockIndices.end(), 0 );
+
+    auto cpuOverMem = [&](IndexType i, IndexType j)->bool{
+        const ValueType iCpuOverMem = inBlockSizes[0][i]/inBlockSizes[1][i];
+        const ValueType jCpuOverMem = inBlockSizes[0][j]/inBlockSizes[1][j];;
+        return iCpuOverMem>jCpuOverMem;
+    };
+
+    std::sort( blockIndices.begin(), blockIndices.end(), cpuOverMem );
+
+    const ValueType totalCompSpeed = std::accumulate( inBlockSizes[0].begin(), inBlockSizes[0].end(), 0.0 );
+    const ValueType totalMemCapacity = std::accumulate( inBlockSizes[1].begin(), inBlockSizes[1].end(), 0.0 );
+    if(myRank==0){
+        std::cout <<"total computational speed of the system is "<< totalCompSpeed << " and memory " << totalMemCapacity << std::endl;
+    }
+    
+    ValueType assignedLoad = 0.0; //for debugging
+    ValueType speedLeft = totalCompSpeed;
+    ValueType loadLeft = inputSize;
+    ValueType prevAssignedWeight = 0;
+
+    std::vector<ValueType> retBlockSizes(numBlocks);
+    bool filledFastPEs = false; //the fast PEs are filled first
+
+    for( auto i : blockIndices){
+        const std::vector<ValueType> &thisBlock = { inBlockSizes[0][i], inBlockSizes[1][i]};
+
+        const ValueType thisCompSpeedPerCent = thisBlock[0]/speedLeft;
+        //we add the percentage this block need to take from the excess load so far.
+        const ValueType optWeight = thisCompSpeedPerCent*loadLeft;
+
+        //memory constraint can be given as a percentage or an absolute number
+        ValueType memCapacity=0.0;
+        if( maxMemoryCapacity>0 ) {
+            memCapacity = thisBlock[1]/totalMemCapacity*maxMemoryCapacity;
+        }else{
+            memCapacity = thisBlock[1];
+        }
+
+        ValueType excessLoad = 0;
+        //if the opt weight fits
+        if( optWeight<memCapacity ){
+            retBlockSizes[i] = optWeight; //give the optimum
+            if(not filledFastPEs){
+                //print that only once
+                MSG0("in " << __FUNCTION__ << ", from block " << i << " and on, blocks get their optWeight= " << optWeight );
+            }
+            filledFastPEs = true;
+        }else{
+            assert(not filledFastPEs);
+            retBlockSizes[i] = memCapacity; //fill it
+            excessLoad = optWeight-memCapacity;
+            MSG0("in " << __FUNCTION__ << ", block " << i << ", optWeight= " << optWeight << ", memCapacity= " << memCapacity << 
+                ", assigned= " << retBlockSizes[i] << ", excess load is " << excessLoad );
+        }
+        speedLeft -= thisBlock[0];
+        loadLeft -= retBlockSizes[i];
+        assignedLoad += retBlockSizes[i];
+
+        if( std::abs(retBlockSizes[i]-prevAssignedWeight) > 0.01 ){
+            MSG0("new assigned weight= " << retBlockSizes[i] << " for block " << i << ", optWeight= " << optWeight << ", memCapacity= " << memCapacity);
+            prevAssignedWeight = retBlockSizes[i];
+        }
+
+    }//for blockIndices
+
+    //all input is assigned; take care of floating errors
+    SCAI_ASSERT_LT_ERROR( std::abs(assignedLoad-inputSize), 5, "Not all load was distributed, input does not fit to system");
+
+    return retBlockSizes;
+}//blockSizesForMemory
+//------------------------------------------------------------------------
 
 template class aux<IndexType, double>;
-//template class aux<long long unsigned int, double>; //rewuired for the parhip wrapper
+//template class aux<long long unsigned int, double>; //required for the parhip wrapper
 template class aux<IndexType, float>;
 
 }//namespace ITI

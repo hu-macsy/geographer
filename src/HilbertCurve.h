@@ -17,11 +17,6 @@
 #include <scai/lama/matrix/all.hpp>
 #include <scai/lama/Vector.hpp>
 
-#include <scai/dmemo/Distribution.hpp>
-#include <scai/dmemo/HaloExchangePlan.hpp>
-#include <scai/dmemo/Distribution.hpp>
-#include <scai/dmemo/BlockDistribution.hpp>
-#include <scai/dmemo/GenBlockDistribution.hpp>
 
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 #include <scai/tracing.hpp>

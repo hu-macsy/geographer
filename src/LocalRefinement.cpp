@@ -4,6 +4,7 @@
 #include "LocalRefinement.h"
 #include "GraphUtils.h"
 #include "HaloPlanFns.h"
+#include "PrioQueue.h"
 
 #include <scai/utilskernel/TransferUtils.hpp>
 
@@ -20,6 +21,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     std::vector<DenseVector<ValueType>> &coordinates,
     std::vector<ValueType> &distances,
     DenseVector<IndexType> &origin,
+    const CommTree<IndexType,ValueType> &commTree,
     const std::vector<DenseVector<IndexType>>& communicationScheme,
     Settings settings) {
 
@@ -53,14 +55,38 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     if (settings.numBlocks != comm->getSize()) {
         throw std::runtime_error("Called with " + std::to_string(comm->getSize()) + " processors, but " + std::to_string(settings.numBlocks) + " blocks.");
     }
-
-    //TODO: opt size
-    //const IndexType optSize_old = ceil(double(globalN) / settings.numBlocks);
-    const IndexType optSize =  nodeWeights.sum() / settings.numBlocks;
-    const IndexType maxAllowableBlockSize = optSize*(1+settings.epsilon);
-
+    
     //for now, we are assuming equal numbers of blocks and processes
     const IndexType localBlockID = comm->getRank();
+
+    //TODO: need vector<vector> for multiple node weights
+    //this works only when k=p
+    std::vector<ValueType> allMaxAllowableBlockSize( comm->getSize() );
+
+    //if the tree is empty, get a opt size around the average.
+    if( commTree.getNumNodes()==0 ){
+        const ValueType optSize =  nodeWeights.sum() / settings.numBlocks;
+        const ValueType maxAllowableBlockSize = optSize*(1+settings.epsilon);
+        //the allMaxAllowableBlockSize vector is not needed in this case but it simplifies things later, 
+        //when calculating the max size of the partner
+        for( int p=0; p<comm->getSize(); p++ ){
+            allMaxAllowableBlockSize[p] = maxAllowableBlockSize;
+        }
+    }else{
+        const std::vector<std::vector<ValueType>> targetBlockWeights = commTree.getBalanceVectors();
+        //SCAI_ASSERT_EQ_ERROR(targetBlockWeights.size(), nodeWeights.size(), "Wrong number of weights");
+        SCAI_ASSERT_EQ_ERROR(targetBlockWeights.size(), 1, "Local refinement does not accept multiple weights (yet).");
+        SCAI_ASSERT_EQ_ERROR(targetBlockWeights[0].size(), settings.numBlocks, "Wrong size of weights");
+        SCAI_ASSERT_EQ_ERROR(targetBlockWeights[0].size(), comm->getSize(), 
+            "More blocks than PEs; local refinement currently works only when number of PES= number of blocks.");
+
+        for( int p=0; p<targetBlockWeights[0].size(); p++ ){
+            allMaxAllowableBlockSize[p] = targetBlockWeights[0][p]*(1+settings.epsilon);
+        }
+    }
+
+    //calculate the maximum allowed block for this PE
+    const ValueType maxAllowableBlockSize = allMaxAllowableBlockSize[localBlockID];
 
     const bool nodesWeighted = nodeWeights.getDistributionPtr()->getGlobalSize() > 0;
     if (nodesWeighted && nodeWeights.getDistributionPtr()->getLocalSize() != input.getRowDistributionPtr()->getLocalSize()) {
@@ -89,6 +115,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
         PRINT0("time elapsed before main loop: " << t1 );
         PRINT0("number of rounds/loops: " << communicationScheme.size() );
     }
+
 
     //main loop, one iteration for each color of the graph coloring
     for (IndexType color = 0; color < communicationScheme.size(); color++) {
@@ -175,12 +202,11 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
             swapField[4] = blockWeightSum;
             comm->swap(swapField, 5, partner);
             //want to isolate raw array accesses as much as possible, define named variables and only use these from now
-            const IndexType otherSize = swapField[0];
+            const IndexType otherSize = swapField[0];               //number of vertices to be exchanged
             const IndexType otherSecondRoundMarker = swapField[1];
             const IndexType otherLastRoundMarker = swapField[2];
             //const IndexType otherBlockSize = swapField[3];
-//WARNING/TODO: this assumes that node weights (and thus block weights) are integers
-            const IndexType otherBlockWeightSum = swapField[4];
+            const ValueType otherBlockWeightSum = swapField[4];
 
             if (interfaceNodes.size() == 0) {
                 if (otherSize != 0) {
@@ -284,10 +310,12 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
             scai::hmemo::HArray<IndexType> originData;
             graphHalo.updateHalo(originData, origin.getLocalValues(), *comm);
 
-//WARNING/TODO: this assumes that node weights (and thus block weights) are integers?
+            //the max allowed size of the partner PE
+            ValueType otherMaxAllowableBlockSize = allMaxAllowableBlockSize[partner];
+
             //block sizes and capacities
-            std::pair<IndexType, IndexType> blockSizes = {blockWeightSum, otherBlockWeightSum};
-            std::pair<IndexType, IndexType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
+            std::pair<ValueType, ValueType> blockSizes = {blockWeightSum, otherBlockWeightSum};
+            std::pair<ValueType, ValueType> maxBlockSizes = {maxAllowableBlockSize, otherMaxAllowableBlockSize};
 
             //second round markers
             std::pair<IndexType, IndexType> secondRoundMarkers = {secondRoundMarker, otherSecondRoundMarker};
@@ -323,6 +351,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
             of PEs involved is low so it makes sense to precompute the distances.
             Maybe distances can be computed here and given as an input
             */
+
             ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, borderRegionIDs, borderNodeWeights, assignedToSecondBlock, maxBlockSizes, blockSizes, tieBreakingKeys, settings);
 
             {
@@ -504,8 +533,8 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
     const std::vector<IndexType>& borderRegionIDs,
     const std::vector<ValueType>& nodeWeights,
     std::vector<bool>& assignedToSecondBlock,
-    const std::pair<IndexType, IndexType> blockCapacities,
-    std::pair<IndexType, IndexType>& blockSizes,
+    const std::pair<ValueType, ValueType> blockCapacities,
+    std::pair<ValueType, ValueType>& blockSizes,
     const std::vector<ValueType>& tieBreakingKeys,
     Settings settings) {
 
@@ -518,7 +547,6 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
         magicStoppingAfterNoGainRounds = borderRegionIDs.size();
     }
 
-    assert(blockCapacities.first == blockCapacities.second);
     const bool nodesWeighted = (nodeWeights.size() != 0);
     //const bool edgesWeighted = nodesWeighted;//TODO: adapt this, change interface
     const bool edgesWeighted = ( scai::utilskernel::HArrayUtils::max(input.getLocalStorage().getValues()) !=1 );
@@ -546,9 +574,6 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
     if (nodesWeighted) {
         assert(nodeWeights.size() == veryLocalN);
     }
-
-    //TODO: not used variable
-    //const IndexType firstBlockSize = std::distance(assignedToSecondBlock.begin(), std::lower_bound(assignedToSecondBlock.begin(), assignedToSecondBlock.end(), 1));
 
     //this map provides an index from 0 to b-1 for each of the b indices in borderRegionIDs
     //globalToVeryLocal[borderRegionIDs[i]] = i
@@ -684,7 +709,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 
             if (gainOverBalance) {
                 firstComparisonPair = {-firstQueue.inspectMin().first.first, blockSizes.first};
-                firstComparisonPair = {-secondQueue.inspectMin().first.first, blockSizes.second};
+                secondComparisonPair = {-secondQueue.inspectMin().first.first, blockSizes.second};
             } else {
                 firstComparisonPair = {blockSizes.first, -firstQueue.inspectMin().first.first};
                 secondComparisonPair = {blockSizes.second, -secondQueue.inspectMin().first.first};

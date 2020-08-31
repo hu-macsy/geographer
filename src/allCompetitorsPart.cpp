@@ -51,6 +51,10 @@ int main(int argc, char** argv) {
     using namespace ITI;
     typedef double ValueType;   //use double
 
+#if ZOLTAN_FOUND
+    Tpetra::ScopeGuard tscope(&argc, &argv);
+#endif
+
     // timing information
     std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
@@ -83,6 +87,14 @@ int main(int argc, char** argv) {
 
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 
+    //---------------------------------------------------------------
+    //
+    // read the communication graph or the block sizes if provided
+    //
+    
+    ITI::CommTree<IndexType,ValueType> commTree = createCommTree( vm, settings, comm, nodeWeights);
+    commTree.adaptWeights( nodeWeights );
+
     //---------------------------------------------------------------------------------
     //
     // start main for loop for all tools
@@ -90,7 +102,7 @@ int main(int argc, char** argv) {
 
     //WARNING: 1) removed parmetis sfc
     //WARNING: 2) parMetisGraph should be last because it often crashes
-    std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph, ITI::Tool::parhipFastMesh, ITI::Tool::parhipUltraFastMesh, ITI::Tool::parhipEcoMesh  };
+    std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanXPulp, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph, ITI::Tool::parhipFastMesh, ITI::Tool::parhipUltraFastMesh, ITI::Tool::parhipEcoMesh  };
 
     std::vector<ITI::Tool> wantedTools;
     std::vector<std::string> tools = settings.tools; //not really needed
@@ -99,7 +111,7 @@ int main(int argc, char** argv) {
     if( tools.size()==0 ){
         wantedTools = allTools;
     } else {
-        for( std::vector<std::string>::iterator tool=tools.begin(); tool!=tools.end(); tool++) {    
+        for( std::vector<std::string>::iterator tool=tools.begin(); tool!=tools.end(); tool++) {
             wantedTools.push_back( to_tool(*tool) );
         }
     }
@@ -109,6 +121,7 @@ int main(int argc, char** argv) {
 
     for( int t=0; t<wantedTools.size(); t++) {
 
+        comm->synchronize();
         ITI::Tool thisTool = wantedTools[t];
         std::cout.precision(5);
 
@@ -117,7 +130,7 @@ int main(int argc, char** argv) {
 
         // if graph is too big, repeat less times to avoid memory and time problems
         if( N>std::pow(2,29) ) {
-            settings.repeatTimes = 2;
+            settings.repeatTimes = 3;
             if( thisPE==0 ) {
                 std::cout << "WARNING: because the graph is too big, we repeat only " << settings.repeatTimes << " times" << std::endl;
             }
@@ -167,7 +180,7 @@ int main(int argc, char** argv) {
         for( int r=0; r<settings.repeatTimes; r++){
             metricsVec.push_back( Metrics<ValueType>( settings ) );
 
-            partition = partitioner->partition( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metricsVec[r]);
+            partition = partitioner->partition( graph, coords, nodeWeights, nodeWeightsUse, thisTool, commTree, settings, metricsVec[r]);
             
             // partition has the the same distribution as the graph rows
             SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
@@ -183,7 +196,8 @@ int main(int argc, char** argv) {
                 metricsVec[r] = metricsVec[r-1];
                 metricsVec[r].MM["timeTotal"] = runTime;
             }else{
-                metricsVec[r].getMetrics( graph, partition, nodeWeights, settings );
+                std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+                metricsVec[r].getMetrics( graph, partition, nodeWeights, settings, blockSizes );
             }
 
             PRINT0("time to get the partition with " << ITI::to_string(thisTool) << ": " << metricsVec[r].MM["timeTotal"] );
@@ -208,11 +222,8 @@ int main(int argc, char** argv) {
 
         if( thisPE==0 ) {
             printInfo( std::cout, comm, settings);
-            std::cout << "\nFinished tool" << std::endl;
-            std::cout << "\033[1;36m";
-            std::cout << "\n---> " << ITI::to_string(thisTool);
-            std::cout<<  "\033[0m" << std::endl;
-
+            std::cout << "\nFinished tool: " << ITI::to_string(thisTool) << std::endl;
+            
             aggrMetrics.print( std::cout );
 
             // write in a file
@@ -229,6 +240,7 @@ int main(int argc, char** argv) {
                     std::cout<< "\n\tWARNING: Could not open file " << outFile << " informations not stored.\n"<< std::endl;
                 }
             }
+            std::cout<< "###" << std::endl;
         }
 
         if( outFile!="-" and settings.storePartition ) {

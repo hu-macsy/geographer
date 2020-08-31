@@ -221,14 +221,15 @@ private:
 	
 	/** Wrapper function to do local refinement on a partitioned graph. 
 	 */
-	static void doLocalRefinement(
-		DenseVector<IndexType> &result,
-		CSRSparseMatrix<ValueType> &input,
-		std::vector<DenseVector<ValueType>> &coordinates,
-		std::vector<DenseVector<ValueType>> &nodeWeights,
-		scai::dmemo::CommunicatorPtr comm,
-		Settings settings,
-		Metrics<ValueType>& metrics);
+    static void doLocalRefinement(
+        DenseVector<IndexType> &result,
+        CSRSparseMatrix<ValueType> &input,
+        std::vector<DenseVector<ValueType>> &coordinates,
+        std::vector<DenseVector<ValueType>> &nodeWeights,
+        CommTree<IndexType,ValueType> &commTree,
+        scai::dmemo::CommunicatorPtr comm,
+        Settings settings,
+        Metrics<ValueType>& metrics);
 	
 };
 } //namespace ITI

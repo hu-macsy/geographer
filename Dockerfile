@@ -16,7 +16,7 @@ RUN apt update && apt install -y \
 	mpi-default-dev
 
 # Clone Lama
-RUN git clone https://github.com/kit-parco/lama.git
+RUN git clone https://github.com/hu-macsy/lama.git
 
 # Configure Lama
 RUN cd lama && mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install ../scai && cd ../..

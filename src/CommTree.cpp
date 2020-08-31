@@ -14,7 +14,6 @@
 
 namespace ITI {
 
-
 //initialize static leaf counter
 template <typename IndexType, typename ValueType>
 unsigned int ITI::CommTree<IndexType,ValueType>::commNode::leafCount = 0;
@@ -159,7 +158,8 @@ IndexType CommTree<IndexType, ValueType>::createFlatHomogeneous(
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneous( const std::vector<std::vector<ValueType>> &leafSizes ) {
+IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneousCore( 
+    const std::vector<std::vector<ValueType>> &leafSizes ) {
     //leafSizes.size() = number of weights
     std::vector<cNode<IndexType, ValueType>> leaves = createLeaves( leafSizes );
     SCAI_ASSERT_EQ_ERROR( leaves.size(), leafSizes[0].size(), "Wrong number of leaves" );
@@ -167,10 +167,43 @@ IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneous( const std::ve
 
     this->numNodes = createTreeFromLeaves(leaves);
     this->numWeights = leafSizes.size();
-    //this->isProportional = std::vector<bool>(numNodeWeights, true); //TODO: check if this is correct
+    return this->numNodes;
+}
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneous( 
+    const std::vector<std::vector<ValueType>> &leafSizes ) {
+
+    IndexType numNodes = createFlatHeterogeneousCore(leafSizes);
+    this->isProportional = std::vector<bool>(leafSizes.size(), true); //TODO: check if this is correct
+    return numNodes;
+}//createFlatHeterogeneous
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneous( 
+    const std::vector<std::vector<ValueType>> &leafSizes,
+    const std::vector<bool> &isWeightProp) {
+
+    IndexType numNodes = createFlatHeterogeneousCore(leafSizes);
+    this->isProportional = isWeightProp;
+    return numNodes;
+}//createFlatHeterogeneous
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+IndexType CommTree<IndexType,ValueType>::createHierHeterogeneous(
+    const std::vector<std::vector<ValueType>> &leafSizes,
+    const std::vector<bool> &isWeightProp,
+    const std::vector<IndexType> &levels){
+
+    std::vector<commNode> leaves = createLeaves( leafSizes, levels);
+    *this = CommTree( leaves, isWeightProp);
 
     return this->numNodes;
-}//createFlatHeterogeneous
+
+}//createHierHeterogeneous
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
@@ -194,6 +227,48 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
         leaves[i] = leafNode;
     }
 
+    return leaves;
+}
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType,ValueType>::createLeaves( 
+    const std::vector<std::vector<ValueType>> &sizes,
+    const std::vector<IndexType> &levels) {
+
+    typedef cNode<IndexType,ValueType> cNode;
+
+    const IndexType numWeights = sizes.size();
+    const IndexType numLevels = levels.size();
+    const IndexType numLeaves = std::accumulate( levels.begin(), levels.end(), 1, std::multiplies<IndexType>() );
+    //PRINT("There are " << numLevels << " levels of hierarchy with " << numLeaves << " leaves in total." );
+    SCAI_ASSERT_EQ_ERROR( sizes[0].size(), numLeaves, "number of leaves and block mismatch" );
+
+    std::vector<unsigned int> hierarchy( numLevels, 0 );
+    std::vector<cNode> leaves(numLeaves);
+
+    for(unsigned int i=0; i<numLeaves; i++) {
+
+        std::vector<ValueType> weights( numWeights );
+        for(int w=0; w<numWeights; w++){
+            weights[w] = sizes[w][i];
+        }
+        cNode node(hierarchy, weights );
+        leaves[i] = node;
+
+        //fix hierarchy label
+        hierarchy.back()++;
+
+        for( unsigned int h=numLevels-1; h>0; h--) {
+            SCAI_ASSERT_GT_ERROR( h, 0, "Hierarchy label construction error" );
+            if( hierarchy[h]>levels[h]-1 ) {
+                hierarchy[h]=0;
+                hierarchy[h-1]++;
+            } else {
+                break;
+            }
+        }
+    }
     return leaves;
 }
 //------------------------------------------------------------------------
@@ -227,13 +302,12 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
             const ValueType scalingFactor = sumNodeWeights / sumHierWeights;
 
             if( not isProportional[i] ) {
-                SCAI_ASSERT_GE_ERROR( sumHierWeights, sumNodeWeights, "Provided node weights do not fit in the given tree for weight " << i );
+                //+1 for rounding errors
+                SCAI_ASSERT_GE_ERROR( sumHierWeights+1, sumNodeWeights, "Provided node weights do not fit in the given tree for weight " << i );
             } else {
                 //go over the nodes and adapt the weights
                 for( commNode& node : hierLevel ) {
                     node.weights[i] *= scalingFactor;
-                    //scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-                    //PRINT0( cNode.weights[i] );
                 }
             }
         }
@@ -243,12 +317,13 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
         [[maybe_unused]] IndexType size = createTreeFromLeaves( hierLevel );
 
         areWeightsAdaptedV = true;
+
     }
 }//adaptWeights
 
 //------------------------------------------------------------------------
 
-//WARNING: Needed that 'typename' to compile...
+
 template <typename IndexType, typename ValueType>
 std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType, ValueType>::createLevelAbove( const std::vector<commNode> &levelBelow ) {
 
@@ -289,7 +364,8 @@ std::vector<typename CommTree<IndexType,ValueType>::commNode> CommTree<IndexType
         //not really needed
         SCAI_ASSERT_EQ_ERROR(
             std::accumulate( fatherNode.weights.begin(), fatherNode.weights.end(), 0.0),
-            std::accumulate( thisNode.weights.begin(), thisNode.weights.end(), 0.0), "Weights are not copied?"
+            std::accumulate( thisNode.weights.begin(), thisNode.weights.end(), 0.0), 
+            "Weights are not copied?"
         );
 
         for( unsigned int j=i+1; j<levelBelowsize; j++) {
@@ -489,6 +565,25 @@ void CommTree<IndexType, ValueType>::print() const {
     }
 
 }//print()
+
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+bool CommTree<IndexType, ValueType>::isHomogeneous( ) const {
+
+    const std::vector<cNode<IndexType,ValueType>>& leaves = this->getLeaves();
+    const cNode<IndexType,ValueType> baseLeaf = leaves[0];
+
+    //bool isHomogeneous = true;
+
+    for( cNode<IndexType,ValueType> leaf : leaves ){
+        if( not (leaf==baseLeaf) ){
+            return false;
+        }
+    }
+    return true;
+}//checkIfHomogeneous
+
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
@@ -535,7 +630,9 @@ bool CommTree<IndexType, ValueType>::checkTree( bool allTests ) const {
     return true;
 }
 
+
 //to force instantiation
 template class CommTree<IndexType, double>;
 template class CommTree<IndexType, float>;
+
 }//ITI

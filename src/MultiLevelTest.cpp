@@ -290,7 +290,8 @@ TYPED_TEST (MultiLevelTest, testMultiLevelStep_dist) {
     Metrics<ValueType> metrics(settings);
 
     scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, settings, metrics);
+    typename ITI::CommTree<IndexType,ValueType>::CommTree commTree;
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, partition, uniformWeights, coords, halo, commTree, settings, metrics);
 
     EXPECT_EQ( graph.l1Norm(), beforel1Norm);
     EXPECT_EQ( graph.getNumValues(), beforeNumValues);
