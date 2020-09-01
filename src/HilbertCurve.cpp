@@ -1036,7 +1036,6 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
     //so only the root PE allocates the array
     double allMinMax[arraySize];
 
-    //every PE sends its local min and max to root
     comm->gather(allMinMax, 2, root, sfcMinMax );
 
     if( settings.debugMode and comm->getRank()==root ) {
