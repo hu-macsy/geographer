@@ -391,7 +391,7 @@ int main(int argc, char** argv) {
     }
 
     //print memory usage information. The message is too long for more PUs
-    if( comm->getSize()<100 ){   
+    if( comm->getSize()<100 and settings.verbose ){   
         //redistribute to get the correct memory usage
         aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coordinates, nodeWeights, settings, true, false);
         MSG0( "" );
@@ -400,7 +400,9 @@ int main(int argc, char** argv) {
         int myRank= comm->getRank() ;
         const std::vector<cNode<IndexType,ValueType>> leaves = commTree.getLeaves();
         SCAI_ASSERT_EQ_ERROR( leaves.size(), comm->getSize(), "leaves size mismatch" );
-        SCAI_ASSERT_EQ_ERROR( commTree.getNumWeights(), 2, "leaves weights size mismatch" );
+        if( settings.w2UpperBound ){
+            SCAI_ASSERT_EQ_ERROR( commTree.getNumWeights(), 2, "leaves weights size mismatch" );
+        }
         for( int i=0; i<comm->getSize(); i++){
             if( myRank==i ){
                 MSG( "I use " << memIuse << " MB of RAM and my assigned block weight is " << 
