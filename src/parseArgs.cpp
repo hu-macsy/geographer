@@ -71,6 +71,12 @@ Options populateOptions() {
     ("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
     ("KMBalanceMethod", "used in KMeans to partition targeting for a better imbalance. Possible values are 'repart', 'reb_lex' and 'reb_sqImba'. First repartition, the two other apply a rebalance method and repartition.", value<std::string>())
     ("focusOnBalance", "Used in hierarchical versions of K-Means to rebalance at every step.")
+    // K-Means Coreset
+    ("useCoresets","Compute a coreset and use this for K-Means")
+    ("coresetC","Tuning parameter for K-Means Coresets. Initially, the pointset is divided into c*k partitions", value<IndexType>())
+    ("coresetD","Tuning parameter for K-Means Coresets. Each refinement potentially partitions a given partition further into d*k smaller ones", value<IndexType>())
+    ("coresetMaxRecursionDepth", "Tuning parameter for K-Means Coresets. The maximum number of times a partition is split up further", value<IndexType>())
+    ("coresetCostFactor", "Tuning parameter for K-Means Coresets. A subdivision is considered better if its accumulated cost is smaller than cost_factor*cost_of_the_original_partition", value<double>())
     // using '/' to separate the lines breaks the output message
     ("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3,4,10 there are 3 levels. In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
     //output
@@ -384,7 +390,23 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         settings.CGResidual = vm["CGResidual"].as<double>();
     }
 
-
+    //kmeans coreset parameters:
+    if (vm.count("useCoresets")) {
+        settings.useCoresets = true;
+    }
+    if (vm.count("coresetC")) {
+        settings.coresetC = vm["coresetC"].as<IndexType>();
+    }  
+    if (vm.count("coresetD")) {
+        settings.coresetD = vm["coresetD"].as<IndexType>();
+    }  
+    if (vm.count("coresetMaxRecursionDepth")) {
+        settings.coresetMaxRecursionDepth = vm["coresetMaxRecursionDepth"].as<IndexType>();
+    }  
+    if (vm.count("coresetCostFactor")) {
+        settings.coresetCostFactor = vm["coresetCostFactor"].as<double>();
+    }
+    
     /*** consistency checks ***/
     if (vm.count("previousPartition")) {
         settings.repartition = true;

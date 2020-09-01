@@ -236,6 +236,16 @@ struct Settings {
     bool focusOnBalance = false;            ///< used in hierarchical versions to rebalance at every step
     std::vector<IndexType> hierLevels; 		///< for hierarchial kMeans, the number of blocks per level
     //@}
+    
+    /** @name Tuning parameters K-Means coresets
+    */
+	//@{
+	bool useCoresets=false;
+	IndexType coresetC=10;
+	IndexType coresetD=3;
+	IndexType coresetMaxRecursionDepth=3;
+	double coresetCostFactor=0.1;
+    //@}
 
     /** @name Parameters for multisection
     */

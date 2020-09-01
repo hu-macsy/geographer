@@ -16,9 +16,9 @@ else ()
 endif()
 
 ### set files ###
-set(FILES_HEADER ParcoRepart.h MultiLevel.h LocalRefinement.h HilbertCurve.h MeshGenerator.h FileIO.h Diffusion.h GraphUtils.h MultiSection.h KMeans.h CommTree.h AuxiliaryFunctions.h HaloPlanFns.h Metrics.h Mapping.h Settings.h)
-set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp Diffusion.cpp GraphUtils.cpp MultiSection_iter.cpp MultiSection.cpp KMeans.cpp CommTree.cpp AuxiliaryFunctions.cpp  HaloPlanFns.cpp Metrics.cpp Mapping.cpp Settings.cpp)
-set(FILES_TEST test_main.cpp quadtree/test/QuadTreeTest.cpp    auxTest.cpp CommTreeTest.cpp DiffusionTest.cpp  FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp LocalRefinementTest.cpp MappingTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp )
+set(FILES_HEADER ParcoRepart.h MultiLevel.h LocalRefinement.h HilbertCurve.h MeshGenerator.h FileIO.h Diffusion.h GraphUtils.h MultiSection.h KMeans.h KMeansCoreset.h CommTree.h AuxiliaryFunctions.h HaloPlanFns.h Metrics.h Mapping.h Settings.h)
+set(FILES_COMMON ParcoRepart.cpp MultiLevel.cpp LocalRefinement.cpp HilbertCurve.cpp MeshGenerator.cpp FileIO.cpp Diffusion.cpp GraphUtils.cpp MultiSection_iter.cpp MultiSection.cpp KMeans.cpp KMeansCoreset.cpp CommTree.cpp AuxiliaryFunctions.cpp  HaloPlanFns.cpp Metrics.cpp Mapping.cpp Settings.cpp)
+set(FILES_TEST test_main.cpp quadtree/test/QuadTreeTest.cpp    auxTest.cpp CommTreeTest.cpp DiffusionTest.cpp  FileIOTest.cpp GraphUtilsTest.cpp HilbertCurveTest.cpp KMeansTest.cpp KMeansCoresetTest.cpp LocalRefinementTest.cpp MappingTest.cpp MeshGeneratorTest.cpp MultiLevelTest.cpp MultiSectionTest.cpp ParcoRepartTest.cpp )
 
 ###
 ### Check if external libraries metis, parmetis and zoltan2 are found. If they are found,
@@ -37,6 +37,8 @@ if(PARMETIS_LIB AND NOT DEFINED METIS_INCLUDE)
     message(WARNING "PARMETIS_BASE was specified but not METIS_INCLUDE. Use -DMETIS_INCLUDE=<path_to_directory_that_contains_metis.h>. Setting path to ${METIS_INCLUDE}")   
 endif()
 
+
+### message(${PARHIP_BASE})
 ### find parhip ###
 find_library( PARHIP_LIB libparhip.a libparhip.so HINTS "${PARHIP_BASE}" "${PARHIP_BASE}/lib" )
 
@@ -122,7 +124,7 @@ if(Zoltan2_FOUND OR PARMETIS_LIB OR PARHIP_LIB )
     target_link_libraries( wrappers ${RBC_LIBRARY} ${PARMETIS_LIBS} ${PARHIP_LIBS} ${ZOLTAN_LIBS} )
 
     add_executable( allCompetitors allCompetitorsPart.cpp parseArgs.cpp)
-    target_include_directories( allCompetitors PUBLIC ${ZOLTAN_INCLUDES} ${PARMETIS_INCLUDES} ${CXXOPTS_DIR} )
+    target_include_directories( allCompetitors PUBLIC ${ZOLTAN_INCLUDES} ${PARMETIS_INCLUDES} ${CXXOPTS_DIR} ${CORESETS_DIR})
     target_link_libraries( allCompetitors geographer wrappers ${SCAI_LIBRARIES} ${RBC_LIBRARY} ${MPI_CXX_LIBRARIES} )
 
     set( EXTRA_LIBRARIES_FOUND "true" )
@@ -149,7 +151,7 @@ if(PARMETIS_LIB)
 endif()
 
 add_executable(GeographerStandalone main.cpp parseArgs.cpp)
-target_include_directories(GeographerStandalone PUBLIC ${CXXOPTS_DIR})
+target_include_directories(GeographerStandalone PUBLIC ${CXXOPTS_DIR} ${CORESETS_DIR})
 target_link_libraries(GeographerStandalone geographer ${SCAI_LIBRARIES} ${MPI_CXX_LIBRARIES})
 
 ### add networkit library if found ###

@@ -59,6 +59,9 @@ endif (USE_NETWORKIT)
 #cxxopts to parse input arguments
 set(CXXOPTS_DIR "${PROJECT_SOURCE_DIR}/external/cxxopts/include")
 
+#coreset for kmeans
+set(CORESETS_DIR "${PROJECT_SOURCE_DIR}/external/kmeans_coreset/include")
+
 
 ### find MPI ###
 find_package(MPI REQUIRED)
@@ -93,7 +96,7 @@ find_package( SCAI REQUIRED CONFIG
               NO_SYSTEM_ENVIRONMENT_PATH 
               PATHS ${SCAI_PATH_HINTS} )
 
-include_directories(${SCAI_INCLUDE_DIRS})
+include_directories(${SCAI_INCLUDE_DIRS} ${CORESETS_DIR})
 add_definitions(${SCAI_DEFINITIONS})
 link_directories(${SCAI_ROOT}/lib/)
 

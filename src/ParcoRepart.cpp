@@ -29,6 +29,7 @@
 #include "MultiLevel.h"
 #include "SpectralPartition.h"
 #include "KMeans.h"
+#include "KMeansCoreset.h"
 #include "AuxiliaryFunctions.h"
 #include "MultiSection.h"
 #include "GraphUtils.h"
@@ -441,8 +442,18 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         if (settings.repartition) {
             result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
         }else if (settings.initialPartition == ITI::Tool::geoKmeans) {
-            result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
-		}else if(settings.initialPartition == ITI::Tool::geoKmeansBalance) {
+            if(settings.useCoresets) {
+                /*
+                auto coreset=ITI::KMeansCorset<IndexType,ValueType>::computeCoreset(coordinateCopy,nodeWeightCopy,settings);
+                auto kmeans_result = ITI::KMeans<IndexType,ValueType>::computePartition(coreset.coordinates, coreset.nodeWeights, blockSizes, settings, metrics);
+                result= ITI::KMeansCorset<IndexType,ValueType>::partitionResult(coreset,kmeans_result,coordinateCopy,nodeWeightCopy,settings);
+                */
+                result= ITI::KMeansCorset<IndexType,ValueType>::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
+            }else{
+                result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
+		    }  
+
+        }else if(settings.initialPartition == ITI::Tool::geoKmeansBalance) {
             settings.keepMostBalanced = true;
             settings.balanceIterations = 30;
             //settings.erodeInfluence = true;
