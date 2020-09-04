@@ -70,8 +70,7 @@ blocks this can have some effect.
 
 \section*{Hierarchical k-means results}
 
-In some case, a block can be completely inside another one. See also the separate report 
-exclusively for hierarchical k-means.
+In some case, a block can be completely inside another one.
 
 \begin{figure}
 \includegraphics[scale=0.3]{slowrot_KMeans_k8.png}
@@ -143,16 +142,5 @@ this should be investigated further. Few new, relevant papers are:
 
 \end{enumerate}
 
-
-\section{Distance of PEs when system is a tree}
-
-Distances between PEs can me used when doing local refinement and consider a vertex to move. 
-The gain is not just the cut; every edge of the cut is multiplied with the cost of communicating 
-between the two PEs. If the PEs are close, e.g. in the same compute node, this cost is low. 
-If they are far, e.g., in different racks, islands etc., the cost is high.
-For a general architecture we need to maintain a $p^2$ matrix for all the distances between PEs.
-
-When our architecture has a hierarchical format, we can describe it with a tree. Then, the distances
-can be calculated fast on the fly.
 
 \end{document}
