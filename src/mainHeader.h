@@ -113,7 +113,9 @@ IndexType readInput(
         } else {
             coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, comm);
         }
-        SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size(), coords[1].getLocalValues().size(), "coordinates not of same size" );      
+        if( settings.dimensions>2 ){
+            SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size(), coords[1].getLocalValues().size(), "coordinates not of same size" );      
+        }
 
     }else if(vm.count("generate")) {
 

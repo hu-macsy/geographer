@@ -39,6 +39,7 @@ namespace
 				}
 				
 				std::discrete_distribution<std::size_t> d2dist(std::begin(dsquared),std::end(dsquared));
+PRINT("will swap " << i << " with "<< range[i+d2dist(gen)] );
 				std::swap(range[i],range[i+d2dist(gen)]);
 			}
 		};
