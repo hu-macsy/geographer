@@ -30,7 +30,10 @@ CommTree<IndexType, ValueType>::CommTree() {
 
 //constructor to create tree from a vector of leaves
 template <typename IndexType, typename ValueType>
-CommTree<IndexType, ValueType>::CommTree( const std::vector<commNode> &leaves, const std::vector<bool> isWeightProp ) {
+CommTree<IndexType, ValueType>::CommTree( 
+    const std::vector<commNode>& leaves,
+    const std::vector<bool>& isWeightProp,
+    const std::vector<double>& commCosts ) {
 
     isProportional = isWeightProp;
 
@@ -40,6 +43,14 @@ CommTree<IndexType, ValueType>::CommTree( const std::vector<commNode> &leaves, c
     this->hierarchyLevels = leaves.front().hierarchy.size()+1;
     this->numLeaves = leaves.size();
     this->numWeights = leaves[0].getNumWeights();
+
+    //no communication costs are defined, set all to 1
+    if( commCosts.size()==0 ){
+        this->commCostPerLevel = std::vector<double>(this->hierarchyLevels, 1.0 );
+    }else{
+        this->commCostPerLevel = commCosts;
+    }
+    SCAI_ASSERT_EQ_ERROR( this->commCostPerLevel.size(), this->hierarchyLevels, "Communication costs in the tree must have size equal the number of hierarchy levels" );
 
     //sanity check, TODO: remove?
     for( commNode l: leaves) {
@@ -51,7 +62,10 @@ CommTree<IndexType, ValueType>::CommTree( const std::vector<commNode> &leaves, c
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-CommTree<IndexType, ValueType>::CommTree( const std::vector<IndexType> &levels, const IndexType numWeights ) {
+CommTree<IndexType, ValueType>::CommTree(
+    const std::vector<IndexType>& levels,
+    const IndexType numWeights,
+    const std::vector<double> &commCosts ) {
 
     typedef cNode<IndexType,ValueType> cNode;
 
@@ -83,7 +97,7 @@ CommTree<IndexType, ValueType>::CommTree( const std::vector<IndexType> &levels, 
         }
     }
 
-    *this = CommTree( leaves, std::vector<bool>(numWeights, true) );
+    *this = CommTree( leaves, std::vector<bool>(numWeights, true), commCosts );
 }
 
 //------------------------------------------------------------------------

@@ -205,7 +205,11 @@ public:
     		For example, node weights can be {64, 0.01} and isWeightProp={ false, true}. An interpretation could be that this node has
     		64GB of memory and 1% of the total FLOPS of the system.
     */
-    CommTree( const std::vector<commNode> &leaves, const std::vector<bool> isWeightProp );
+    CommTree( 
+        const std::vector<commNode>& leaves,
+        const std::vector<bool>& isWeightProp,
+        const std::vector<double>& commCosts = std::vector<double>(0,0.0)
+        );
 
     /** This creates a homogeneous but not flat tree. The tree has levels.size() number of levels
     	and number of leaves=levels[0]*levels[1]*...*levels.back(). Each leaf node has the given
@@ -219,7 +223,11 @@ public:
     	@param[in] numWeights The number of weights that each node has. Node weights are set to 1 and
     	set to proportional.
     */
-    CommTree( const std::vector<IndexType> &levels, const IndexType numWeights );
+    CommTree( 
+        const std::vector<IndexType>& levels,
+        const IndexType numWeights,
+        const std::vector<double>& commCosts = std::vector<double>(0,0.0)
+        );
 
     /** @brief Return the root, i.e., hierarchy level 0.
     */
@@ -275,6 +283,12 @@ public:
         return areWeightsAdaptedV;
     }
 
+    void setCommCosts( const std::vector<double>& commCosts){
+        SCAI_ASSERT_EQ_ERROR( 
+            commCosts.size(), this->hierarchyLevels,
+            "Communication costs in the tree must have size equal the number of hierarchy levels" );
+        this->commCostPerLevel = commCosts;
+    }
     /** Check if the system if homogeneous or heterogeneous. That is, if all weights in all leaves
     are (nearly) identical, then the system is homogeneous.
     */
@@ -493,6 +507,7 @@ private:
     bool areWeightsAdaptedV = false;		///< if relative weights are adapted, \sa adaptWeights
     /// if isProportional[i] is true, then weight i is proportional and if false, weight i is absolute; isProportional.size()=numWeights
     std::vector<bool> isProportional;
+    std::vector<double> commCostPerLevel;
 
 //------------------------------------------------------------------------
 

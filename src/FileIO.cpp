@@ -6,6 +6,7 @@
  */
 
 #include "FileIO.h"
+#include "AuxiliaryFunctions.h"
 #include "quadtree/QuadTreeCartesianEuclid.h"
 
 #include <scai/lama.hpp>
@@ -2557,6 +2558,16 @@ CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const st
         std::string b;
         ss >> b;
         isProp[w] = bool( std::stoi(b) );
+    }
+
+    //next entries should have the communication cost per level
+
+    std::getline(file, line);
+    std::vector<std::string> costs = aux<IndexType,double>::split(line, ' '); 
+    auto dCosts = std::vector<double>(costs.size() );
+    for( int i=0; i<costs.size(); i++ ){
+        dCosts[i] = std::stod( costs[i] );
+PRINT0( dCosts[i] );
     }
 
     //read by line to create the leaves

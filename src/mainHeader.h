@@ -457,8 +457,9 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
     //
 
     if(vm.count("PEgraphFile")) {
+        
+        commTree =  FileIO<IndexType, ValueType>::readPETree( settings.PEGraphFile );
         throw std::logic_error("Reading of communication trees not yet implemented here.");
-        //commTree =  FileIO<IndexType, ValueType>::readPETree( settings.PEGraphFile );
 
     } else if( vm.count("blockSizesFile") or vm.count("topologyFile") ) {
         std::string blockSizesFile;
