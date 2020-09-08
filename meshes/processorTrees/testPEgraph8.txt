@@ -1,0 +1,15 @@
+#comments start with # or % and are allowed only in the top of the file
+%first line is the number of PEs, number of weights w and then w bools (0 or 1)
+%that indicate if each weight is proportional (1) or not (0)
+%second line has h=label size numbers that are the communication costs for each level
+#(label), mem(GB), cpu(%)
+8 1 1
+500 200 20
+0,0,0 # 1
+0,0,1 # 1.1
+0,1,0 # 1.2
+0,1,1 # 1.3
+1,0,0 # 1
+1,0,1 # 1.1
+1,1,0 # 1.2
+1,1,1 # 1.3

@@ -163,16 +163,16 @@ TYPED_TEST(CommTreeTest, testLabelDistance) {
     };
 
 
-    EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[0], nodes[1])), 3 );
-    EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[0], nodes[2])), 5 );
-    EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[2], nodes[3])), 1 );
-    EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[1], nodes[3])), 5 );
-    EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[3], nodes[4])), 4 );
-    EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[2], nodes[4])), 4 );
-    EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[4], nodes[4])), 0 );
+    EXPECT_EQ( (CommTree<IndexType,ValueType>::lcaDistance(nodes[0], nodes[1])), 3 );
+    EXPECT_EQ( (CommTree<IndexType,ValueType>::lcaDistance(nodes[0], nodes[2])), 5 );
+    EXPECT_EQ( (CommTree<IndexType,ValueType>::lcaDistance(nodes[2], nodes[3])), 1 );
+    EXPECT_EQ( (CommTree<IndexType,ValueType>::lcaDistance(nodes[1], nodes[3])), 5 );
+    EXPECT_EQ( (CommTree<IndexType,ValueType>::lcaDistance(nodes[3], nodes[4])), 4 );
+    EXPECT_EQ( (CommTree<IndexType,ValueType>::lcaDistance(nodes[2], nodes[4])), 4 );
+    EXPECT_EQ( (CommTree<IndexType,ValueType>::lcaDistance(nodes[4], nodes[4])), 0 );
     //this throws a warning too because nodes 4 and 5 have identical hierarchy label
     //but have different leaf IDs
-    EXPECT_EQ( (CommTree<IndexType,ValueType>::distance(nodes[4], nodes[5])), 0 );
+    EXPECT_EQ( (CommTree<IndexType,ValueType>::lcaDistance(nodes[4], nodes[5])), 0 );
 
 
 }//TYPED_TEST(CommTreeTest, testLabelDistance)

@@ -394,24 +394,22 @@ public:
     */
     std::vector<unsigned int> getGrouping(const std::vector<commNode> thisLevel) const;
 
-    /** Calculates the distance of two nodes using their hierarchy labels.
-    	We assume that leaves with the same father have distance 1.
-    	Comparing two hierarchy labels, the distance is their first mismatch.
-    	In other words, the height of their least common ancestor.
+    /** Calculates the distance of the least common ancestor (lca) of two nodes using their hierarchy labels.
+    	We assume that leaves with the same father have distance 1. Comparing two hierarchy labels, the distance is their first mismatch.
 
     	For example:
     	@verbatim
     	1.hierarchy = { 3, 3, 1, 4, 2}
     	2.hierarchy = { 3, 3, 0, 0, 1}
     	3.hierarchy = { 0, 3, 1, 4, 2}
-    	distances(1,2)=3, distacne(1,3)=5, distance(2,3)=5
+    	distances(1,2)=3, distance(1,3)=5, distance(2,3)=5
     	@endverbatim
 
     	@param[in] node1 The first node
     	@param[in] node2 The second node
     	@return Their distance in the tree.
     */
-    static ValueType distance( const commNode &node1, const commNode &node2 );
+    static ValueType lcaDistance( const commNode &node1, const commNode &node2 );
 
     /** Export the tree as a weighted graph. The edge weight between two nodes
     	is the distance of the nodes in the tree as it is calculates by the function distance.

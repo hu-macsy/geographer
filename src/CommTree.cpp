@@ -450,7 +450,7 @@ std::vector<std::vector<ValueType>> CommTree<IndexType, ValueType>::getBalanceVe
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-ValueType CommTree<IndexType, ValueType>::distance( const commNode &node1, const commNode &node2 ) {
+ValueType CommTree<IndexType, ValueType>::lcaDistance( const commNode &node1, const commNode &node2 ) {
 
     const std::vector<unsigned int> &hier1 = node1.hierarchy;
     const std::vector<unsigned int> &hier2 = node2.hierarchy;
@@ -493,7 +493,7 @@ scai::lama::CSRSparseMatrix<ValueType> CommTree<IndexType, ValueType>::exportAsG
                 continue;
 
             const commNode otherLeaf = leaves[j];
-            const ValueType dist = distance( thisLeaf, otherLeaf );
+            const ValueType dist = lcaDistance( thisLeaf, otherLeaf );
 
             ja.push_back(j);
             values.push_back(dist);
