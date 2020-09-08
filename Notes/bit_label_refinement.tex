@@ -15,132 +15,165 @@
 
 \definecolor{blue1}{RGB}{44,127,184}
 
-\newcommand{\wave}{$\mathcal{WAVE}$ }
-
 \newcommand{\bull}{$\bullet$}
 \newcommand{\red}[1]{{\color{red}{#1}}}
 \newcommand{\blue}[1]{{\color{blue1}{#1}}}
 \newcommand{\mz}{\mathbb{Z}}
 \newcommand{\quot}[1]{``#1''}
 \newcommand{\km}{$k$-means}
+\newcommand{\geo}{\textsc{Geographer}}
 \newcommand{\todo}[1]{{\red{TODO}}: #1}
+\newcommand{\etc}{e.t.c.\xspace}
 \newcommand\noIndent[1]{
   \par\vbox{\parbox[t]{\linewidth}{#1}}
 }
 
 \graphicspath{{/home/harry/wave/figures/}{../figures/}}
 
+\title{Refinement using PU distances and bit labels}
 
 \begin{document}
 
-This is meant as a place to document problems and TODOs, possible solutions and ideas and, when some
-idea is implemented, what are the results.
-
-\section*{PE renumbering}
-Given a partition, we want to redistribute data based on that. A function for this  exists in
-aux::redistributeFromPartition. Theoretically, it can happen that PE $P_j$ have local points that belong
-to other PEs, that is, $\text{localPart}(i)\neq j,\; \forall i\in P_j$. So it will send local data and receive new.
-
-\paragraph*{Idea:}  Before redistribution, every PE goes over its local points and counts how many points
-are belong to each block. Then, if for PE $P_j$, the majority of its local points belong to block $k$,
-we will renumber block $k$ to $j$. This way, $P_j$ will keep as many points as possible. 
-
-The problem is that many PEs can request for different renumbering of the same block. 
-For example, in PE $P_0$ the majority of its local points, say $30\%$ belong to block $3$ 
-but also, the majority of points in $P_1$ belongs also block $3$ with $40\%$ of the points in $P_1$. 
-So $P_0$ want the renumbering 3 to 0 and $P_1$ the renumbering
-3 to 1. For that, every PE claims a new label and this are globally summed to avoid conflicts.
-For every conflicting request, we accept the one with the largest weight. In the example above,
-we will pick 3 to 1 since $P_1$'s weight is 0.4 and $P_0$'s is 0.3. The PE that did not get claimed
-id will request another id in the next round. If all wanted ids are taken, it will pick one
-at random. We repeat until every PEs has picked an id.
-
-\paragraph*{Result:} The idea is implemented in aux::redistributeFromPartition. For random partitions
-it works, but it does not do anything for k-means. That is, every PE claims its own id.
-
-After the hilbert curve sorting, every PE has points that are local, i.e., $\forall i \in P_j,
-\text{localPart}(i)=j$. After k-means, PEs can have points from different blocks but usually
-the majority of their local points still belong to them. For the renumbering to work, at least
-2 PEs must claim a different id but this rarely happens (I noticed that most blocks still own
-$50-70\%$ of their points after k-means). This makes sense. I did not test that in detail, but in
-a few graph I tried, every PE claimed its own id, so no renumbering occurred. Maybe with smaller 
-blocks this can have some effect.
+\maketitle
 
 
+\section{Local refinement with PU communication costs}
 
-\section*{Hierarchical k-means results}
+To better exploit the system architecture,
+communication costs (or distance) between PUs are used when performing local refinement and a vertex
+is considered for moving to another block
+(vertices do not belong to PUs but blocks; to use the costs between PUs we imply the
+identity mapping where block $i$ is mapped to PU $i$).
+The gain is not just the cut; every edge of the cut is weighted by the communication cost 
+between the two PUs. If the PUs are close, e.g., in the same compute node, this cost is low. 
+If they are far, e.g., in different racks, islands etc., the cost is high.
+For a general architecture we need to maintain a $p^2$ matrix for all the distances between PUs,
+where $p$ is the number of PUs.
 
-In some case, a block can be completely inside another one.
+For example see \Cref{fig:lr}. In the case where we do not know the
+communication costs between PUs, the squared vertex $v$ will be moved to PU 2, as this burdens the cut 
+value by only 3. If we consider the communication costs between PUs as shown in the figure, 
+if $v$ remain in PU 0, it contributes a cost of 
+$$
+cost(\Pi(v)=0) = 2 d(0,1) + 3 d(0,2)= 2\cdot 10 + 3\cdot 10 = 50
+$$,
+if it moves to PU 1 the cost is 
+$$
+cost(\Pi(v)=1) = d(0,1) + 3d(1,2) = 10 + 3\cdot 30= 100
+$$,
+while if it moves to PU 2, the cost is
+$$
+cost(\Pi(v)=2) = d(0,2)+ 2d(1,2) = 10 + 2\cdot 30 = 70
+$$.
+It induces less communication costs if vertex $v$ remains in PU 0.
 
 \begin{figure}
-\includegraphics[scale=0.3]{slowrot_KMeans_k8.png}
-\includegraphics[scale=0.3]{slowrot_HKMeans_k8.png}
-\caption{Graph slowrot0 partitioned  with k-means and the hierarchical version }.
+\centering
+\includegraphics[scale=1.6]{local_search_PU_dist}
+\caption{Red line indicates the cut. Without communication costs, the squared vertex should go to 
+PU 2. If we consider the communication costs, the best PU is 1.}
+\label{fig:lr}
 \end{figure}
 
 
-\begin{figure}
-\includegraphics[scale=0.2]{slowrot_RecursiveKMeans_k2}
-\includegraphics[scale=0.2]{slowrot_RecursiveKMeans_k4}
+\section{Hierarchical systems}
 
-\includegraphics[scale=0.2]{slowrot_RecursiveKMeans_k8}
-\caption{Graph slowrot0 partitioned recursively into 8 blocks. }
+When our architecture has a hierarchical format, we can describe it with a tree. Then, the distances
+can be calculated fast on the fly without storing the distance matrix.
+We will consider only trees that are balanced, with height $h$ and in each level, all nodes have
+the same number of children. Also, each level has a cost $c$ which describes the communication
+cost of a message if it needs to cross this level.
+These trees can be described by a sequence of (number-of-children, cost) pairs
+$(p_i,c_i)$
+for each level $i$. The number of leaves is $\prod p_i=p$.
+For example, the tree in \Cref{fig:tree} is described by the sequence $(4,500),(2,300), (3,100)$
+and it has $4\cdot 2 \cdot 3 = 24$ leaves.
+ 
+Using a tree description for the system, the PUs are the leaves of the tree and intermediate tree nodes
+represent collections of PUs like CPUs, sockets, racks, \etc.
+Each leaf/PU $w$ can be uniquely identified by a label $l(w)$ that describes its position in the tree.
+The label has size $h$ and $l(w)[i]$ is the child position of $w$ in the $i$-th level.
+For example, the leaf $w$ in \Cref{fig:tree} has label $l(w)=1,0,2$. 
+The cost of communication between PUs $w$ and $z$ is $500$. The cost of communicating between $w$
+and the PUs with label $1,1,\text{X}$ is $300$.
+
+All the communication costs are stored in a vector $C$ starting from the root cost and moving down.
+Naturally, the costs are in decreasing order as communication costs more if a message needs to 
+go over a higher level of the tree.
+For this example, $C=[500,300,100]$.
+Suppose we want to find the communication cost between two PUs $w$ and $z$.
+We scan their labels $l(w)$ and $l(z)$ and we find the first position they differ, say $i$.
+Then, the communication cost between $w$ and $z$ is $C[i]$.  In our example, they differ in the 
+first position ($l(z)=0,0,0$), so the cost is $C[0]=500$.
+
+\begin{figure}
+\centering
+\includegraphics[scale=2]{hier_tree_system}
+\caption{A tree-like system.}
+\label{fig:tree}
 \end{figure}
 
+\todo{fast calculation of the cost using bit labels instead of integers}
 
 
-\section*{Get communication graph in parallel}
+\section{Distributed memory and integration to Geographer}
 
-We want to build the communication/block graph $G_c$ given the input, application graph $G_a$ and a
-partition into $k$ blocks. Notice that $V(G_c)=k$, edges $E(G_c)$ are weighted and every PE owns some subset 
-of $E(G_c)$. Even more,
-edges can be divided among PEs, for example, PE 1 can own edge $(4,5)$ with weight $10$ and the same
-edge can be present in other PEs with different weights. The actual weight of the edge $(4,5)$ is the
-sum of the weights.
+When using distributed memory, the tree structure is replicated in every PU, so no extra 
+communication is needed. The problem for \geo\ is that the implementation of the local refinement
+performs a number of 2-way FM steps in rounds based on an edge coloring of the communication graph.
+Since the distance between PUs is symmetric, it cannot be used
+for a 2-way refinement. So, the local refinement algorithm needs to be designed for k-way refinement.
+This will also lift the $k=p$ restriction that is imposed by the current local refinement implementation.
 
-\paragraph*{One solution} is to create the complete graph of size $k^2$. Every PE sets the weights of the edges that
-it owns. Then, with a global sum operation the edge weights are added and scattered back to all PEs.
-This is problematic for large $k$.
-Maybe we could avoid the quadratic space if we know how many edges $G_c$ has. But this is not easy either.
+%\section{Plan}
 
-\paragraph*{Another} way is that every PE sends its own edges and weights to a root PE, the root PE gather all the
-edges, constructs the block graph and scatters the graph back to all PEs.
+We can view this as a new local refinement algorithm in \geo\ that uses the PU distances.
+For this to work, the local refinement needs to be redesigned and re-implemented to perform
+a k-way refinement. We could use the current coarsening schemes and introduce bit labels
+after the local refinement works. There a possibility that we have some silent assumptions
+in the code or that the current code is optimized for a behavior that we will not have.
+For example, we redistributed the data (using SFC) before \km\ and local refinement and
+we do not know if we are going to do that now.
 
-\paragraph*{Update, 19/03/19:} The parallel version works now. One possible problem is that we need to create
-an array with the edges in one root PE where we gather all edges from all PEs. This arrays can have 
-big size since some edges of $G_c$ exist in many PEs. For example, if blocks 4 and 5 have a boundary 
-and are present in 4 PEs, then the edge $(4,5)$ will appear 4 times in this array. Still, this
-is much better than the quadratic size. One solution can be to have a communication pattern like
-the global sum and at every step edge weights are summed and duplicates are eliminated.
+The first steps would be to test the competitors. This way we can have a working pipeline:
+read graph and system, perform partition with competitor, evaluate solution.
+And later on, we replace the competitor with \geo.
 
-TODO: run a benchmark to see if and how faster this is.
 
-\paragraph*{A possibly} better approach is not everything to one PE but consider each PE responsible
-for some rows/vertices of the block graph. The, every PE, for every local edge will send the information 
-to the responsible PE for this row/vertex. Then, the PE will add up the edges they received and
-broadcast everything back. This is less centralized but may trigger more complicated communication 
-patterns. If the block graph needs to be replicated, the several broadcast at the last step may
-cause congestion.
+\subsection{Methodology}
 
-\paragraph*{In parallel}: The communication graph is used to create the communication schedule
-based on the edge coloring of the graph. The edge coloring can be also computed in parallel
-avoiding the explicit construction of the communication graph. Not computing the communication
-is essential for higher scalability since, for high numbers of PEs, it is a possible bottleneck although
-this should be investigated further. Few new, relevant papers are:
 \begin{enumerate}
-\item \href{https://dl.acm.org/citation.cfm?id=3188906}
-{Deterministic distributed edge-coloring with fewer colors}
-
-\item \href{https://dl.acm.org/citation.cfm?id=3175473}
-{The complexity of distributed edge coloring with small palettes}
-
-\item \href{https://dl.acm.org/citation.cfm?id=2722155}
-{$(2\Delta -1)$-edge-coloring is much easier than maximal matching in the distributed setting}
-
-\item \href{https://dl.acm.org/citation.cfm?id=282804}
-{Near-optimal, distributed edge colouring via the nibble method}
-
+\item (optional) Redistribute the graph so a PU own a somewhat connected subgraph.
+\item Obtain initial partition on application graph ($G_a$) (other than the inherent partition implied
+by the vertex labels) using a fast graph partitioner.
+\item Rename vertex labels within blocks to respect PU IDs.
+\item Perform HEM coarsening (locally for each PU).
+\item Create coarse communication graph.
+\item (optional) Renumber vertices in the communication graph such that neighboring vertices have 
+small distance (reordering step using hierarchical distance of processor graph ($G_p$)).
+\item Perform uncoarsening and refinement.
 \end{enumerate}
 
+%? In the SEA paper they consider $N^d(v)$ that is neighborhood of vertex $v$ with distance 
+%up to $d$ and they use $d=10$.
+
+\subsection{Refinement}
+Two main ideas for the refinement process:
+\begin{itemize}
+\item [Move-based] Refinement process that moves a vertex $u$
+  of $G_a$ to \quot{neighboring} PUs. Neighboring PUs are those that contain
+  neighbor vertices $v$ of $u$ in $G_a$ ($edge (u,v) \in E(G_a)$) and those that
+  %have \quot{similar} labels with the current PU and the other neighboring PUs.
+  are connected with the PU of $u$ in the process graph (or its siblings in the 
+  process tree).
+  For the boundary nodes the direct neighbors in $G_a$
+  (denoted as $N^{1}$) should be exchanged and updated between PUs after every (?) move.
+  Balance constraint should be checked explicitly.
+
+\item [Pair-based] Refinement process that swaps a vertex-pair
+  $u,v$ of $G_a$. Vertex pairs are taken from a neighborhood of $d$-distance
+  ($N^{d}$). For the boundary nodes, the neighborhood $N^{d}$ should be
+  exchanged and updated between PUs. Balance constraint is maintained implicitly.
+\end{itemize}
 
 \end{document}
