@@ -143,7 +143,10 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/config.h" DESTINATION "${HEADER_DEST}
 ### include and define targets ###
 add_subdirectory(src)
 
-add_subdirectory(tools)
+option(BUILD_TOOLS "Build additional tools, default=OFF" OFF)
+if( BUILD_TOOLS )
+    add_subdirectory(tools)
+endif()
 
 if( TARGET wrappers )
 	set( WRAPPERS_FOUND TRUE CACHE INTERNAL "")
