@@ -494,6 +494,7 @@ scai::lama::CSRSparseMatrix<ValueType> CommTree<IndexType, ValueType>::exportAsG
                 continue;
 
             const commNode otherLeaf = leaves[j];
+            //TODO: use the communication costs here, not the distance
             const ValueType dist = lcaDistance( thisLeaf, otherLeaf );
 
             ja.push_back(j);
