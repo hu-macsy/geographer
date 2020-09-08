@@ -2563,16 +2563,16 @@ CommTree<IndexType,ValueType> FileIO<IndexType, ValueType>::readPETree( const st
     //next entries should have the communication cost per level
 
     std::getline(file, line);
-    std::vector<std::string> costs = aux<IndexType,double>::split(line, ' '); 
+    std::vector<std::string> costs = aux<IndexType,double>::split(line, ' ');
     auto dCosts = std::vector<double>(costs.size() );
     for( int i=0; i<costs.size(); i++ ){
         dCosts[i] = std::stod( costs[i] );
-PRINT0( dCosts[i] );
     }
 
     //read by line to create the leaves
 
     std::vector<cNode<IndexType,ValueType>> leaves(numPEs);
+    auto labelSize = 0;
 
     for(int i=0; i<numPEs; i++) {
         bool read = !std::getline(file, line).fail();
@@ -2596,6 +2596,12 @@ PRINT0( dCosts[i] );
             ss >> tok;
         }
 
+        if( i==0 ){
+            labelSize = hierarchy.size();
+        }else{
+            assert( labelSize== hierarchy.size() );
+        }
+
         // found '#', create the weights
 
         for( unsigned int w=0; w<numWeights; w++) {
@@ -2607,7 +2613,10 @@ PRINT0( dCosts[i] );
         leaves[i]= node;
     }
 
-    return CommTree<IndexType,ValueType>( leaves, isProp );
+    //this assertion goes here as the label size is not know earlier
+    SCAI_ASSERT_EQ_ERROR( dCosts.size(), labelSize, "Communication costs should be equal to the label size" );
+
+    return CommTree<IndexType,ValueType>( leaves, isProp, dCosts );
 }
 //-------------------------------------------------------------------------------------------------
 

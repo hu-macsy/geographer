@@ -9,7 +9,7 @@
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
 #define MSG( msg, rank ) {std::stringstream ss; ss << msg; print_message( ss.str(), rank );}
 #define MSG0( msg ) {std::stringstream ss; ss << msg; print_message( ss.str(), 0 );}
-#define PRINT0( msg ) {std::stringstream ss; ss<< __FILE__<< ", "<< __LINE__ << ": "<< msg; print_message( ss.str(), 0 );}
+#define PRINT0( msg ) {std::stringstream _ss; _ss<< __FILE__<< ", "<< __LINE__ << ": "<< msg; print_message( _ss.str(), 0 );}
 
 namespace ITI {
 

@@ -317,22 +317,22 @@ public:
     	that each PE has.
     	Next, there are numWeights bits, each bit indicating if the corresponding weight is proportional or not.
     	(In total, the first line should have numWeights+2 numbers.)
-        Next line should have the communication cost per level; as many costs as the hierarchy levels.
-    	Then, there are numPEs lines and every line contains the
-    	information of one PE: first are number indicating the label of this PE in the tree (for more details
-    	see CommTree.h); this part ends with a '#'. After are numWeights numbers, the weight values for each PE.
+        Next line should have the communication cost per level starting from the top level; as many costs as the hierarchy levels.
+    	Then, there are numPEs lines and every line contains the information of one PE: first are number indicating the label of this PE in the tree 
+        (for more details see CommTree.h); this part ends with a '#'. After are numWeights numbers, the weight values for each PE.
+        **Labels and weights should be space separated.**
     	For an example, see the files in meshes/processorTrees/.
     	@verbatim
     	#comments...
     	#(label), mem(GB), cpu(%)
     	28 2 0 1
         500 300 120
-    	0,0,0 # 52.5, 0.8
-    	0,0,1 # 52, 0.5
-    	0,1,0 # 51, 0.8
-    	0,1,1 # 51.2, 0.8
-    	0,1,2 # 54, 0.7
-    	0,2,0 # 64, 1
+    	0 0 0 # 52.5 0.8
+    	0 0 1 # 52 0.5
+    	0 1 0 # 51 0.8
+    	0 1 1 # 51.2 0.8
+    	0 1 2 # 54 0.7
+    	0 2 0 # 64 1
         ...
     	@endverbatim
 

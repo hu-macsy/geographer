@@ -50,7 +50,8 @@ CommTree<IndexType, ValueType>::CommTree(
     }else{
         this->commCostPerLevel = commCosts;
     }
-    SCAI_ASSERT_EQ_ERROR( this->commCostPerLevel.size(), this->hierarchyLevels, "Communication costs in the tree must have size equal the number of hierarchy levels" );
+    SCAI_ASSERT_EQ_ERROR( this->commCostPerLevel.size(), this->hierarchyLevels-1,
+        "Communication costs in the tree must have size equal the number of hierarchy levels" );
 
     //sanity check, TODO: remove?
     for( commNode l: leaves) {
