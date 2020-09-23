@@ -119,7 +119,13 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
 
     if (vm.count("version")) {
         std::cout << "Git commit " << version << std::endl;
-        settings.isValid = false;
+        settings.isValid = true;
+        exit(0);
+        return settings;
+    }
+
+    if (vm.count("help")) {
+        settings.isValid = true;
         return settings;
     }
 
