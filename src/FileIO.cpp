@@ -165,14 +165,16 @@ std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { 
 //is this needed?
 
         //add the size of the header and all the previous
-        fNew.open(newFile, std::ios::binary | std::ios::app);
         for(IndexType p=0; p<numPEs; p++){
             if( myTurn==p){
+                fNew.open(newFile, std::ios::binary | std::ios::app);
                 fNew.write( (char*)(localNodeDegrees.data()), localN*sizeof(ULONG));
+                fNew.close();
             }
             comm->synchronize();
         }
         PRINT0("node degrees written");
+        fNew.close();
     }
 
     //
@@ -223,7 +225,7 @@ std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { 
             if( binary ){
                 fNew.open(newFile, std::ios::binary | std::ios::app); //append
                 fNew.write((char*) binaryBuffer.data(), binaryBuffer.size()*sizeof(ULONG) );
-                SCAI_ASSERT_EQ_ERROR( fNew.tellp(), (localNodeDegrees[thisPE+1]*2+3)*sizeof(ULONG) , "While writing edge list in parallel: Position in file " << filename << " for PE " << thisPE << " is not correct." );
+                SCAI_ASSERT_EQ_ERROR( fNew.tellp(), (localNodeDegrees.back()+3+globalN)*sizeof(ULONG) , "While writing edge list in parallel: Position in file " << filename << " for PE " << thisPE << " is not correct." );
                 fNew.close();
             }
             else{
