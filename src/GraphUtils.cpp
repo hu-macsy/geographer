@@ -1499,9 +1499,9 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
         localPairs[2*i].first = v1;
         localPairs[2*i].second = v2;
 
-        //insert also reversed edge to keep matrix symmetric
-        localPairs[2*i+1].first = v2;
-        localPairs[2*i+1].second = v1;
+        //TODO?: insert also reversed edge to keep matrix symmetric
+        //localPairs[2*i+1].first = v2;
+        //localPairs[2*i+1].second = v1;
     }
 
     const IndexType N = comm->max( maxLocalVertex );
