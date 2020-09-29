@@ -1445,7 +1445,7 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getCSRm
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList, const scai::dmemo::CommunicatorPtr comm ) {
+scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList, const scai::dmemo::CommunicatorPtr comm, const bool duplicateEdges ) {
 
     const IndexType thisPE = comm->getRank();
     IndexType localM = edgeList.size();
@@ -1463,7 +1463,10 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     //
 
     //TODO: not filling with dummy values, each localPairs can have different sizes
-    std::vector<int_pair> localPairs(localM*2);
+    std::vector<int_pair> localPairs(localM);
+    if( duplicateEdges ){
+        localPairs.reserve( 2*localM );
+    }
 
     // duplicate and reverse all edges before sorting to ensure matrix will be symmetric
     // TODO: any better way to avoid edge duplication?
@@ -1496,16 +1499,18 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     for(IndexType i=0; i<localM; i++) {
         IndexType v1 = edgeList[i].first - oneORzero;;
         IndexType v2 = edgeList[i].second - oneORzero;;
-        localPairs[2*i].first = v1;
-        localPairs[2*i].second = v2;
+        localPairs[i].first = v1;
+        localPairs[i].second = v2;
 
         //TODO?: insert also reversed edge to keep matrix symmetric
-        //localPairs[2*i+1].first = v2;
-        //localPairs[2*i+1].second = v1;
+        if( duplicateEdges ){
+            localPairs[localM+i].first = v2;
+            localPairs[localM+i].second = v1;
+        }
     }
 
     const IndexType N = comm->max( maxLocalVertex );
-    localM *=2 ;	// for the duplicated edges
+    //localM *=2 ;	// for the duplicated edges
 
     //
     // globally sort edges
@@ -1598,19 +1603,18 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     // insert all the received edges to your local edges
     {
         scai::hmemo::ReadAccess<IndexType> rRecvEdges(recvEdges);
-        std::vector<int_pair> recvEdgesV(recvEdgesSize);
+        std::vector<int_pair> recvEdgesV;
+        recvEdgesV.reserve(recvEdgesSize);
         SCAI_ASSERT_EQ_ERROR(rRecvEdges.size(), recvEdgesSize, "mismatch");
         for( IndexType i=0; i<recvEdgesSize; i+=2) {
             SCAI_ASSERT_LT_ERROR(i+1, rRecvEdges.size(), "index mismatch");
             int_pair sp;
             sp.first = rRecvEdges[i];
             sp.second = rRecvEdges[i+1];
-            //localPairs.insert( localPairs.begin(), sp);//this is horribly expensive! Will move the entire list of local edges with each insertion!
             recvEdgesV.push_back(sp);
             //PRINT( thisPE << ": recved edge: "<< recvEdges[i] << " - " << recvEdges[i+1] );
         }
-        recvEdgesV.insert( recvEdgesV.end(), localPairs.begin(), localPairs.end() );
-        recvEdgesV.swap( localPairs );
+        localPairs.insert( localPairs.begin(), recvEdgesV.begin(), recvEdgesV.end() );
     }
 
     PRINT0("rebuild local edge list");
