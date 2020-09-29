@@ -1598,15 +1598,19 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     // insert all the received edges to your local edges
     {
         scai::hmemo::ReadAccess<IndexType> rRecvEdges(recvEdges);
+        std::vector<int_pair> recvEdgesV(recvEdgesSize);
         SCAI_ASSERT_EQ_ERROR(rRecvEdges.size(), recvEdgesSize, "mismatch");
         for( IndexType i=0; i<recvEdgesSize; i+=2) {
             SCAI_ASSERT_LT_ERROR(i+1, rRecvEdges.size(), "index mismatch");
             int_pair sp;
             sp.first = rRecvEdges[i];
             sp.second = rRecvEdges[i+1];
-            localPairs.insert( localPairs.begin(), sp);//this is horribly expensive! Will move the entire list of local edges with each insertion!
+            //localPairs.insert( localPairs.begin(), sp);//this is horribly expensive! Will move the entire list of local edges with each insertion!
+            recvEdgesV.push_back(sp);
             //PRINT( thisPE << ": recved edge: "<< recvEdges[i] << " - " << recvEdges[i+1] );
         }
+        recvEdgesV.insert( recvEdgesV.end(), localPairs.begin(), localPairs.end() );
+        recvEdgesV.swap( localPairs );
     }
 
     PRINT0("rebuild local edge list");
