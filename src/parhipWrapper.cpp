@@ -15,6 +15,7 @@ scai::lama::DenseVector<IndexType> parhipWrapper<IndexType, ValueType>::partitio
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
     const bool nodeWeightsFlag,
     const Tool tool,
+    const ITI::CommTree<IndexType,ValueType> &commTree,
     const struct Settings &settings,
     Metrics<ValueType> &metrics){
 

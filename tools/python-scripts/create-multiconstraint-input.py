@@ -140,6 +140,9 @@ def do_main():
     parser.add_argument('instance', type=str)
     parser.add_argument('--part', type=str)
     args = parser.parse_args()
+    print(args)
+    #for a in args:
+    #    print(a)
     #print('arguments: format.graph exp.type nb.cons instance.graph part.graph')
     create_multicons_input(args.format, args.exp, args.cons, args.instance, args.part)
     

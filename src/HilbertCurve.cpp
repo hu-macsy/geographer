@@ -7,6 +7,13 @@
 
 #include "HilbertCurve.h"
 
+#include <scai/dmemo/Distribution.hpp>
+#include <scai/dmemo/HaloExchangePlan.hpp>
+#include <scai/dmemo/Distribution.hpp>
+#include <scai/dmemo/BlockDistribution.hpp>
+#include <scai/dmemo/GenBlockDistribution.hpp>
+#include <scai/dmemo/GeneralDistribution.hpp>
+
 #include <scai/dmemo/mpi/MPICommunicator.hpp>
 
 
@@ -1029,7 +1036,6 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
     //so only the root PE allocates the array
     double allMinMax[arraySize];
 
-    //every PE sends its local min and max to root
     comm->gather(allMinMax, 2, root, sfcMinMax );
 
     if( settings.debugMode and comm->getRank()==root ) {

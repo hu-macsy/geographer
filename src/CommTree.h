@@ -67,7 +67,7 @@ public:
         @param[in] isLeaf If this node is a leaf or not
         */
         commNode( std::vector<unsigned int> hier, std::vector<ValueType> allWeights, bool isLeaf=true)
-            :	hierarchy(hier),
+            : hierarchy(hier),
               numChildren(0),
               weights(allWeights),
               isLeaf(isLeaf)
@@ -86,7 +86,7 @@ public:
         /** Default constructor for non-leaf nodes.
         */
         commNode()
-            :	hierarchy( std::vector<unsigned int>(1,1)), //TODO: is this right?
+            : hierarchy( std::vector<unsigned int>(1,1)), //TODO: is this right?
               numChildren(0), //TODO: check
               numCores(0),
               isLeaf(false)
@@ -142,7 +142,7 @@ public:
             return not (*this==c);
         }
 
-//TODO: these are only leaf nodes or all the nodes of the subtree?
+        //TODO: these are only leaf nodes or all the nodes of the subtree?
         /* @brief Return the number of all ancestors this node has.
         */
         //TODO: probably children should be removed but this function is needed
@@ -194,7 +194,7 @@ public:
 
     /** @brief Default constructor.
     */
-//TODO: remove?
+
     CommTree();
 
     /**	@brief Constructor to create tree from a vector of leaves.
@@ -267,10 +267,18 @@ public:
         return hierarchyLevels;
     }
 
-    bool areWeightsAdapted(){
+    std::vector<bool> getIfWeightsAreProportional() const {
+        return isProportional;
+    }
+
+    bool areWeightsAdapted() const{
         return areWeightsAdaptedV;
     }
 
+    /** Check if the system if homogeneous or heterogeneous. That is, if all weights in all leaves
+    are (nearly) identical, then the system is homogeneous.
+    */
+    bool isHomogeneous() const;
 
     /** Creates a homogeneous tree with levels.size() number of levels
     and each node in level i has levels[i] children. \sa CommTree()
@@ -291,7 +299,7 @@ public:
     @param[in] numLeaves The number of the leaves.
     @param[in] numNodeWeights Number of weights that each node has.
     @return The size of the tree, i.e., numNodes. Since this is a flat tree with one hierarchy level,
-    numNodes=numLeanes+1, where +1 is for the root node.
+    numNodes=numLeaves+1, where +1 is for the root node.
     */
     IndexType createFlatHomogeneous( const IndexType numLeaves, const IndexType numNodeWeights = 1 );
 
@@ -313,6 +321,13 @@ public:
         const std::vector<std::vector<ValueType>> &leafSizes,
         const std::vector<bool> &isWeightProp);
 
+
+    IndexType createHierHeterogeneous(
+        const std::vector<std::vector<ValueType>> &leafSizes,
+        const std::vector<bool> &isWeightProp,
+        const std::vector<IndexType> &levels);
+
+
     /** Creates a vector of leaves with only one hierarchy level, i.e., a flat
     tree. There can be multiple weights for each leaf.
 
@@ -321,6 +336,12 @@ public:
     @return A vector with all the leaves.
     **/
     std::vector<commNode> createLeaves( const std::vector<std::vector<ValueType>> &sizes);
+
+    /** Creates leaves according to the provided levels.
+    */
+    std::vector<commNode> createLeaves( 
+        const std::vector<std::vector<ValueType>> &sizes,
+        const std::vector<IndexType> &levels);
 
     /* Takes a level of the tree and creates the level above it by grouping together nodes that
      have the same last hierarchy index.
@@ -434,7 +455,19 @@ public:
     */
     bool checkTree( bool allTests=false ) const;
 
-
+    /** Copy from other tree and convert the ValueType
+    */
+    template<typename ValueType2>
+    void copyFrom( const CommTree<IndexType,ValueType2> &otherTree ){
+        this->hierarchyLevels = otherTree.getNumHierLevels();
+        this->numNodes = otherTree.getNumNodes();
+        this->numLeaves = otherTree.getNumLeaves();
+        this->numWeights = otherTree.getNumWeights();
+        this->areWeightsAdaptedV = otherTree.areWeightsAdapted();
+        this->isProportional = otherTree.getIfWeightsAreProportional();
+        typedef typename ITI::CommTree<IndexType,ValueType2>::commNode commNode2;
+        std::vector<commNode2> leaves = otherTree.getLeaves();
+    }
 
 private:
 
@@ -453,16 +486,13 @@ private:
     */
     std::vector<std::vector<commNode>> tree;
 
-//must be known how many levels the tree has
-//(well, it can inferred but it is just easier)
     IndexType hierarchyLevels; 			///< how many hierarchy levels exist, hierarchyLevels = tree.size()
     IndexType numNodes;					///< all the nodes of the tree
     IndexType numLeaves;				///< the leafs of the tree
     IndexType numWeights;				///< how many weights each node has
     bool areWeightsAdaptedV = false;		///< if relative weights are adapted, \sa adaptWeights
-/// if isProportional[i] is true, then weight i is proportional and if false, weight i is absolute; isProportional.size()=numWeights
+    /// if isProportional[i] is true, then weight i is proportional and if false, weight i is absolute; isProportional.size()=numWeights
     std::vector<bool> isProportional;
-
 
 //------------------------------------------------------------------------
 

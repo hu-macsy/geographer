@@ -27,12 +27,12 @@ template <typename IndexType, typename ValueType>
 class GraphUtils {
 public:
     /**
-     * Reindexes the nodes of the input graph to form a BlockDistribution. No redistribution of the graph happens, only the indices are changed.
-     * After this method is run, the input graph has a BlockDistribution.
+     * Redistributes the nodes of the input graph to form a GenBlockDistribution.
+     * After this method is finished, the input graph has a GenBlockDistribution.
      *
      * @param[in,out] the graph
      *
-     * @return A block-distributed vector containing the old local indices
+     * @return A  general block-distributed vector containing the old local indices
      of this PE
      */
     static scai::dmemo::DistributionPtr genBlockRedist(scai::lama::CSRSparseMatrix<ValueType> &graph);
@@ -115,6 +115,12 @@ public:
         const scai::lama::DenseVector<ValueType> &nodeWeights = scai::lama::DenseVector<ValueType>(0,0),
         const std::vector<ValueType> &blockSizes = std::vector<ValueType>(0,0));
 
+
+    static std::vector<ValueType> getBlocksWeights(
+        const scai::lama::DenseVector<IndexType> &part,
+        const IndexType numBlocks,
+        const scai::lama::DenseVector<ValueType> &nodeWeights = scai::lama::DenseVector<ValueType>(0,0)
+        );
     /**
      * @brief Builds a halo containing all non-local neighbors.
      *
@@ -281,9 +287,13 @@ public:
      Go over the vector of the local edges, sort the edges, construct the local part of CSR sparse matrix and
      build the global matrix in the end.
      * @param[in] edgeList The local list of edges for this PE; edgeList[i].first is one vertex of the edge and .second the other.
+     * @param[in] duplicateEdges Will duplicate all edges to make sure matrix is symmetric. This will convert a directed graph to undirected.
      * @return The distributed adjacency matrix.
      */
-    static scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>>& edgeList, const scai::dmemo::CommunicatorPtr comm );
+    static scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( 
+        std::vector< std::pair<IndexType, IndexType>>& edgeList,
+        const scai::dmemo::CommunicatorPtr comm,
+        const bool duplicateEdges=false );
 
 
     /** Given a CSR sparse matrix, it calculates its edge list representations.
@@ -292,9 +302,20 @@ public:
 
     	@param[in] adjM The input graph (ignores direction)
     	@param[out] maxDegree The maximum degree of the graph
-    	@return The local part of an edge list representation. return.size()==adjM.getLocalNumValues()/2. Global size==graph.getNumValues()/2.
+    	@return The local part of an edge list representation. return.size()==adjM.getLocalNumValues(). Global size==graph.getNumValues().
     */
-    static std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_local(const scai::lama::CSRSparseMatrix<ValueType>& adjM, IndexType& maxDegree=0);
+    static std::vector<std::tuple<IndexType,IndexType,ValueType>> CSR2EdgeList_repl(const scai::lama::CSRSparseMatrix<ValueType>& adjM, IndexType& maxDegree=0);
+
+    /** Converts the local part of the CSR matrix to an edge list  where node IDs are global.
+
+        @param[in] adjM The input graph (ignores direction)
+        @param[out] maxDegree The maximum degree of the graph
+        @return The local part of an edge list representation. return.size()==adjM.getLocalNumValues(). Global size==graph.getNumValues().
+    */
+    static std::vector<std::tuple<IndexType,IndexType,ValueType>> localCSR2GlobalEdgeList(
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        IndexType &maxDegree);
+
 
     /** @brief Construct the Laplacian of the input matrix. May contain parallel communication.
      *
@@ -304,10 +325,11 @@ public:
      */
     static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian(const scai::lama::CSRSparseMatrix<ValueType>& adjM);
 
-    /** @deprecated Not used anymore, use computeCommVolume().
+    /** @deprecated Construct positive semi-definite laplacian: like the regular laplacian but
+	 * the diagonal elements have value degree +1, not just degree, so the matrix is positive definite.
     */
     //TODO: debug and benchmark (it might be faster than the other method) or remove
-    static scai::lama::CSRSparseMatrix<ValueType> constructLaplacian_depr(const scai::lama::CSRSparseMatrix<ValueType>& adjM);
+    static scai::lama::CSRSparseMatrix<ValueType> constructLaplacianPlusIdentity(const scai::lama::CSRSparseMatrix<ValueType>& adjM);
     
 
     /** @brief Construct a replicated projection matrix for a fast Johnson-Lindenstrauß-Transform

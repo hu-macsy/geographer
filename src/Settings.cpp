@@ -25,8 +25,14 @@ std::ostream& ITI::operator<<( std::ostream& out, const ITI::Tool tool) {
     case Tool::geoHierRepart:
         token = "geoHierRepart";
         break;
+    case Tool::geoKmeansBalance:
+        token = "geoKmeansBalance";
+        break;
     case Tool::geoMS:
         token = "geoMS";
+        break;
+    case Tool::geomRebalance:
+        token = "geomRebalance";
         break;
     case Tool::parMetisGraph:
         token = "parMetisGraph";
@@ -48,6 +54,9 @@ std::ostream& ITI::operator<<( std::ostream& out, const ITI::Tool tool) {
         break;
     case Tool::zoltanMJ:
         token = "zoltanMJ";
+        break;
+    case Tool::zoltanXPulp:
+        token = "zoltanXPulp";
         break;
     case Tool::zoltanSFC:
         token = "zoltanSFC";
@@ -105,8 +114,12 @@ std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool) {
         tool = ITI::Tool::geoHierKM;
     else if( token=="geoHierRepart" or tokenLower=="geohierrepart")
         tool = ITI::Tool::geoHierRepart;
+    else if( token=="geoKmeansBalance" or tokenLower=="geokmeansbalance")
+        tool = ITI::Tool::geoKmeansBalance;
     else if( token=="geoMS" or tokenLower=="geoms")
         tool = ITI::Tool::geoMS;
+    else if( token=="geomRebalance" or tokenLower=="geomrebalance")
+        tool = ITI::Tool::geomRebalance;
     else if( token=="parMetisGraph" or tokenLower=="parmetisgraph")
         tool = ITI::Tool::parMetisGraph;
     else if( token=="parMetisGeom" or tokenLower=="parmetisgeom" )
@@ -121,9 +134,12 @@ std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool) {
         tool = ITI::Tool::zoltanRCB;
     else if( token=="zoltanMJ" or tokenLower=="zoltanmj")
         tool = ITI::Tool::zoltanMJ;
+    else if( token=="zoltanXPulp" or tokenLower=="zoltanxpulp")
+        tool = ITI::Tool::zoltanXPulp;
     else if( token=="zoltanSFC" or tokenLower=="zoltansfc")
         tool = ITI::Tool::zoltanSFC;
-    else if( token=="parhipFastMesh" or tokenLower=="parhipfastmesh" )
+    else if( token=="parhipFastMesh" or tokenLower=="parhipfastmesh" 
+            or token=="parHip" or tokenLower=="parhip" )
         tool = ITI::Tool::parhipFastMesh;
     else if( token=="parhipUltraFastMesh" or tokenLower=="parhipultrafastmesh")
         tool = ITI::Tool::parhipUltraFastMesh;
@@ -162,17 +178,26 @@ ITI::Settings::Settings() {
     this->machine = std::string(machineChar);
 }
 
-bool ITI::Settings::checkValidity() {
-    if( this->storeInfo && this->outFile=="-" ) {
+bool ITI::Settings::checkValidity(const scai::dmemo::CommunicatorPtr comm ) {
+    if( this->storeInfo and this->outFile=="-" and this->outDir=="-" ){
         this->isValid = false;
+        if( comm->getRank()==0){
+            std::cout<< "ERROR: storeInfo argument was given but no outFile or outDir was given" << std::endl;
+        }
         return false;
     }
-    if( initialPartition==Tool::unknown or initialPartition==Tool::unknown){
+    if( initialMigration==Tool::unknown or initialPartition==Tool::unknown){
         this->isValid = false;
+        if( initialMigration==Tool::unknown ){
+            throw std::runtime_error("provided tool for initialMigration is not known");
+        }
+        if( initialPartition==Tool::unknown ){
+            throw std::runtime_error("provided tool for initialPartition is not known");
+        }
         return false;
     }
 
-    return isValid;
+    return true;
 }
 
 template <typename ValueType>
@@ -198,6 +223,19 @@ ITI::Settings ITI::Settings::setDefault( const scai::lama::CSRSparseMatrix<Value
 
     return retSet;
 }
+
+
+void ITI::print_message( const std::string message, IndexType rank){
+    const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
+    if( rank==-1 ){
+        rank = comm->getRank();
+    }
+    if( comm->getRank()==rank ) {
+       std::cout<< "PE " << rank << ": " << message << std::endl;
+    }
+}
+
 
 //instantiation
 template ITI::Settings ITI::Settings::setDefault<double>( const scai::lama::CSRSparseMatrix<double>& graph );

@@ -7,7 +7,9 @@
 #include "config.h"
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl //not happy with these macros
+#define MSG( msg, rank ) {std::stringstream ss; ss << msg; print_message( ss.str(), rank );}
+#define MSG0( msg ) {std::stringstream ss; ss << msg; print_message( ss.str(), 0 );}
+#define PRINT0( msg ) {std::stringstream ss; ss<< __FILE__<< ", "<< __LINE__ << ": "<< msg; print_message( ss.str(), 0 );}
 
 namespace ITI {
 
@@ -128,7 +130,7 @@ inline std::ostream& operator<<(std::ostream& out, Format method) {
 - zoltanMJ Partition a point set (no graph is needed) using the Multijagged algorithm of zoltan2.
 - zoltanMJ Partition a point set (no graph is needed) using the space filling curves algorithm of zoltan2.
 */
-enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, parMetisRefine, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, parhipFastMesh, parhipUltraFastMesh, parhipEcoMesh, myAlgo, none, unknown};
+enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoKmeansBalance, geoSFC, geoMS, geomRebalance, parMetisGraph, parMetisGeom, parMetisSFC, parMetisRefine, zoltanRIB, zoltanRCB, zoltanMJ, zoltanXPulp, zoltanSFC, parhipFastMesh, parhipUltraFastMesh, parhipEcoMesh, myAlgo, none, unknown};
 
 
 std::istream& operator>>(std::istream& in, ITI::Tool& tool);
@@ -147,7 +149,7 @@ std::string getCallingCommand( const int argc, char** argv );
 */
 struct Settings {
     Settings();
-    bool checkValidity();
+    bool checkValidity(const scai::dmemo::CommunicatorPtr comm );
 
     /** @name General partition settings
     */
@@ -155,6 +157,7 @@ struct Settings {
     IndexType numBlocks = 2; 	///< number of blocks to partition to
     double epsilon = 0.03;		///< maximum allowed imbalance of the output partition
     bool repartition = false; 	///< set to true to respect the initial partition
+    std::vector<double> epsilons;
 
     ITI::Tool initialPartition = ITI::Tool::geoKmeans;			///< the tool to use to get the initial partition, \sa Tool
     //static const ITI::Tool initialMigration = ITI::Tool::geoSFC;///< pre-processing step to redistribute/migrate coordinates
@@ -169,7 +172,6 @@ struct Settings {
     std::string outFile = "-";	///< name of the file to store metrics (if desired)
     std::string outDir = "-"; 	//this is used by the competitors main
     std::string PEGraphFile = "-"; //TODO: this should not be in settings
-    std::string blockSizesFile = "-"; //TODO: this should not be in settings
     ITI::Format fileFormat = ITI::Format::AUTO;   	///< the format of the input file, \sa Format
     ITI::Format coordFormat = ITI::Format::AUTO; 	///< the format of the coordinated input file, \sa Format
     bool useDiffusionCoordinates = false;		///< if not coordinates are provided, we can use artificial coordinates
@@ -180,6 +182,8 @@ struct Settings {
     std::string callingCommand;         ///< the complete calling command used
     bool autoSetCpuMem = false;         ///< if set, geographer will gather cpu and memory info and use them for partitioning
     IndexType processPerNode = 24;      ///< the number of processes per compute node. Is used with autoSetCpuMem to determine the cpu ID
+    bool w2UpperBound = false;          ///< when given a file with the block sizes or the topology, treat the second weight as an upper bound(usually, this is used so the second weight corresponds to the memory capacity of the PEs)
+    bool useMemFromFile = false;        ///< when a topology or block sizes file is given, if true, use the actual values in the file for memory. otherwise set the max memory to 1.2*number of graph rows.
     //@}
 
     /** @name Mesh generation settings
@@ -216,8 +220,6 @@ struct Settings {
     /** @name Tuning parameters balanced K-Means
     */
     //@{
-//TODO?: in the heterogenous and hierarchical case, minSamplingNodes
-//makes more sense to be a percentage of the nodes, not a number. Or not?
     IndexType minSamplingNodes = 100;		///< the starting number of sampled nodes. If set to -1, all nodes are considered from the start
 
     double influenceExponent = 0.5;
@@ -227,7 +229,11 @@ struct Settings {
     bool tightenBounds = false;
     bool freezeBalancedInfluence = false;
     bool erodeInfluence = false;
-    //bool manhattanDistance = false;
+    bool keepMostBalanced = false;
+    std::string KMBalanceMethod = "reb_lex";
+    //IndexType batchSize = 100;              ///< after how many moves we calculate the global sum in KMeans::rebalance()
+    double batchPercent = 0.01;          ///< calculate the batch size as a percentage of the number of local points
+    bool focusOnBalance = false;            ///< used in hierarchical versions to rebalance at every step
     std::vector<IndexType> hierLevels; 		///< for hierarchial kMeans, the number of blocks per level
     //@}
 
@@ -267,8 +273,8 @@ struct Settings {
     //calculate expensive performance metrics?
     bool computeDiameter = false;			///< if the diameter should be computed (can be expensive)
     IndexType maxDiameterRounds = 2;		///< max number of rounds to approximate the diameter
-    IndexType maxCGIterations = 3000;        ///< max number of iterations of the CG solver in metrics
-    double CGResidual = 1e-4;
+    IndexType maxCGIterations = 300;        ///< max number of iterations of the CG solver in metrics
+    double CGResidual = 1e-6;
     //@}
 
     /** @name Various parameters
@@ -374,6 +380,10 @@ struct Settings {
 
 }; //struct Settings
 
+
+void print_message( const std::string message, IndexType rank=-1 );
+
+//void MSG0( const std::stringstream stream );
 
 
 struct int_pair {
