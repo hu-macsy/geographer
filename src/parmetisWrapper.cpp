@@ -65,6 +65,8 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::refine
     {
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
         SCAI_ASSERT_EQ_ERROR( vtxDist.size(), comm->getSize()+1, "Wrong vtxDist size" );
+        const ValueType localWeightSum = std::accumulate( vVwgt.begin(), vVwgt.end(), 0.0);
+        SCAI_ASSERT_GT_ERROR( localWeightSum, 0, "Sum of local vertex weights should not be 0" );
     }
 
     // nparts: the number of parts to partition (=k)
