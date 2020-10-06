@@ -293,7 +293,8 @@ public:
     static scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( 
         std::vector< std::pair<IndexType, IndexType>>& edgeList,
         const scai::dmemo::CommunicatorPtr comm,
-        const bool duplicateEdges=false );
+        const bool duplicateEdges=false,
+        const bool removeSelfLoops =true );
 
 
     /** Given a CSR sparse matrix, it calculates its edge list representations.

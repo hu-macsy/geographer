@@ -196,7 +196,11 @@ public:
      * @param[in] filename The prefix of the file to read from.
      * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
      * */
-    static scai::lama::CSRSparseMatrix<ValueType> readEdgeListDistributed(const std::string filename, const scai::dmemo::CommunicatorPtr comm);
+    static scai::lama::CSRSparseMatrix<ValueType> readEdgeListDistributed(
+        const std::string filename,
+        const scai::dmemo::CommunicatorPtr comm,
+        const bool duplicateEdges = false,
+        const bool removeSelfLoops = true);
 
     /** @brief Reads the coordinates from file "filename" and returns then in a vector of DenseVector.
      *

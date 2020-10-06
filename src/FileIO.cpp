@@ -203,7 +203,7 @@ std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { 
             for(IndexType i=0; i<rLocalIA.size()-1; i++) {       // for all local nodes
                 for(IndexType j= rLocalIA[i]; j<rLocalIA[i+1]; j++) {    // for all the edges of a node
                     if(!edgeWeights) {
-                        ssBuffer << rLocalJA[j]+1 << " ";
+                        ssBuffer << rLocalJA[j] +1 << " ";
                     } else {
                         ssBuffer << rLocalJA[j]+1 << " "<< rLocalVal[j]<< " ";
                     }
@@ -1350,7 +1350,11 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 //TODO: handle case where number of files != numPEs
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListDistributed(const std::string prefix, const scai::dmemo::CommunicatorPtr comm) {
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListDistributed(
+    const std::string prefix,
+    const scai::dmemo::CommunicatorPtr comm,
+    const bool duplicateEdges,
+    const bool removeSelfLoops) {
     SCAI_REGION( "FileIO.readEdgeListDistributed" );
 
     const IndexType thisPE = comm->getRank();
@@ -1389,7 +1393,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
         edgeList.push_back( std::make_pair( v1, v2) );
     }
 
-    return  GraphUtils<IndexType, ValueType>::edgeList2CSR( edgeList, comm );
+    return  GraphUtils<IndexType, ValueType>::edgeList2CSR( edgeList, comm, duplicateEdges, removeSelfLoops );
 
 }
 //-------------------------------------------------------------------------------------------------

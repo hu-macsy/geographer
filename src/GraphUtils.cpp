@@ -1445,7 +1445,11 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getCSRm
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList, const scai::dmemo::CommunicatorPtr comm, const bool duplicateEdges ) {
+scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeList2CSR(
+    std::vector< std::pair<IndexType, IndexType>> &edgeList,
+    const scai::dmemo::CommunicatorPtr comm,
+    const bool duplicateEdges,
+    const bool removeSelfLoops) {
 
     const IndexType thisPE = comm->getRank();
     IndexType localM = edgeList.size();
@@ -1466,6 +1470,8 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     std::vector<int_pair> localPairs(localM);
     if( duplicateEdges ){
         localPairs.reserve( 2*localM );
+        localPairs.resize( 2*localM );
+        PRINT0("will duplicate edges");
     }
 
     // duplicate and reverse all edges before sorting to ensure matrix will be symmetric
@@ -1495,10 +1501,15 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
 
     //if vertices are numbered starting from 1, subtract 1 by every vertex index
     const IndexType oneORzero = globalMinIndex==0 ? 0: 1;
+    IndexType selfLoopsCnt = 0;
     
     for(IndexType i=0; i<localM; i++) {
-        IndexType v1 = edgeList[i].first - oneORzero;;
-        IndexType v2 = edgeList[i].second - oneORzero;;
+        IndexType v1 = edgeList[i].first - oneORzero;
+        IndexType v2 = edgeList[i].second - oneORzero;
+        if( removeSelfLoops && v1==v2 ){
+            selfLoopsCnt++;
+            continue;
+        }
         localPairs[i].first = v1;
         localPairs[i].second = v2;
 
@@ -1510,7 +1521,10 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     }
 
     const IndexType N = comm->max( maxLocalVertex );
+    const IndexType globalSelfLoops = comm->sum( selfLoopsCnt );
     //localM *=2 ;	// for the duplicated edges
+
+    PRINT0("removed globally " << globalSelfLoops << " self loops");
 
     //
     // globally sort edges
@@ -1624,13 +1638,26 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     //remove duplicates
     //
     {
-        const IndexType numEdges = localPairs.size() ;
-        localPairs.erase(unique(localPairs.begin(), localPairs.end(), [](int_pair p1, int_pair p2) {
+        const IndexType numEdges = localPairs.size();
+        localPairs.erase( unique( localPairs.begin(), localPairs.end(), [](int_pair p1, int_pair p2) {
             return ( (p1.second==p2.second) and (p1.first==p2.first));
         }), localPairs.end() );
         const IndexType numRemoved = numEdges - localPairs.size();
         const IndexType totalNumRemoved = comm->sum(numRemoved);
         PRINT0("removed duplicates, total removed edges: " << totalNumRemoved);
+    }
+
+    //remove self loops one more time; probably not needed
+    if(removeSelfLoops) {
+        const IndexType numEdges = localPairs.size();
+        std::remove_if( localPairs.begin(), localPairs.end(), 
+            [](int_pair p) {
+                return p.first==p.second;
+            }
+        );
+        const IndexType numRemoved = numEdges - localPairs.size();
+        const IndexType totalNumRemoved = comm->sum(numRemoved);
+        PRINT0("removed self loops, total removed edges: " << totalNumRemoved);
     }
 
     //

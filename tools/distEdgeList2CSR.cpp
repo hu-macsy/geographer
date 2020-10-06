@@ -37,7 +37,10 @@ int main(int argc, char** argv) {
 
 	std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 	
-    const scai::lama::CSRSparseMatrix<ValueType> graph = ITI::FileIO<IndexType,ValueType>::readEdgeListDistributed( filename, comm );
+    bool duplicateEdges = true;
+    bool removeSelfLoops = true;
+    const scai::lama::CSRSparseMatrix<ValueType> graph = 
+        ITI::FileIO<IndexType,ValueType>::readEdgeListDistributed( filename, comm, duplicateEdges, removeSelfLoops);
 
 	std::chrono::duration<double> readListTime = std::chrono::steady_clock::now() - startTime;
     if( thisPE==0 ) {
