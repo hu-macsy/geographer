@@ -106,7 +106,11 @@ IndexType readInput(
         }
 
         //read the coordinates file
-        if (vm.count("coordFormat")) {
+        if( settings.dimensions==0 ){
+            //if dimensions are explicitly set to 0, set only one coord with the same value
+            const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(N, comm));
+            coords.push_back( DenseVector<ValueType>( dist, 0.0 ) );
+        }else if (vm.count("coordFormat")) {
             coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, comm, settings.coordFormat);
         } else if (vm.count("fileFormat")) {
             coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, comm, settings.fileFormat);
@@ -114,7 +118,7 @@ IndexType readInput(
             coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, comm);
         }
         if( settings.dimensions>2 ){
-            SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size(), coords[1].getLocalValues().size(), "coordinates not of same size" );      
+            SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size(), coords[1].getLocalValues().size(), "coordinates not of same size" );
         }
 
     }else if(vm.count("generate")) {
