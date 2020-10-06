@@ -9,6 +9,7 @@
 
 #include "CommTree.h"
 
+
 namespace ITI {
 
 /** @brief A struct to hold and calculate several metrics for the partition.
@@ -47,7 +48,7 @@ public:
         {"edgeImbalance", -1.0}, {"maxBorderNodesPercent",-1.0}, {"avgBorderNodesPercent",-1.0},
         {"maxBlockDiameter",-1.0}, {"harmMeanDiam",-1.0}, {"numDisconBlocks",-1.0},
         {"maxRedistVol",-1.0}, {"totRedistVol",-1.0},	 //redistribution metrics
-        {"maxCongestion",-1.0}, {"maxDilation",-1.0}, {"avgDilation",-1.0}		//mapping metrics
+        {"maxCongestion",-1.0}, {"maxDilation",-1.0}, {"avgDilation",-1.0}, {"qap_J(C,D,P)", -1.0}//mapping metrics
     };
 
     //constructors
@@ -85,6 +86,12 @@ public:
         struct Settings settings,
         const std::vector<std::vector<ValueType>> &blockSizes = std::vector<std::vector<ValueType>>(0, std::vector<ValueType>(0,0)) );
 
+    void getMetrics(
+        const scai::lama::CSRSparseMatrix<ValueType> &graph,
+        const scai::lama::DenseVector<IndexType> &partition,
+        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
+        struct Settings settings,
+        const CommTree<IndexType,ValueType> &PEtree );
 
     /** @brief Get all possible metrics.
 
