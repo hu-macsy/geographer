@@ -229,7 +229,7 @@ Settings initialize( const int argc, char** argv, const cxxopts::ParseResult& vm
     }
       
     std::string callingCommand = ITI::getCallingCommand(argc, argv);
-    
+PRINT(callingCommand);
     Settings settings = ITI::interpretSettings(vm);
     //add the calling command to the setting so it can be extracted later
     settings.callingCommand = callingCommand;
@@ -568,6 +568,25 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
             const int coresPerNode = settings.hierLevels.back(); 
             std::vector<std::vector<ValueType>> blockWeights = calculateLoadRequests<ValueType>(comm, coresPerNode);
             commTree.createFlatHeterogeneous( blockWeights, std::vector<bool>{true, false}  );
+        }else if( vm.count("distance_parameter_string") ){
+            SCAI_ASSERT( !vm.count("blockSizesFile"), "conflicting arguments");
+            SCAI_ASSERT( !vm.count("topologyFile"), "conflicting arguments");
+
+            //create the distance vector
+            std::vector<ValueType> distances;
+            {
+                std::stringstream ss( vm["distance_parameter_string"].as<std::string>() );
+                std::string item;
+
+                while (!std::getline(ss, item, ':').fail()) {
+                    distances.push_back( std::stod(item) );
+PRINT0( distances.back() );
+                }
+            }
+
+            //tree is homogeneous, that means that block sizes should be homogeneous, i.e., all equal to N/k or sumWeight/k
+            const IndexType numWeights = nodeWeights.size();
+            commTree.createHierHomogeneous( settings.hierLevels, distances, numWeights );
         }else{
             const IndexType numWeights = nodeWeights.size();
             commTree.createFromLevels(settings.hierLevels, numWeights );

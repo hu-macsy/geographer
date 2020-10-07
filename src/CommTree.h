@@ -210,7 +210,7 @@ public:
     /** This creates a homogeneous but not flat tree. The tree has levels.size() number of levels
     	and number of leaves=levels[0]*levels[1]*...*levels.back(). Each leaf node has the given
     	number of weights set to 1 and all weights are proportional.
-    	Example: leaves = {3,4,5,6}, the first level has 3 children, each node in the next level
+    	Example: levels = {3,4,5,6}, the first level has 3 children, each node in the next level
     	has 4 children, each node in the next 5 and the nodes before the leaves has 6 children each.
     	In total, 4 levels and 3*4*5*6 = 360 leaves.
 
@@ -275,6 +275,10 @@ public:
         return areWeightsAdaptedV;
     }
 
+    void setDistances(const std::vector<ValueType> dist){
+        this->distances = dist;
+    }
+
     /** Check if the system if homogeneous or heterogeneous. That is, if all weights in all leaves
     are (nearly) identical, then the system is homogeneous.
     */
@@ -326,6 +330,11 @@ public:
         const std::vector<std::vector<ValueType>> &leafSizes,
         const std::vector<bool> &isWeightProp,
         const std::vector<IndexType> &levels);
+
+    IndexType createHierHomogeneous( 
+    const std::vector<IndexType> &levels,
+    const std::vector<ValueType> &hierDistances,
+    const IndexType numNodeWeights);
 
 
     /** Creates a vector of leaves with only one hierarchy level, i.e., a flat
@@ -397,7 +406,7 @@ public:
     	@param[in] node2 The second node
     	@return Their distance in the tree.
     */
-    static ValueType distance( const commNode &node1, const commNode &node2 );
+    static IndexType distance( const commNode &node1, const commNode &node2 );
 
     /** Export the tree as a weighted graph. The edge weight between two nodes
     	is the distance of the nodes in the tree as it is calculates by the function distance.
@@ -493,6 +502,8 @@ private:
     bool areWeightsAdaptedV = false;		///< if relative weights are adapted, \sa adaptWeights
     /// if isProportional[i] is true, then weight i is proportional and if false, weight i is absolute; isProportional.size()=numWeights
     std::vector<bool> isProportional;
+
+    std::vector<ValueType> distances;
 
 //------------------------------------------------------------------------
 

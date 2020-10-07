@@ -47,6 +47,7 @@ CommTree<IndexType, ValueType>::CommTree( const std::vector<commNode> &leaves, c
         SCAI_ASSERT_EQ_ERROR( l.getNumWeights(), numWeights, "Found leaf that does not have the same number of weights as the others before" );
     }
     this->numNodes = createTreeFromLeaves( leaves );
+    this->distances.assign( hierarchyLevels, 1.0 );
 }
 //------------------------------------------------------------------------
 
@@ -96,6 +97,7 @@ void CommTree<IndexType, ValueType>::createFromLevels( const std::vector<IndexTy
     {
         auto leaves = tmpTree.getLeaves();
         IndexType tmpHierarchyLevels = leaves.front().hierarchy.size();
+        //tmpTree.distances.assign( hierarchyLevels, 1.0 );
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
         if( comm->getRank()==0 ) {
             std::cout << "There are " << tmpHierarchyLevels << " levels of hierarchy and " << leaves.size() << " leaves.";
@@ -120,6 +122,7 @@ IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vecto
     //bottom level are the leaves
     std::vector<commNode> levelBelow = leaves;
     tree.insert( tree.begin(), levelBelow );
+    distances.assign( hierarchyLevels, 1.0 );
     IndexType size = levelBelow.size();
 
     IndexType tmpHierarchyLevels = leaves.front().hierarchy.size();
@@ -152,6 +155,7 @@ IndexType CommTree<IndexType, ValueType>::createFlatHomogeneous(
     this->numNodes = createTreeFromLeaves(leaves);
     this->numWeights = numNodeWeights;
     this->isProportional = std::vector<bool>(numNodeWeights, true); //TODO: check if this is correct
+    this->distances.assign( hierarchyLevels, 1.0 );
 
     return this->numNodes;
 }//createFlatHomogeneous
@@ -167,6 +171,8 @@ IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneousCore(
 
     this->numNodes = createTreeFromLeaves(leaves);
     this->numWeights = leafSizes.size();
+    this->distances.assign( hierarchyLevels, 1.0 );
+
     return this->numNodes;
 }
 //------------------------------------------------------------------------
@@ -200,6 +206,24 @@ IndexType CommTree<IndexType,ValueType>::createHierHeterogeneous(
 
     std::vector<commNode> leaves = createLeaves( leafSizes, levels);
     *this = CommTree( leaves, isWeightProp);
+
+    return this->numNodes;
+
+}//createHierHeterogeneous
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+IndexType CommTree<IndexType,ValueType>::createHierHomogeneous(
+    const std::vector<IndexType> &hierLevels,
+    const std::vector<ValueType> &hierDistances,
+    const IndexType numNodeWeights){
+
+    //tree is homogeneous, so all blocks/leaves have the same weight: N/k
+    //std::vector<std::vector<ValueType>> blockSizes( numNodeWeights, std::vector<ValueType>(numLeaves, 1) );
+
+    //std::vector<commNode> leaves = createLeaves( blockSizes, hierLevels);
+    *this = CommTree( hierLevels, numNodeWeights );
+    this->setDistances(hierDistances);
 
     return this->numNodes;
 
@@ -436,7 +460,7 @@ std::vector<std::vector<ValueType>> CommTree<IndexType, ValueType>::getBalanceVe
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-ValueType CommTree<IndexType, ValueType>::distance( const commNode &node1, const commNode &node2 ) {
+IndexType CommTree<IndexType, ValueType>::distance( const commNode &node1, const commNode &node2 ) {
 
     const std::vector<unsigned int> &hier1 = node1.hierarchy;
     const std::vector<unsigned int> &hier2 = node2.hierarchy;

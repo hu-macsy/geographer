@@ -37,6 +37,8 @@ Options populateOptions() {
     ("processPerNode", "the number of processes per compute node. Is used with autoSetCpuMem to determine the internal cpu/core ID within a compute node and query the cpu frequency.",  value<IndexType>())
     ("useMemFromFile", "when a topology or block sizes file is given, if true, use the actual values in the file for memory. otherwise set the max memory to 1.2*number of graph rows.")
     ("mappingRenumbering", "map blocks to PEs using the SFC index of the block's center. This works better when PUs are numbered consecutively." )
+    ("hierarchy_parameter_string", "a sequence of h number separated by : that indicate the structure of a tree-like architecture from leaves to root. For example, the system 12:4:2 has 2 nodes that each has 4 sockets (for example) and each socket has 12 cores, summing to 12*4*2=96 PEs", value<std::string>() )
+    ("distance_parameter_string", "The communication costs between PEs that belong to different subtrees of a tree-like system from leaves to root. For example, 1:10:500 means that two leaves/PEs with the same socket have communication cost 1, to leaves/PEs in different sockets but in the same node have communication cost 10 and two leaves/PEs in different nodes have cost 500", value<std::string>())
     //repartitioning
     ("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
     //multi-level and local refinement
@@ -72,7 +74,7 @@ Options populateOptions() {
     ("KMBalanceMethod", "used in KMeans to partition targeting for a better imbalance. Possible values are 'repart', 'reb_lex' and 'reb_sqImba'. First repartition, the two other apply a rebalance method and repartition.", value<std::string>())
     ("focusOnBalance", "Used in hierarchical versions of K-Means to rebalance at every step.")
     // using '/' to separate the lines breaks the output message
-    ("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3,4,10 there are 3 levels. In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
+    ("hierLevels", "The number of blocks per level starting from the leaves. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 10,4,3 there are 3 levels. In the first/top one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
     //output
     ("outFile", "write result partition into file", value<std::string>())
     //debug
@@ -341,26 +343,43 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("maxKMeansIterations")) {
         settings.maxKMeansIterations = vm["maxKMeansIterations"].as<IndexType>();
     }
-    if (vm.count("hierLevels")) {  
-        std::stringstream ss( vm["hierLevels"].as<std::string>() );
+
+    if (vm.count("hierLevels") or vm.count("hierarchy_parameter_string")) {  
+        if (vm.count("hierLevels") and vm.count("hierarchy_parameter_string")){
+            throw std::invalid_argument("Conflicting arguments, provide either argument hierLevels or hierarchy_parameter_string");
+        }
+
+        std::stringstream ss;
+        char delim = ',';
+        if (vm.count("hierLevels") ){
+            ss << vm["hierLevels"].as<std::string>();
+        }else{
+PRINT0(vm["hierarchy_parameter_string"].as<std::string>() );
+            ss << vm["hierarchy_parameter_string"].as<std::string>();
+            delim = ':';
+        }
+        //std::stringstream ss( vm["hierLevels"].as<std::string>() );
         std::string item;
         std::vector<IndexType> hierLevels;
         IndexType product = 1;
 
-        while (!std::getline(ss, item, ',').fail()) {
+        while (!std::getline(ss, item, delim).fail()) {
             IndexType blocksInLevel = std::stoi(item);
-            hierLevels.push_back(blocksInLevel);
+            hierLevels.insert( hierLevels.begin(), blocksInLevel );
             product *= blocksInLevel;
         }
 
         settings.hierLevels = hierLevels;
+for( auto x:hierLevels){
+    PRINT0(x);
+}
 
         if (!vm.count("numBlocks")) {
             settings.numBlocks = product;
         } else {
             if (vm["numBlocks"].as<IndexType>() != product) {
                 std::cout << vm["numBlocks"].as<IndexType>() << " " << product << std::endl;
-                throw std::invalid_argument("When giving --hierLevels, either omit --numBlocks or set it to the product of level entries.");
+                throw std::invalid_argument("When giving --hierLevels or --hierarchy_parameter_string, either omit --numBlocks or set it to the product of level entries. Hierarchy given results to " + std::to_string(product) + " blocks");
             }
         }
     }
@@ -411,7 +430,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
                 || settings.initialPartition == Tool::geoHierRepart)) {
             if(comm->getRank() ==0 ) {
                 std::cout << " WARNING: Without using hierarchical partitioning, ";
-                std::cout << "the given hierarchy levels will be ignored." << std::endl;
+                std::cout << "the given hierarchy levels will be ignored during partitioning." << std::endl;
             }
         }
 
@@ -435,6 +454,14 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         }
 
         settings.tools = tools;
+    }
+
+    if( vm.count("PEgraphFile") or vm.count("topologyFile")){
+        if( vm.count("distance_parameter_string") or vm.count("hierarchy_parameter_string") ){
+            if(comm->getRank() ==0 ) {
+                throw std::invalid_argument("Conflicting input parameters. Give either distance and hierarchy parameters for the system or a file");
+            }
+        }
     }
 
     return settings;
