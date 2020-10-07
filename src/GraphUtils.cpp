@@ -1091,6 +1091,7 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 
             if (neighborBlock != thisBlock) {
                 IndexType index = thisBlock*k + neighborBlock;
+                //there is no += operator for HArray
                 localBlockGraphEdges[index] = localBlockGraphEdges[index] + values[j];
             }
         }
@@ -1117,9 +1118,8 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
     scai::hmemo::HArray<IndexType> csrJA;
     scai::hmemo::HArray<ValueType> csrValues( numEdges, 0.0 );
     {
-        IndexType numNZ = numEdges;     // this equals the number of edges of the graph
         scai::hmemo::WriteOnlyAccess<IndexType> ia( csrIA, k +1 );
-        scai::hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numNZ );
+        scai::hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numEdges );
         scai::hmemo::WriteOnlyAccess<ValueType> values( csrValues );
         scai::hmemo::ReadAccess<ValueType> globalEdges( localBlockGraphEdges );
         ia[0]= 0;

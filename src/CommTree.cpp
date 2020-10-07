@@ -502,7 +502,7 @@ scai::lama::CSRSparseMatrix<ValueType> CommTree<IndexType, ValueType>::exportAsG
         const commNode thisLeaf = leaves[i];
         //to keep matrix symmetric
         for( IndexType j=0; j<numLeaves; j++ ) {
-            if( i==j )	//explicitly avoid self loops
+            if( i==j )  //explicitly avoid self loops
                 continue;
 
             const commNode otherLeaf = leaves[j];

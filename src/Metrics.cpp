@@ -58,21 +58,6 @@ void Metrics<ValueType>::getMetrics(
 
 //---------------------------------------------------------------------------
 
-// template<typename ValueType>
-// void Metrics<ValueType>::getMetrics(
-//     const scai::lama::CSRSparseMatrix<ValueType> &graph,
-//     const scai::lama::DenseVector<IndexType> &partition,
-//     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-//     struct Settings settings,
-//     const CommTree<IndexType,ValueType> &PEtree){
-
-//     SCAI_ASSERT_EQ_ERROR( settings.metricsDetail, "mapping", "Should be called only for the mapping metrics" );
-
-//     const scai::lama::CSRSparseMatrix<ValueType> PEgraph = PEtree.exportAsGraph_local();
-//     getMappingMetrics( graph, partition, PEgraph );
-// }
-//---------------------------------------------------------------------------
-
 
 template<typename ValueType>
 void Metrics<ValueType>::getAllMetrics(
@@ -488,7 +473,7 @@ void Metrics<ValueType>::getMappingMetrics(
     SCAI_ASSERT_EQ_ERROR( PEia.size(), N+1, "ia size mismatch" );
     SCAI_ASSERT_LE_ERROR( PEia[N], peM, "Too large index in PE graph" );
     SCAI_ASSERT_LE_ERROR( scai::utilskernel::HArrayUtils::max(PEStorage.getIA()), peM, "some ia value is too large");
-PRINT0( PEValues.size() << " should be equal to " << N*(N-1)/2 );
+    SCAI_ASSERT_EQ_ERROR( PEValues.size(), N*(N-1), "PE graph should be a complete undirected graph" );
     SCAI_ASSERT_LE_ERROR( blockValues.size(), PEValues.size(), "mismatch in graph edges" );
 
     // calculate dilation and congestion for every edge
