@@ -340,9 +340,9 @@ public:
         const std::vector<IndexType> &levels);
 
     IndexType createHierHomogeneous( 
-    const std::vector<IndexType> &levels,
-    const std::vector<ValueType> &hierDistances,
-    const IndexType numNodeWeights);
+        const std::vector<IndexType> &levels,
+        const std::vector<ValueType> &hierDistances,
+        const IndexType numNodeWeights);
 
 
     /** Creates a vector of leaves with only one hierarchy level, i.e., a flat
@@ -414,7 +414,7 @@ public:
     	@param[in] node2 The second node
     	@return Their distance in the tree.
     */
-    static IndexType distance( const commNode &node1, const commNode &node2 );
+    ValueType distance( const commNode &node1, const commNode &node2 ) const ;
 
     /** Export the tree as a weighted graph. The edge weight between two nodes
     	is the distance of the nodes in the tree as it is calculates by the function distance.

@@ -578,8 +578,8 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
                 std::string item;
 
                 while (!std::getline(ss, item, ':').fail()) {
-//                  distances.push_back( std::stod(item) );
-                    distances.insert( distances.begin(), std::stod(item) );
+                  distances.push_back( std::stod(item) );
+//                    distances.insert( distances.begin(), std::stod(item) );
                 }
             }
             //tree is homogeneous, that means that block sizes should be homogeneous, i.e., all equal to N/k or sumWeight/k
