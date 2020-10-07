@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
     
     ITI::CommTree<IndexType,ValueType> commTree = createCommTree( vm, settings, comm, nodeWeights);
     commTree.adaptWeights( nodeWeights );
-
+    
     //---------------------------------------------------------------
     //
     // get previous partition, if set
@@ -227,8 +227,8 @@ int main(int argc, char** argv) {
         std::chrono::time_point<std::chrono::steady_clock> beforeReport = std::chrono::steady_clock::now();
 
         {
-            std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
-            metricsVec[r].getMetrics(graph, partition, nodeWeights, settings, blockSizes );
+            //std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+            metricsVec[r].getMetrics(graph, partition, nodeWeights, settings, commTree );
             metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
         }
 

@@ -275,8 +275,16 @@ public:
         return areWeightsAdaptedV;
     }
 
-    void setDistances(const std::vector<ValueType> dist){
+    bool hasDistances() const{
+        return this->distances.size()>0;
+    }
+
+    void setDistances(const std::vector<ValueType> &dist){
         this->distances = dist;
+    }
+    
+    std::vector<ValueType> getDistances() const{
+        return this->distances;
     }
 
     /** Check if the system if homogeneous or heterogeneous. That is, if all weights in all leaves
@@ -295,7 +303,7 @@ public:
     @param[in] leaves A vector with all the leaf nodes.
     @return The size of the tree, i.e., numNodes.
     */
-    IndexType createTreeFromLeaves( const std::vector<commNode> leaves);
+    IndexType createTreeFromLeaves( const std::vector<commNode> &leaves, const std::vector<ValueType> &hierDistances = std::vector<ValueType>(0,0) );
 
     /** Creates an artificial flat tree with only one hierarchy level.
     This mainly used when no communication is provided. All leaf nodes have the same weight.

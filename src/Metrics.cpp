@@ -18,12 +18,14 @@ void Metrics<ValueType>::getMetrics(
     const scai::lama::DenseVector<IndexType> &partition,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
     struct Settings settings,
-    const std::vector<std::vector<ValueType>> &blockSizes){
+    const CommTree<IndexType,ValueType> &PEtree){
+
+    const std::vector<std::vector<ValueType>> blockSizes = PEtree.getBalanceVectors();
 
     if( settings.metricsDetail=="all" ) {
         getAllMetrics( graph, partition, nodeWeights, settings, blockSizes);
     }
-    if( settings.metricsDetail=="easy" ) {
+    if( settings.metricsDetail=="easy" or settings.metricsDetail=="mapping" ) {
         getEasyMetrics( graph, partition, nodeWeights, settings, blockSizes );
     }
     if( settings.metricsDetail=="mapping" ) {
@@ -34,6 +36,9 @@ void Metrics<ValueType>::getMetrics(
 
         if( settings.PEGraphFile!="-" ){ // a processor graph is provides by the user
             PEgraph = ITI::FileIO<IndexType, ValueType>::readGraph( settings.PEGraphFile, PEnodeWeights, comm, settings.fileFormat );
+        }else if(PEtree.hasDistances() ){
+            PEgraph = PEtree.exportAsGraph_local();
+            SCAI_ASSERT_EQ_ERROR( PEgraph.getNumRows(), settings.numBlocks, "PEgraph size mismatch" );
         }else{// if not, create the processor graph
             if( settings.numBlocks!=comm->getSize()){
                 if( comm->getRank()==0 ){
@@ -53,19 +58,19 @@ void Metrics<ValueType>::getMetrics(
 
 //---------------------------------------------------------------------------
 
-template<typename ValueType>
-void Metrics<ValueType>::getMetrics(
-    const scai::lama::CSRSparseMatrix<ValueType> &graph,
-    const scai::lama::DenseVector<IndexType> &partition,
-    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
-    struct Settings settings,
-    const CommTree<IndexType,ValueType> &PEtree){
+// template<typename ValueType>
+// void Metrics<ValueType>::getMetrics(
+//     const scai::lama::CSRSparseMatrix<ValueType> &graph,
+//     const scai::lama::DenseVector<IndexType> &partition,
+//     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+//     struct Settings settings,
+//     const CommTree<IndexType,ValueType> &PEtree){
 
-    SCAI_ASSERT_EQ_ERROR( settings.metricsDetail, "mapping", "Should be called only for the mapping metrics" );
+//     SCAI_ASSERT_EQ_ERROR( settings.metricsDetail, "mapping", "Should be called only for the mapping metrics" );
 
-    const scai::lama::CSRSparseMatrix<ValueType> PEgraph = PEtree.exportAsGraph_local();
-    getMappingMetrics( graph, partition, PEgraph );
-}
+//     const scai::lama::CSRSparseMatrix<ValueType> PEgraph = PEtree.exportAsGraph_local();
+//     getMappingMetrics( graph, partition, PEgraph );
+// }
 //---------------------------------------------------------------------------
 
 

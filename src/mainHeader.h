@@ -229,7 +229,6 @@ Settings initialize( const int argc, char** argv, const cxxopts::ParseResult& vm
     }
       
     std::string callingCommand = ITI::getCallingCommand(argc, argv);
-PRINT(callingCommand);
     Settings settings = ITI::interpretSettings(vm);
     //add the calling command to the setting so it can be extracted later
     settings.callingCommand = callingCommand;
@@ -579,11 +578,10 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
                 std::string item;
 
                 while (!std::getline(ss, item, ':').fail()) {
-                    distances.push_back( std::stod(item) );
-PRINT0( distances.back() );
+//                  distances.push_back( std::stod(item) );
+                    distances.insert( distances.begin(), std::stod(item) );
                 }
             }
-
             //tree is homogeneous, that means that block sizes should be homogeneous, i.e., all equal to N/k or sumWeight/k
             const IndexType numWeights = nodeWeights.size();
             commTree.createHierHomogeneous( settings.hierLevels, distances, numWeights );

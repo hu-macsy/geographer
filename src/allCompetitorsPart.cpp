@@ -196,8 +196,8 @@ int main(int argc, char** argv) {
                 metricsVec[r] = metricsVec[r-1];
                 metricsVec[r].MM["timeTotal"] = runTime;
             }else{
-                std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
-                metricsVec[r].getMetrics( graph, partition, nodeWeights, settings, blockSizes );
+                //std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+                metricsVec[r].getMetrics( graph, partition, nodeWeights, settings, commTree );
             }
 
             PRINT0("time to get the partition with " << ITI::to_string(thisTool) << ": " << metricsVec[r].MM["timeTotal"] );

@@ -114,7 +114,9 @@ void CommTree<IndexType, ValueType>::createFromLevels( const std::vector<IndexTy
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vector<commNode> leaves) {
+IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( 
+    const std::vector<commNode> &leaves,
+    const std::vector<ValueType> &hierDistances) {
 
     hierarchyLevels = leaves.front().hierarchy.size()+1; //+1 is for the root
     numLeaves = leaves.size();
@@ -122,9 +124,13 @@ IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vecto
     //bottom level are the leaves
     std::vector<commNode> levelBelow = leaves;
     tree.insert( tree.begin(), levelBelow );
-    distances.assign( hierarchyLevels, 1.0 );
-    IndexType size = levelBelow.size();
+    if( hierDistances.size()==0 ){
+        distances.assign( hierarchyLevels, 1.0 );
+    }else{
+        distances = hierDistances;
+    }
 
+    IndexType size = levelBelow.size();
     IndexType tmpHierarchyLevels = leaves.front().hierarchy.size();
 
     for(int h = tmpHierarchyLevels-1; h>=0; h--) {
@@ -219,11 +225,8 @@ IndexType CommTree<IndexType,ValueType>::createHierHomogeneous(
     const IndexType numNodeWeights){
 
     //tree is homogeneous, so all blocks/leaves have the same weight: N/k
-    //std::vector<std::vector<ValueType>> blockSizes( numNodeWeights, std::vector<ValueType>(numLeaves, 1) );
-
-    //std::vector<commNode> leaves = createLeaves( blockSizes, hierLevels);
     *this = CommTree( hierLevels, numNodeWeights );
-    this->setDistances(hierDistances);
+    this->distances = hierDistances;
 
     return this->numNodes;
 
@@ -338,7 +341,7 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
 
         //clear tree and rebuild. This will correctly construct the intermediate levels
         tree.clear();
-        [[maybe_unused]] IndexType size = createTreeFromLeaves( hierLevel );
+        [[maybe_unused]] IndexType size = createTreeFromLeaves( hierLevel, getDistances() );
 
         areWeightsAdaptedV = true;
 

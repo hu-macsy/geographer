@@ -354,7 +354,6 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         if (vm.count("hierLevels") ){
             ss << vm["hierLevels"].as<std::string>();
         }else{
-PRINT0(vm["hierarchy_parameter_string"].as<std::string>() );
             ss << vm["hierarchy_parameter_string"].as<std::string>();
             delim = ':';
         }
@@ -370,9 +369,6 @@ PRINT0(vm["hierarchy_parameter_string"].as<std::string>() );
         }
 
         settings.hierLevels = hierLevels;
-for( auto x:hierLevels){
-    PRINT0(x);
-}
 
         if (!vm.count("numBlocks")) {
             settings.numBlocks = product;

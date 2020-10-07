@@ -84,14 +84,16 @@ public:
         const scai::lama::DenseVector<IndexType> &partition,
         const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
         struct Settings settings,
-        const std::vector<std::vector<ValueType>> &blockSizes = std::vector<std::vector<ValueType>>(0, std::vector<ValueType>(0,0)) );
+        const CommTree<IndexType,ValueType> &PEtree = CommTree<IndexType,ValueType>()
+    //    const std::vector<std::vector<ValueType>> &blockSizes = std::vector<std::vector<ValueType>>(0, std::vector<ValueType>(0,0))
+    );
 
-    void getMetrics(
-        const scai::lama::CSRSparseMatrix<ValueType> &graph,
-        const scai::lama::DenseVector<IndexType> &partition,
-        const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
-        struct Settings settings,
-        const CommTree<IndexType,ValueType> &PEtree );
+    // void getMetrics(
+    //     const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    //     const scai::lama::DenseVector<IndexType> &partition,
+    //     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights, 
+    //     struct Settings settings,
+    //     const CommTree<IndexType,ValueType> &PEtree );
 
     /** @brief Get all possible metrics.
 
