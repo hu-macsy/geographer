@@ -75,6 +75,15 @@ scai::lama::DenseVector<IndexType> parhipWrapper<IndexType, ValueType>::partitio
         case Tool::parhipEcoMesh:
             mode = 2;
             break;
+        case Tool::parhipUltraFastSocial:
+            mode =3;
+            break;
+        case Tool::parhipFastSocial:
+            mode = 4;
+            break;
+        case Tool::parhipEcoSocial:
+            mode = 5;
+            break;
         default:
             throw std::invalid_argument("Error, wrong mode/tool: "+ to_string(tool) + " provided in parhipWrapper.\nAborting...");
     }

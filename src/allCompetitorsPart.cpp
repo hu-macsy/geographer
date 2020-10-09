@@ -124,6 +124,7 @@ int main(int argc, char** argv) {
         comm->synchronize();
         ITI::Tool thisTool = wantedTools[t];
         std::cout.precision(5);
+        MSG0("will start partition with tool " << ITI::to_string(thisTool) );
 
         // if using unit weights, set flag for wrappers
         bool nodeWeightsUse = true;
