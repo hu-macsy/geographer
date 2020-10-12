@@ -5,6 +5,7 @@
 #include "sys/times.h"
 #include "sys/vtimes.h"
 
+#include <chrono>
 #include <cxxopts.hpp>
 
 #include "AuxiliaryFunctions.h"
@@ -35,6 +36,7 @@ IndexType readInput(
     std::vector<scai::lama::DenseVector<ValueType>>& coords,
     std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights ){
 
+    std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
     IndexType N;
 
     if (vm.count("graphFile")) {
@@ -198,6 +200,12 @@ IndexType readInput(
     if( not aux<IndexType,ValueType>::checkConsistency( graph, coords, nodeWeights, settings) ){
         throw std::runtime_error("Input not consistent.\nAborting...");
         return -1;
+    }
+    
+    std::chrono::duration<double> endTime = std::chrono::steady_clock::now() - startTime;
+    double totalTime= comm->max(endTime.count() );
+    if( comm->getRank()==0 ) {
+        std::cout<< "input read/created in " << totalTime << " seconds " << std::endl;
     }
 
     return N;
