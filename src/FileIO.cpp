@@ -30,6 +30,7 @@
 #include <iterator>
 #include <map>
 #include <tuple>
+#include <chrono>
 
 
 using scai::lama::CSRStorage;
@@ -862,7 +863,6 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     //get distribution and local range
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
-    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
     IndexType beginLocalRange, endLocalRange;
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
@@ -870,6 +870,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     SCAI_ASSERT_LE_ERROR(localN, std::ceil(ValueType(globalN) / comm->getSize()), "localN: " << localN << ", optSize: " << std::ceil(globalN / comm->getSize()));
 
     //scroll to begin of local range. Neighbors of node i are in line i+1
+    std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
     IndexType ll;
     for (ll = 0; ll < beginLocalRange; ll++) {
         std::getline(file, line);
@@ -878,8 +879,10 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
             exit(1);
         }
     }
+    std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - startTime;
+    double tillMyStartTime = elapTime.count();
 
-    std::cout << "Process " << comm->getRank() << " reading from " << beginLocalRange << " to " << endLocalRange << std::endl;
+    std::cout << "Process " << comm->getRank() << " reading from " << beginLocalRange << " to " << endLocalRange <<", time to reach starting vertex " << tillMyStartTime << std::endl;
 
     std::vector<IndexType> ia(localN+1, 0);
     std::vector<IndexType> ja;
@@ -895,6 +898,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     ja.reserve(edgeEstimate);
 
     //std::cout << "Process " << comm->getRank() << " reserved memory for  " <<  edgeEstimate << " edges." << std::endl;
+    startTime =  std::chrono::steady_clock::now();
 
     //now read in local edges
     for (IndexType i = 0; i < localN; i++) {
@@ -955,7 +959,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         }
     }
 
-    //std::cout << "Process " << comm->getRank() << " read " << ja.size() << " local edges. " << std::endl;
+    elapTime = std::chrono::steady_clock::now() - startTime;
+    //std::cout << "Process " << comm->getRank() << " read " << ja.size() << " local edges in time " << elapTime.count() << std::endl;
 
 
     nodeWeights.resize(numberNodeWeights);
@@ -990,13 +995,17 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         throw std::runtime_error("Expected " + std::to_string(2*globalM) + " edges, got " + std::to_string(comm->sum(ja.size())));
     }
 
+    startTime =  std::chrono::steady_clock::now();
     //assign matrix
     scai::lama::CSRStorage<ValueType> myStorage(localN, globalN,
             HArray<IndexType>(ia.size(), ia.data()),
             HArray<IndexType>(ja.size(), ja.data()),
             HArray<ValueType>(values.size(), values.data()));
 
-    //std::cout << "Process " << comm->getRank() << " created local storage " << std::endl;
+    elapTime = std::chrono::steady_clock::now() - startTime;
+    std::cout << "Process " << comm->getRank() << " created local storage in time " << elapTime.count() << std::endl;
+
+    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
     return scai::lama::distribute<scai::lama::CSRSparseMatrix<ValueType>>(myStorage, dist, noDist);
     //ThomasBranses ? return scai::lama::CSRSparseMatrix<ValueType>( dist, std::move(myStorage) ); // if no comm
