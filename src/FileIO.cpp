@@ -869,8 +869,6 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     const IndexType localN = endLocalRange - beginLocalRange;
     SCAI_ASSERT_LE_ERROR(localN, std::ceil(ValueType(globalN) / comm->getSize()), "localN: " << localN << ", optSize: " << std::ceil(globalN / comm->getSize()));
 
-    //std::cout << "Process " << comm->getRank() << " reading from " << beginLocalRange << " to " << endLocalRange << std::endl;
-
     //scroll to begin of local range. Neighbors of node i are in line i+1
     IndexType ll;
     for (ll = 0; ll < beginLocalRange; ll++) {
@@ -880,6 +878,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
             exit(1);
         }
     }
+
+    std::cout << "Process " << comm->getRank() << " reading from " << beginLocalRange << " to " << endLocalRange << std::endl;
 
     std::vector<IndexType> ia(localN+1, 0);
     std::vector<IndexType> ja;
