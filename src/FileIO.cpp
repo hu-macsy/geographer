@@ -873,10 +873,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     IndexType ll;
     for (ll = 0; ll < beginLocalRange; ll++) {
         std::getline(file, line);
-        if( file.tellg()<0) {
-            PRINT(*comm << " : "<<  ll);
-            exit(1);
-        }
+        SCAI_ASSERT_GE_ERROR( file.tellg(), 0, "Wrong number of vertices or corrupted file?" );
     }
 
     std::cout << "Process " << comm->getRank() << " reading from " << beginLocalRange << " to " << endLocalRange << std::endl;
