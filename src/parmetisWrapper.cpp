@@ -209,6 +209,13 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
         return scai::lama::DenseVector<IndexType>(0,0);
     }
 
+    if( settings.verbose ){
+        options.resize(2);
+        MSG0("setting options[1] to " << PARMETIS_DBGLVL_REFINEINFO );
+        options[0] = 1;
+        options[1] = PARMETIS_DBGLVL_REFINEINFO; //verbosity
+    }
+    
     // nparts: the number of parts to partition (=k)
     IndexType nparts= settings.numBlocks;
     // ndims: the number of dimensions
