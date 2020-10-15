@@ -254,7 +254,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
 
     if( tool==Tool::parMetisGraph ) {
         if( comm->getRank()==0 ) 
-            std::cout<< "About to call ParMETIS_V3_PartKway" << std::endl;
+            std::cout<< "About to call ParMETIS_V3_PartKway to partition into " << nparts << " blocks" << std::endl;
 
         ParMETIS_V3_PartKway( 
             vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, tpwgts.data(), ubvec.data(), options.data(), &edgecut, partKway, &metisComm );
