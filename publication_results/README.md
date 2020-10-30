@@ -1,0 +1,4 @@
+## Guidelines to reproduce results that have been used in publications
+
+In each folder you will find a file names 'experiments_X_Y.yml' where X is the publication that this file has been used, Y can show the machine that this file has been used.
+These 'experiment.yml' files are to be read and used by [simexpal](https://github.com/hu-macsy/simexpal).

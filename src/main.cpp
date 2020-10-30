@@ -391,7 +391,7 @@ int main(int argc, char** argv) {
     }
 
     //print memory usage information. The message is too long for more PUs
-    if( comm->getSize()<100 and settings.verbose ){   
+    if( comm->getSize()<100 and settings.verbose ){
         //redistribute to get the correct memory usage
         aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coordinates, nodeWeights, settings, true, false);
         MSG0( "" );
