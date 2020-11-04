@@ -163,11 +163,7 @@ TYPED_TEST(CommTreeTest, testLabelDistance) {
     };
 
     CommTree<IndexType,ValueType> commTree( nodes, {false,false, true} );
-    
     commTree.setDistances( std::vector<ValueType>{1,2,3,4,5} );
-
-    //std::vector<ValueType> distances = {5,4,3,1,0};
-    //commTree.setDistances( distances);
 
     EXPECT_EQ( (commTree.distance(nodes[0], nodes[1])), 3 );
     EXPECT_EQ( (commTree.distance(nodes[0], nodes[2])), 5 );
@@ -216,7 +212,8 @@ TYPED_TEST(CommTreeTest, testExportGraph) {
         cNode( std::vector<unsigned int>{2,1,1}, {8, 12, 90} ),
     };
 
-    const ITI::CommTree<IndexType,ValueType> cTree( leaves, {0,0,0} );
+    ITI::CommTree<IndexType,ValueType> cTree( leaves, {0,0,0} );
+    cTree.setDistances( std::vector<ValueType>{1,2,3} );
 
     const scai::lama::CSRSparseMatrix<ValueType> PEgraph = cTree.exportAsGraph_local();
 

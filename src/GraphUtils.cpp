@@ -1883,8 +1883,8 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(
     //TODO: check, this might break the matrix's consistency
     //L = D-A
     L.matrixPlusMatrix( 1.0, degreeM, -1.0, graph );
-    //L *= -1.0;
-    //L += degreeM;
+
+    SCAI_ASSERT_EQ_ERROR( dist, L.getRowDistributionPtr(), "distribution mismatch" );
     SCAI_ASSERT_ERROR(L.isConsistent(), "laplacian matrix not consistent");
 
     return L;
