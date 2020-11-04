@@ -83,7 +83,7 @@ before_install:
   - sudo apt-get install -y cmake mpi-default-dev mpi-default-bin libatlas-base-dev libboost-filesystem-dev
 
 install:
-  - git clone --branch fix-compiler-warnings https://github.com/hu-macsy/lama.git
+  - git clone --branch master https://github.com/hu-macsy/lama.git
   - pushd lama && mkdir build && cd build && cmake -DADDITIONAL_WARNING_FLAGS="" ../scai && make -j4 && sudo make install && popd
 
 script:
