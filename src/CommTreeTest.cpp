@@ -163,6 +163,11 @@ TYPED_TEST(CommTreeTest, testLabelDistance) {
     };
 
     CommTree<IndexType,ValueType> commTree( nodes, {false,false, true} );
+    
+    commTree.setDistances( std::vector<ValueType>{1,2,3,4,5} );
+
+    //std::vector<ValueType> distances = {5,4,3,1,0};
+    //commTree.setDistances( distances);
 
     EXPECT_EQ( (commTree.distance(nodes[0], nodes[1])), 3 );
     EXPECT_EQ( (commTree.distance(nodes[0], nodes[2])), 5 );

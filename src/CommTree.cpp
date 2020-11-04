@@ -483,7 +483,8 @@ ValueType CommTree<IndexType, ValueType>::distance( const commNode &node1, const
         PRINT("WARNING: labels are identical but nodes have different leafIDs: " << node1.leafID <<"!="<<node2.leafID );
     }
 
-    return distances[labelSize-i-1];
+    //if i==labelSize it means that the two nodes are identical, i.e. it is the same node
+    return i==labelSize? 0 : distances[labelSize-i-1];
 }//distance
 //------------------------------------------------------------------------
 
