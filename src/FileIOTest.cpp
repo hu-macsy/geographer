@@ -366,7 +366,7 @@ TYPED_TEST(FileIOTest, testReadQuadTree) {
 
 //-------------------------------------------------------------------------------------------------
 
-TYPED_TEST(FileIOTest, testReadBinaryEdgeList) {
+TYPED_TEST(FileIOTest, DISABLED_testReadBinaryEdgeList) {
     using ValueType = TypeParam;
 
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -737,7 +737,8 @@ TYPED_TEST (FileIOTest, testReadEdgeListDistributed) {
 
         std::string file = FileIOTest<ValueType>::graphPath + "tmp4/out";
 
-        scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file, comm );
+        bool duplicateEdges = true;
+        scai::lama::CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readEdgeListDistributed( file, comm, duplicateEdges );
 
         ASSERT_TRUE( graph.isConsistent());
         EXPECT_TRUE( graph.checkSymmetry() );

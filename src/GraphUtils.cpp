@@ -1474,7 +1474,7 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
         PRINT0("will duplicate edges");
     }
 
-    // duplicate and reverse all edges before sorting to ensure matrix will be symmetric
+    // TODO: duplicate and reverse all edges before sorting to ensure matrix will be symmetric?
     // TODO: any better way to avoid edge duplication?
 
     IndexType maxLocalVertex=0;
@@ -1538,6 +1538,7 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
         mpi_comm = mpiComm.getMPIComm();
     }
 
+    //sort globally
     JanusSort::sort(mpi_comm, localPairs, MPI_2INT);
 
     std::chrono::duration<double> sortTmpTime = std::chrono::steady_clock::now() - beforeSort;
@@ -1545,15 +1546,15 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     PRINT0("time to sort edges: " << sortTime);
 
     //check for isolated nodes and wrong conversions
-    IndexType lastNode = localPairs[0].first;
+    IndexType prevVertex = localPairs[0].first;
     for (int_pair edge : localPairs) {
         //TODO: should we allow isolated vertices? (see also below)
-        //not necessarilly an error
-        SCAI_ASSERT_LE_ERROR(edge.first, lastNode + 1, "Gap in sorted node IDs before edge exchange in PE " << comm->getRank() );
-        //if( edge.first>lastNode+1 /* and settings.verbose */ ){
-        //	std::cout<< "WARNING, node " << lastNode+1 << " has no edges" << std::endl;
-        //}
-        lastNode = edge.first;
+        //not necessarily an error
+        SCAI_ASSERT_LE_ERROR(edge.first, prevVertex + 1, "Gap in sorted node IDs before edge exchange in PE " << comm->getRank() );
+        if( edge.first>prevVertex+1 /* and settings.verbose */ ){
+        	std::cout<< "WARNING, node " << prevVertex << " has no edges, in PE " << comm->getRank() << std::endl;
+        }
+        prevVertex = edge.first;
     }
 
 
@@ -1584,6 +1585,8 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
             localPairs.pop_back();
         }
     }
+
+    //PRINT( thisPE << ": maxLocalVertex= " << newMaxLocalVertex << ", removed edges " << numEdgesToRemove );
 
     // make communication plan
     std::vector<IndexType> quantities(comm->getSize(), 0);
@@ -1626,13 +1629,14 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
             sp.first = rRecvEdges[i];
             sp.second = rRecvEdges[i+1];
             recvEdgesV.push_back(sp);
-            //PRINT( thisPE << ": recved edge: "<< recvEdges[i] << " - " << recvEdges[i+1] );
+            //PRINT( thisPE << ": received edge: "<< recvEdges[i] << " - " << recvEdges[i+1] );
         }
+        std::sort( recvEdgesV.begin(), recvEdgesV.end() );
+
         localPairs.insert( localPairs.begin(), recvEdgesV.begin(), recvEdgesV.end() );
     }
 
     PRINT0("rebuild local edge list");
-    SCAI_ASSERT_ERROR(std::is_sorted(localPairs.begin(), localPairs.end()), "Disorder after insertion of received edges." );
 
     //
     //remove duplicates
@@ -1646,6 +1650,9 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
         const IndexType totalNumRemoved = comm->sum(numRemoved);
         PRINT0("removed duplicates, total removed edges: " << totalNumRemoved);
     }
+
+    SCAI_ASSERT_ERROR( std::is_sorted(localPairs.begin(), localPairs.end()), \
+        "Disorder after insertion of received edges in PE " << thisPE );
 
     //remove self loops one more time; probably not needed
     if(removeSelfLoops) {
