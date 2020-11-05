@@ -87,6 +87,10 @@ void FileIO<IndexType, ValueType>::writeGraph (
             fNew.write((char*)(&globalN), sizeof( ULONG ));
             ULONG M = globalM/2;
             fNew.write((char*)(&M), sizeof( ULONG ));
+            ULONG prSum0 = globalN+4; // the first vertex degree prefix sum position is not 0 but global+4.
+            //this is the position where the neighbors list begins
+            fNew.write((char*)(&prSum0), sizeof( ULONG )); 
+
         }else{
             fNew.open(newFile, std::ios::out);
             // first line is the number of nodes and edges
@@ -96,12 +100,11 @@ void FileIO<IndexType, ValueType>::writeGraph (
             }
             fNew<< std::endl;
         }
+        if(not fNew.is_open()){
+            throw std::runtime_error("File "+ newFile+ " could not be opened");
+        }
     }
-/*
-    if(not fNew.is_open()){
-        throw std::runtime_error("File "+ newFile+ " could not be opened");
-    }
-*/
+
     //wait root to write header
     comm->synchronize();
     fNew.close();
@@ -158,17 +161,20 @@ void FileIO<IndexType, ValueType>::writeGraph (
             localMPrefixSum[i+1] += localMPrefixSum[i];
         }
         SCAI_ASSERT_EQ_ERROR( localMPrefixSum.back(), globalM, "Wrong degrees prefix sum in PE " << thisPE);
-//
-//add the localM prefix sum to the degrees
-//
-const ULONG myOffset = localMPrefixSum[thisPE];
-std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { d+=myOffset;});
-//is this needed?
+        
+        //
+        //add the localM prefix sum to the degrees
+        //
+        const ULONG myOffset = localMPrefixSum[thisPE] + 4 /*head size + 1 for the first 0*/ + globalN;
+        std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { d+=myOffset;});
+        //is this needed?
 
         //add the size of the header and all the previous
         for(IndexType p=0; p<numPEs; p++){
             if( myTurn==p){
                 fNew.open(newFile, std::ios::binary | std::ios::app);
+int filePos = fNew.tellp()/sizeof(ULONG);
+PRINT(p << ": in position " << filePos << ", first degree= " << localNodeDegrees[0] );
                 fNew.write( (char*)(localNodeDegrees.data()), localN*sizeof(ULONG));
                 fNew.close();
             }
@@ -226,7 +232,7 @@ std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { 
             if( binary ){
                 fNew.open(newFile, std::ios::binary | std::ios::app); //append
                 fNew.write((char*) binaryBuffer.data(), binaryBuffer.size()*sizeof(ULONG) );
-                SCAI_ASSERT_EQ_ERROR( fNew.tellp(), (localNodeDegrees.back()+3+globalN)*sizeof(ULONG) , "While writing edge list in parallel: Position in file " << filename << " for PE " << thisPE << " is not correct." );
+                SCAI_ASSERT_EQ_ERROR( fNew.tellp(), (localNodeDegrees.back() /*+3+globalN*/ )*sizeof(ULONG) , "While writing edge list in parallel: Position in file " << filename << " for PE " << thisPE << " is not correct." );
                 fNew.close();
             }
             else{
@@ -1061,7 +1067,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
 
     const IndexType window_size = numPEs;// std::min( binary_io_window_size, numPEs );
     IndexType lowPE =0;
-    IndexType highPE = window_size;
+    IndexType highPE = numPEs;
 
     std::vector<IndexType> ia;//(localN+1, 0);  localN is not known yet
     std::vector<IndexType> ja;
@@ -1069,11 +1075,11 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
 
 
     while( lowPE<numPEs ) {
-        if( thisPE>=lowPE and thisPE<highPE) {
+       if( thisPE>=lowPE and thisPE<highPE) {
             std::ifstream file;
             file.open(filename.c_str(), std::ios::binary | std::ios::in);
 
-			//std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
+std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
 
             ia.resize( localN +1);
             ia[0]=0;
@@ -1082,22 +1088,26 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             // read the vertices offsets
             //
             SCAI_REGION_START("FileIO.readGraphBinary.fileRead")
+            std::size_t ULONGsize = sizeof(ULONG);
 
-            const ULONG startPos = (headerSize+beginLocalRange)*(sizeof(ULONG));
+            const ULONG startPos = (headerSize+beginLocalRange);
             ULONG* vertexOffsets = new ULONG[localN+1];
-            file.seekg(startPos);
-            file.read( (char *)(vertexOffsets), (localN+1)*sizeof(ULONG) );
-
+            file.seekg( startPos*(ULONGsize) );
+            file.read( (char *)(vertexOffsets), (localN+1)*ULONGsize );
+PRINT(thisPE << ": " << startPos/ULONGsize);
             //
             // read the edges
             //
-            ULONG edgeStartPos = vertexOffsets[0];
+            const ULONG edgeStartPos = vertexOffsets[0];
 
             const ULONG numReads = vertexOffsets[localN]-vertexOffsets[0];
-            const ULONG numEdges = numReads/sizeof(ULONG);
+            const ULONG numEdges = numReads/ULONGsize;
+PRINT(thisPE << ": " << numReads);
             ULONG* edges = new ULONG[numEdges];
-            file.seekg( edgeStartPos );
-            file.read( (char *)(edges), (numEdges)*sizeof(ULONG) );
+PRINT(thisPE << ": " << edgeStartPos);
+//SCAI_ASSERT_LE_ERROR( edgeStartPos+numEdges, );
+            file.seekg( edgeStartPos*(ULONGsize) );
+            file.read( (char *)(edges), (numEdges)*ULONGsize );
 
             SCAI_REGION_END("FileIO.readGraphBinary.fileRead")
 
@@ -1116,7 +1126,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             for( IndexType i=0; i<localN; i++) {
                 SCAI_REGION("FileIO.readGraphBinary.buildCSRmatrix")
                 ULONG nodeDegree = (vertexOffsets[i+1]-vertexOffsets[i])/sizeof(ULONG);
-                SCAI_ASSERT_GT_ERROR( nodeDegree, 0, "Node with degree zero not allowed, for node " << i*(thisPE+1) );
+PRINT( thisPE <<": " << vertexOffsets[i+1] << " - " << vertexOffsets[i] );
+                SCAI_ASSERT_GT_ERROR( nodeDegree, 0, "Node with degree zero not allowed, for node " << i << " in PE " << thisPE );
                 neighbors.resize(nodeDegree);
 
                 for(ULONG j=0; j<nodeDegree; j++, pos++) {
