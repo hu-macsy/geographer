@@ -185,6 +185,7 @@ TYPED_TEST(GraphUtilsTest, testConstructLaplacian) {
     const IndexType dimensions = 2;
     std::vector<DenseVector<ValueType>> coords = FileIO<IndexType, ValueType>::readCoords( std::string(coordFile), n, dimensions);
     Settings settings;
+    settings.noRefinement=true;
 
     scai::lama::DenseVector<IndexType> partition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coords, settings);
 
@@ -392,7 +393,7 @@ TYPED_TEST (GraphUtilsTest,testEdgeList2CSR) {
         //PRINT(thisPE << ": inserting edge " << v1 << " - " << v2 );
     }
 
-    scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils<IndexType,ValueType>::edgeList2CSR( localEdgeList, comm );
+    scai::lama::CSRSparseMatrix<ValueType> graph = GraphUtils<IndexType,ValueType>::edgeList2CSR( localEdgeList, comm, true );
 
     EXPECT_TRUE( graph.isConsistent());
     EXPECT_TRUE( graph.checkSymmetry() );
