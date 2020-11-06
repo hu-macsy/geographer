@@ -515,8 +515,8 @@ std::vector<ValueType>  GraphUtils<IndexType,ValueType>::getBlocksWeights(
         globalSubsetSizes = subsetSizes;
     }
 
-ValueType globWsum = std::accumulate( globalSubsetSizes.begin(), globalSubsetSizes.end(), 0.0 );
-SCAI_ASSERT_EQ_ERROR( globWsum, comm->sum(weightSum), " global sum mismatch" );
+    ValueType globWsum = std::accumulate( globalSubsetSizes.begin(), globalSubsetSizes.end(), 0.0 );
+    SCAI_ASSERT_EQ_ERROR( globWsum, comm->sum(weightSum), " global sum mismatch" );
 
     return globalSubsetSizes;
 }
