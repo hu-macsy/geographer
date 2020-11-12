@@ -1,3 +1,4 @@
+#example; supposed to be executed in the build/ folder
 cmake .. \
 -DSCAI_DIR= ~/LamaInstallation \
 -DCMAKE_INSTALL_PREFIX= ~/geographer/installation/ \
