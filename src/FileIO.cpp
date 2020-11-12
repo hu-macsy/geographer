@@ -38,9 +38,9 @@ using scai::hmemo::HArray;
 
 namespace ITI {
 
-const IndexType fileTypeVersionNumber= 3;
 typedef unsigned long int ULONG;
 typedef unsigned long long int ULLI;
+const ULONG fileTypeVersionNumber= 3;
 
 //-------------------------------------------------------------------------------------------------
 /*Given the adjacency matrix it writes it in the file "filename" using the METIS format. In the
@@ -1048,7 +1048,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     PRINT0( "Binary read, version= " << version << ", N= " << globalN << ", M= " << M );
 
     if( version != fileTypeVersionNumber ) {
-        throw std::runtime_error( "filetype version mismatch" );
+        throw std::runtime_error( "filetype version mismatch, it should be "+std::to_string(fileTypeVersionNumber)+" but it is "+ std::to_string(version) );
     }
 
     const IndexType numPEs = comm->getSize();
