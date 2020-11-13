@@ -14,6 +14,7 @@ matrix:
     #         - g++-6
     #   env:
     #     - MATRIX_EVAL="CC=gcc-6 && CXX=g++-6"
+        # - COD_COV_BOOL=OFF
 
     - name: GCC7
       os: linux
@@ -25,6 +26,7 @@ matrix:
             - g++-7
       env:
         - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
+        - COD_COV_BOOL=OFF
 
     # - name: GCC8
     #   os: linux
@@ -36,17 +38,19 @@ matrix:
     #         - g++-8
     #   env:
     #     - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8"
+        # - COD_COV_BOOL=OFF
 
-    - name: GCC9
-      os: linux
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-9
-      env:
-        - MATRIX_EVAL="CC=gcc-9 && CXX=g++-9" 
+    # - name: GCC9
+    #   os: linux
+    #   addons:
+    #     apt:
+    #       sources:
+    #         - ubuntu-toolchain-r-test
+    #       packages:
+    #         - g++-9
+    #   env:
+    #     - MATRIX_EVAL="CC=gcc-9 && CXX=g++-9" 
+    #     - COD_COV_BOOL=OFF
 
     - name: code_coverage
       os: linux
@@ -62,7 +66,8 @@ matrix:
         - eval "${MATRIX_EVAL}"
         - sudo apt-get install -y cmake mpi-default-dev mpi-default-bin libatlas-base-dev libboost-filesystem-dev
       env:
-        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8 && -DCODE_COVERAGE=ON"
+        - MATRIX_EVAL="CC=gcc-8 && CXX=g++-8"
+        - COD_COV_BOOL=ON
       after_success:
         - coveralls --exclude lib --exclude tests --gcov-options '\-lp'
 
@@ -76,8 +81,9 @@ before_install:
 
 install:
   - git clone --branch master https://github.com/hu-macsy/lama.git
-  - pushd lama && mkdir build && cd build && cmake -DADDITIONAL_WARNING_FLAGS="" ../scai && make -j4 && sudo make install && popd
+  - pushd lama && mkdir build && cd build && cmake -DADDITIONAL_WARNING_FLAGS="" -DCODE_COVERAGE=$COD_COV_BOOL ../scai && make -j4 && sudo make install && popd
 
 script:
   - mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_BUILD_TYPE=Debug .. && make -j4 && sudo make install && cd ..
+  - if
   - mpirun -np 4 install/bin/GeographerTest
