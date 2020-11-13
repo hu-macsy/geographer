@@ -885,7 +885,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - startTime;
     double tillMyStartTime = elapTime.count();
 
-    std::cout << "Process " << comm->getRank() << " reading from " << beginLocalRange << " to " << endLocalRange <<", time to reach starting vertex " << tillMyStartTime << std::endl;
+    //std::cout << "Process " << comm->getRank() << " reading from " << beginLocalRange << " to " << endLocalRange <<", time to reach starting vertex " << tillMyStartTime << std::endl;
 
     std::vector<IndexType> ia(localN+1, 0);
     std::vector<IndexType> ja;
@@ -1006,7 +1006,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
             HArray<ValueType>(values.size(), values.data()));
 
     elapTime = std::chrono::steady_clock::now() - startTime;
-    std::cout << "Process " << comm->getRank() << " created local storage in time " << elapTime.count() << std::endl;
+    //std::cout << "Process " << comm->getRank() << " created local storage in time " << elapTime.count() << std::endl;
 
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 

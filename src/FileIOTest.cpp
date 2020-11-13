@@ -295,7 +295,7 @@ TYPED_TEST(FileIOTest, testPartitionFromFile_dist_2D) {
     settings.numBlocks= k;
     settings.epsilon = epsilon;
     settings.dimensions = dim;
-    settings.minGainForNextRound = 10;
+    settings.noRefinement = true;
     Metrics<ValueType> metrics(settings);
 
     //partition the graph
