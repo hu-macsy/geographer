@@ -81,7 +81,9 @@ before_install:
 
 install:
   - git clone --branch master https://github.com/hu-macsy/lama.git
-  - pushd lama && mkdir build && cd build && cmake -DADDITIONAL_WARNING_FLAGS="" -DCODE_COVERAGE=$COD_COV_BOOL ../scai && make -j4 && sudo make install && popd
+  - echo ${MATRIX_EVAL}
+  - echo ${COD_COV_BOOL}
+  - pushd lama && mkdir build && cd build && cmake -DADDITIONAL_WARNING_FLAGS="" -DCODE_COVERAGE=${COD_COV_BOOL} ../scai && make -j4 && sudo make install && popd
 
 script:
   - mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_BUILD_TYPE=Debug .. && make -j4 && sudo make install && cd ..
