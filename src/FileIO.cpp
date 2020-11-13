@@ -882,9 +882,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         std::getline(file, line);
         SCAI_ASSERT_GE_ERROR( file.tellg(), 0, "Wrong number of vertices or corrupted file?" );
     }
-    std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - startTime;
-    double tillMyStartTime = elapTime.count();
-
+    //std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - startTime;
+    //double tillMyStartTime = elapTime.count();
     //std::cout << "Process " << comm->getRank() << " reading from " << beginLocalRange << " to " << endLocalRange <<", time to reach starting vertex " << tillMyStartTime << std::endl;
 
     std::vector<IndexType> ia(localN+1, 0);
@@ -962,7 +961,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         }
     }
 
-    elapTime = std::chrono::steady_clock::now() - startTime;
+    //elapTime = std::chrono::steady_clock::now() - startTime;
     //std::cout << "Process " << comm->getRank() << " read " << ja.size() << " local edges in time " << elapTime.count() << std::endl;
 
 
@@ -1005,7 +1004,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
             HArray<IndexType>(ja.size(), ja.data()),
             HArray<ValueType>(values.size(), values.data()));
 
-    elapTime = std::chrono::steady_clock::now() - startTime;
+    //elapTime = std::chrono::steady_clock::now() - startTime;
     //std::cout << "Process " << comm->getRank() << " created local storage in time " << elapTime.count() << std::endl;
 
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
