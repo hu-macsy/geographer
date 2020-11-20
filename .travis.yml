@@ -87,5 +87,4 @@ install:
 
 script:
   - mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=../install -DCMAKE_BUILD_TYPE=Debug .. && make -j4 && sudo make install && cd ..
-  - if
   - mpirun -np 4 install/bin/GeographerTest
