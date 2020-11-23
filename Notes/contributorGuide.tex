@@ -58,6 +58,17 @@ include communication between processing elements (PEs) underneath.
 What it might be intricate code when writing raw MPI code,
 it becomes a simple function call. Below, we will see some of the most used data structures and 
 functions in \geo.
+More information about lama can be found in their official web site \url{www.libama.org/},
+their gitlab repository \url{gitlab.scai.fraunhofer.de/hpcpublic/lama} (also holds information on how
+to build the documentation) and can be reached in lama$@$scai.fraunhofer.de.
+
+Both lama and \geo use template types for the integer and non-integer values, named
+\MI{IndexType} and \MI{ValueType} respectively.
+While installing lama one has to specify \MI{IndexType}. By default this is \MI{int}
+but for handling large graph this needs to be set to \MI{long int} or \MI{unsigned long int}.
+This can be done by passing \texttt{-DSCAI\_INDEX\_TYPE="long"} to cmake.
+\geo uses the same type for \MI{IndexType} as lama. All classes are instantiated for the given 
+\MI{IndexType} and for double and float for \MI{ValueType}.
 
 
 \subsubsection*{Distribution}
@@ -352,7 +363,8 @@ local data.
 
 In this section we present some useful functions and what should be adapted within 
 \geo in order to make a contribution to the project.
-By design, the main \quot{entry point} for a new algorithm is \MI{ITI::ParcoRepart::partitionGraph()}, which
+By design, the main \quot{entry point} for a new algorithm is 
+\MI{ITI::ParcoRepart::partitionGraph()}, which
 is the function to call if you want to partition a graph or a point set. 
 For most (overloaded) versions of \MI{partitionGraph()}, 
 the input typically consists of 3 objects: a \MI{CSRSparseMatrix} that is the adjacency 
@@ -366,6 +378,7 @@ The arguments of this version are the same (or similar) to the metis and parmeti
 By using the \MI{Settings} struct you can choose which algorithm you want to use for 
 partitioning and pass various input parameters to the partitioning algorithm.
 
+\paragraph*{Geometric partition}
 If you want to contribute a new partitioning algorithm
 you should first create a separate class, add a value in \MI{Settings::Tools} and adapt the 
 \MI{ITI::ParcoRepart::partitionGraph()} function in order to call the desired partitioning function.
@@ -376,13 +389,58 @@ The first part can be found in \MI{ParcoRepart::initialPartition()}; this is whe
 want to add the call to the new function. Afterwards, applying
 local refinement can improve the cut provided by your algorithm.
 By setting \MI{Settings.noRefinement} to true, local refinement is disabled.
+The return value is a \MI{scai::DenseVector<IndexType>} that holds the partition vector, i.e., 
+the block id where each every vertex belongs too.
 Any required input parameter for the new algorithm should be declared in \MI{Settings}.
 Probably, you must also adapt \MI{parseArgs} so the parameters can be passed at run time as 
 command line arguments.
 
-\att in the case that you algorithm is about local refinement you should probably do more extensive
-changes as currently we do not support different local refinement algorithms.
+To get the geometric partition of a point set there are classes \MI{ITI::KMeans},
+\MI{ITI::HilbertCurve} and \MI{ITI::MultiSection}. These classes can partition weighted point sets in the given
+number of blocks adhering to a given balance constrain. To do so, each class provides a 
+\MI{computePartition} function with similar prototypes. To see how to control the parameters for
+each class look into \MI{Settings}. Although some of them require also the
+graph, this is mainly for sanity checks and debugging reasons and only the geometric information,
+i.e., the coordinates, are used. 
+In the \geo workflow, a mesh is first partitioned using one of the above techniques and
+then is further refined using the graph.
 
+\att some of this function internally redistribute the input data in order to improve locality of the
+point and reduce running time. For example, before calling the balanced \km algorithm we redistribute
+the input using \MI{HilbertCurve::redistribute} that redistributes the points according to their
+hilbert space-filling curve (SFC) indices. Look into the documentation of each class for more details.
+
+\paragraph*{Local refinement}
+In the case that you algorithm is about local refinement, the corresponding function to
+adapt is \MI{ParcoRepart::doLocalRefinement()} and different local refinement schemes are
+controlled by \MI{Settings.localRefAlgo}. Currently, we support a refinement algorithm based 
+on local vertex swap between blocks, a geometric rebalance scheme and a refinement using
+the parmetis method (if parmetis is installed).
+
+The classes \MI{MultiLevel} and \MI{LocalRefinement} are used to coarsen the graph using the
+multilevel scheme and apply local refinement, i.e., move vertices between blocks only if moving
+the vertex improves the cut value without hurting the imbalance.
+Usually, when using the multilevel approach, we start with a non-partitioned graph and merge vertices
+together until we reach a small number of vertices. Then this graph  (the coarsest) is partitioned. 
+To improve the cut we then refine the coarsen graph and do local refinement in steps.
+
+The approach in \geo is different.
+Although the uncoarsening/refinement step is identical, for the coarsening step we start from an
+already partitioned graph, the one provided by the geometric partition. To merge vertices we
+use a matching algorithm that only matches two adjacent vertices if they belong to the same block.
+This means that cut edges (edges between blocks) are not considered in the matching and so, the cut 
+value of the initial partition and the coarsest graph should be equal.
+To do a local refinement to a partitioned graph call \MI{ITI::MultiLevel::multiLevelStep()}. 
+This function will perform the coarsening and uncoarsening and internally, while uncoarsening,
+will also perform the local refinement.
+
+\att currently, local refinement only works when $k=p$, i.e., the number of desired blocks and the
+number of PEs are the same. Additionally, vertices are actually moved between PEs. That means
+that the input graph must be redistributed according to the given partition before the local refinement
+(here, \MI{aux::redistributeFromPartition()} can be helpful)
+and that vertices are redistributed during the local refinement.
+
+\paragraph{Miscellaneous}
 Useful helper functions for graph and points sets can be found in \MI{ITI::aux}
 and \MI{ITI::GraphUtils}. For example, in \MI{GraphUtils} there are function to compute the cut,
 the imbalance, the diameter of blocks and other properties of a partitioned (or not) graph.
@@ -398,6 +456,11 @@ it redistributes the input (graph, coordinates and node weights) according to th
 Many functions to read and write graphs and coordinates from and to files can be found
 in the \MI{ITI::FileIO} class.
 
+If you have an already partitioned graph and you want to repartition/rebalance it you can do
+so by setting \MI{settings.repartition} to true and call \MI{ParcoRepart::computePartition()}.
+If repartition is activated, internally we call the function \MI{KMeans::computeRepartition()}.
+You can also call this function directly to repartition a point set.
+
 \begin{figure}[h]
 \centering
 \includegraphics[scale=0.9]{graph_partitioned_with_PE_block_graph}
@@ -407,48 +470,24 @@ block graph with the weights on the edges.}
 \label{fig:part_graph}
 \end{figure}
 
-Apart from the above, to get the geometric partition of a point set there are classes \MI{ITI::KMeans},
-\MI{ITI::HilbertCurve} and \MI{ITI::MultiSection}. These classes can partition weighted point sets in the given
-number of blocks adhering to a given balance constrain. To do so, each class provides a 
-\MI{computePartition} function with similar prototypes. To see how to control the parameters for
-each class look into \MI{Settings}. Although some of them require also the
-graph, this is mainly for sanity checks and debugging reasons and only the geometric information,
-i.e., the coordinates,
-are used. In the \geo workflow, a mesh is first partitioned using one of the above techniques and
-then is further refined using the graph.
 
-\att some of this function internally redistribute the input data in order to improve locality of the
-point and reduce running time. For example, before calling the balanced \km algorithm we redistribute
-the input using \MI{HilbertCurve::redistribute} that redistributes the points according to their
-hilbert space-filling curve (SFC) indices. Look into the documentation of each class for more details.
+\paragraph*{External library}
+Another possibility is to write and compile you implementation outside \geo as a library and link
+your library to \geo. For calling external libraries we use the \MI{ITI::Wrappers} class and function
+\MI{ITI::Wrappers::partition()}. There, the distributed CSR matrix and dense vectors are converted
+to appropriate data type for each external tool. The currently external libraries supported are
+metis, parmetis, parhip and zoltan.
 
-The classes \MI{MultiLevel} and \MI{LocalRefinement} are used to coarsen the graph using the
-multilevel scheme and apply local refinement, i.e., move vertices between blocks only if moving
-the vertex improves the cut value without hurting the imbalance.
-Usually, when using the multilevel approach, we start with a non-partitioned graph and merge vertices
-together until we reach a small number of vertices. Then this graph is partitioned. To improve
-the cut we then refine the coarsen graph and do local refinement.
 
-The approach in \geo is different.
-Although the uncoarsening/refinement step is identical, for the coarsening step we start from an
-already partitioned graph, the one provided by the geometric partition. To merge vertices we
-use a matching algorithm that only matches two adjacent vertices if they belong to the same block.
-This means that cut edges (edges between blocks) are not considered in the matching and so, the cut 
-value of the initial partition and the coarsest graph should be equal.
-To do a local refinement to a partitioned graph call \MI{ITI::MultiLevel::multiLevelStep()}. 
-This function will do the coarsening and uncoarsening and internally, while uncoarsening,
-will do the local refinement.
+\paragraph{Tests and benchmarks}
+To test the code we use \texttt{GoogleTest}; see the documentation on how to install and use it.
+To benchmark and test the executable on your own, you can use the \texttt{testGeoStandalone.py}
+script located in the top folder that calls the \geo executable with several parameters
+and graphs.
 
-\att currently, local refinement only works when $k=p$, i.e., the number of desired blocks and the
-number of PEs are the same. Additionally, vertices are actually moved between PEs. That means
-that the input graph must be redistributed according to the given partition before the local refinement
-(here, \MI{aux::redistributeFromPartition()} can be helpful)
-and that vertices are redistributed during the local refinement.
+Another option in to use the simexpal tool from \url{https://github.com/hu-macsy/simexpal}.
+An \texttt{experiment.yml} file used by simexpal is located in the top folder.
 
-If you have an already partitioned graph and you want to repartition/rebalance it you can do
-so by setting \MI{settings.repartition} to true and call \MI{ParcoRepart::computePartition()}.
-If repartition is activated, internally we call the function \MI{KMeans::computeRepartition()}.
-You can also call this function directly to repartition a point set.
 
 \subsubsection*{Example: contribute a new partitioning algorithm}
 
@@ -470,13 +509,14 @@ possibly useful argument can be a \MI{ITI::CommTree} that is used to store the p
 graph, i.e., the physical network, and can be taken into account while partitioning. Of course,
 the function can have less input arguments.
 
-
 \att you must force instantiation of the class otherwise you will get linking error.
 One way to do it is to add the line 
 \begin{minted}{c++}
 template class MyAlgo<IndexType, ValueType>;
 \end{minted}
 within namespace ITI in file MyAlgo.cpp.
+Another way is to have only a ,h file and keep all the implementation there.
+For \MI{IndexType} we use the type used when installing lama.
 
 In order to call \MI{MyAlgo} to get the initial partition you should first add an entry to enum
 \MI{Settings::Tool} in Settings.h,
@@ -594,14 +634,9 @@ TEST_F(MyAlgoTest, testMyPartition) {
 \label{MyAlgoTest.cpp}
 \end{algorithm}
 
-Another possibility is to write and compile you implementation outside \geo as a library and link
-your library to \geo. For calling external libraries we use the \MI{ITI::Wrappers} class and function
-\MI{ITI::Wrappers::partition()}. There, the distributed CSR matrix and dense vectors are converted
-to appropriate data type for each external tool. The currently external libraries supported are
-metis, parmetis and zoltan.
+\clearpage
 
-
-\section{Future plans}
+\section*{Future plans}
 
 Here we list some open issues and ideas to be included in \geo.
 
