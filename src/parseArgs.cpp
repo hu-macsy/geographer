@@ -77,6 +77,7 @@ Options populateOptions() {
     ("hierLevels", "The number of blocks per level starting from the leaves. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 10,4,3 there are 3 levels. In the first/top one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
     //output
     ("outFile", "write result partition into file", value<std::string>())
+    ("redistAndStore", "redistribute and store the graph after partitioning", value<bool>())
     //debug
     ("writeDebugCoordinates", "Write Coordinates of nodes in each block", value<bool>())
     ("writePEgraph", "Write the processor graph to a file", value<bool>())
