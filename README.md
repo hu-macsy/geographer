@@ -30,8 +30,7 @@ Compile and install the Lama library.
 If its dependencies are installed, this can be done with the following commands:
 
     git clone https://github.com/hu-macsy/lama.git
-    mkdir lama/build && cd lama/build && cmake ../scai && cd ../..
-    cd lama/build && make && sudo make install && cd ../..
+    mkdir lama/build && cd lama/build && cmake ../scai && make && sudo make install
 
 If root access is not available or not preferred, you can pass the argument `-DCMAKE_INSTALL_PREFIX=<path>`to cmake to specify an alternative install location.
 

@@ -223,49 +223,6 @@ variants:
         environ:
           OMP_NUM_THREADS: 1    
 
-      # for hierarchical kmeans
-
-      - name: c48_hier
-        num_nodes: 1
-        procs_per_node: 48
-        num_threads: 1
-        extra_args:
-          - '--hierLevels'
-          - '1,48'
-        environ:
-          OMP_NUM_THREADS: 1    
-
-      - name: c96_hier
-        num_nodes: 1
-        procs_per_node: 96
-        num_threads: 1
-        extra_args:
-          - '--hierLevels'
-          - '1,96'
-        environ:
-          OMP_NUM_THREADS: 1
-
-      - name: c192_hier
-        num_nodes: 2
-        procs_per_node: 96
-        num_threads: 1
-        extra_args:
-          - '--hierLevels'
-          - '2,96'
-        environ:
-          OMP_NUM_THREADS: 1
-
-      - name: c384_hier
-        num_nodes: 4
-        procs_per_node: 96
-        num_threads: 1
-        extra_args:
-          - '--hierLevels'
-          - '4,96'
-        environ:
-          OMP_NUM_THREADS: 1
-
-
   - axis: geo_version
     items:
       - name: km_noRef
