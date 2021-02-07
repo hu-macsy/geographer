@@ -73,6 +73,12 @@ int main(int argc, char** argv) {
     } 
 
     printInfo( std::cout, comm, settings);
+    double initTotalMemUse=0.0;
+
+    {   //get intial memory usage
+        [[maybe_unused]] double memIuse, freeRam;
+        std::tie(memIuse, initTotalMemUse) = getFreeRam(comm, freeRam, false);
+    }
 
     //-----------------------------------------
     //
@@ -94,6 +100,12 @@ int main(int argc, char** argv) {
     
     ITI::CommTree<IndexType,ValueType> commTree = createCommTree( vm, settings, comm, nodeWeights);
     commTree.adaptWeights( nodeWeights );
+
+    {   
+        [[maybe_unused]] double memIuse, freeRam, totalMemUse;
+        std::tie(memIuse, totalMemUse) = getFreeRam(comm, freeRam, false);
+        MSG0("Total mem usage after reading graph is " << totalMemUse );
+    }
 
     //---------------------------------------------------------------------------------
     //
