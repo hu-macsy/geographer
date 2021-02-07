@@ -395,8 +395,8 @@ int main(int argc, char** argv) {
         //redistribute to get the correct memory usage
         aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coordinates, nodeWeights, settings, true, false);
         MSG0( "" );
-        double memIuse;
-        getFreeRam(comm, memIuse, false);
+        [[maybe_unused]] double memIuse, freeRam, totalMemUse;
+        std::tie(memIuse, totalMemUse) = getFreeRam(comm, freeRam, true);
         int myRank= comm->getRank() ;
         const std::vector<cNode<IndexType,ValueType>> leaves = commTree.getLeaves();
         SCAI_ASSERT_EQ_ERROR( leaves.size(), comm->getSize(), "leaves size mismatch" );
@@ -414,8 +414,12 @@ int main(int argc, char** argv) {
     
     if( vm.count("redistAndStore") ){
         aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coordinates, nodeWeights, settings, true, false);
-        const std::string fileName = settings.fileName+"_reordered" );
-        ITI::FileIO<IndexType, ValueType>::writeGraph( graph, fileName );
+
+        //need (and it is better) to have general block distribution
+        //auto dist = GraphUtils<IndexType,ValueType>::genBlockRedist( graph );
+        const std::string fileName = settings.fileName+"_reordered" ;
+        ITI::FileIO<IndexType, ValueType>::writeGraphDistributed( graph, fileName );
+        MSG0("reordered graph stored in file " << fileName );
     }
     
     if (vm.count("callExit")) {

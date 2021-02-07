@@ -302,7 +302,8 @@ std::string getOutFileName( const Settings& settings, const std::string& toolNam
 
 //taken from 
 //https://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
-unsigned long long getFreeRam(const scai::dmemo::CommunicatorPtr& comm, double& myMem, bool printMessage=false){
+//returns the ram this PE uses and the free ram of the compute node
+std::pair<double,double> getFreeRam(const scai::dmemo::CommunicatorPtr& comm, double& freeRam, bool printMessage=false){
 
     struct sysinfo memInfo;
     const IndexType rank = comm->getRank();
@@ -324,7 +325,7 @@ unsigned long long getFreeRam(const scai::dmemo::CommunicatorPtr& comm, double& 
     //Multiply in next statement to avoid int overflow on right hand side...
     physMemUsed *= memInfo.mem_unit;
 
-    unsigned long long freeRam = memInfo.freeram;
+    freeRam = memInfo.freeram;
     freeRam *= memInfo.mem_unit;
 
     unsigned long long sharedRam = memInfo.sharedram;
@@ -359,19 +360,20 @@ unsigned long long getFreeRam(const scai::dmemo::CommunicatorPtr& comm, double& 
         return result;
     };
 
-    /*const double*/ myMem = getValue()/kb;
+    const double myMemUse = getValue()/kb;
+    double totalMemUse = physMemUsed/mb;
 
     if( printMessage ){
         MSG0( "totalPhysMem: " << (totalPhysMem/mb) << 
-                " MB, physMemUsed: " << physMemUsed/mb << 
+                " MB, physMemUsed: " << totalMemUse << 
                 " MB, free ram: " << freeRam/mb);
         MSG(    //" MB, shared ram: " << sharedRam/mb <<
                 //" MB, buffered ram: " << buffRam/mb << " MB, " <<
-                "I am using: " << myMem << " MB",
+                "I am using: " << myMemUse << " MB",
                 rank );
     }
 
-    return freeRam;
+    return std::make_pair(myMemUse,totalMemUse);
 }
 
 
@@ -431,8 +433,10 @@ std::vector<std::vector<vType>> calculateLoadRequests(const scai::dmemo::Communi
 
     //memory
     //TODO: remove hardcoded long int size
-    [[maybe_unused]] double myRam;
-    const unsigned long myFreeRam = getFreeRam(comm,myRam)/sizeof(long int); //value returned in bytes; convert to vertex size 
+    [[maybe_unused]] double myRamUse, myFreeRam, totalRamUse;
+    std::tie(myRamUse, totalRamUse) = getFreeRam(comm,myFreeRam); 
+    myRamUse /= sizeof(long int);      //value returned in bytes; convert to vertex size 
+    totalRamUse /= sizeof(long int);
 
     std::vector<vType> allFreeRam(numPEs, 0.0);
     allFreeRam[rank] = (vType) myFreeRam;
