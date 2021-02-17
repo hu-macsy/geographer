@@ -190,6 +190,12 @@ int main(int argc, char** argv) {
         scai::lama::DenseVector<IndexType> oldPartition(dist, 1);
         std::vector<Metrics<ValueType>> metricsVec;
 
+        {   
+            [[maybe_unused]] double memIuse, freeRam, totalMemUse;
+            std::tie(memIuse, totalMemUse) = getFreeRam(comm, freeRam, false);
+            MSG0("Total mem usage before repeat loop for " << settings.repeatTimes << " repetitions" << totalMemUse );
+        }
+
         for( int r=0; r<settings.repeatTimes; r++){
             metricsVec.push_back( Metrics<ValueType>( settings ) );
 
@@ -223,6 +229,11 @@ int main(int argc, char** argv) {
                 break;
             }
             oldPartition = partition;
+            {   
+                [[maybe_unused]] double memIuse, freeRam, totalMemUse;
+                std::tie(memIuse, totalMemUse) = getFreeRam(comm, freeRam, false);
+                MSG0("Total mem usage after repetition " << r << totalMemUse );
+            }
         }
 
         //aggregate metrics in one struct
