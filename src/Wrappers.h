@@ -17,6 +17,7 @@
 
 #include "Metrics.h"
 #include "CommTree.h"
+#include "system_info.h"
 
 
 namespace ITI {

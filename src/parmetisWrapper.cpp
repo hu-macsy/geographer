@@ -246,6 +246,12 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
     //  PRINT("dims=" << ndims << ", nparts= " << nparts<<", ubvec= "<< ubvec << ", options="<< *options << ", wgtflag= "<< wgtflag );
     //}
 
+    {
+        [[maybe_unused]] double memIuse, freeRam, totalMemUse;
+        std::tie(memIuse, totalMemUse) = getFreeRam(comm, freeRam, true);
+        MSG0("Total mem usage before calling ParMETIS_V3_XX() " << totalMemUse );
+    }
+
     //
     // get the partitions with parMetis
     //

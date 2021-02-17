@@ -192,8 +192,8 @@ int main(int argc, char** argv) {
 
         {   
             [[maybe_unused]] double memIuse, freeRam, totalMemUse;
-            std::tie(memIuse, totalMemUse) = getFreeRam(comm, freeRam, false);
-            MSG0("Total mem usage before repeat loop for " << settings.repeatTimes << " repetitions" << totalMemUse );
+            std::tie(memIuse, totalMemUse) = getFreeRam(comm, freeRam, true);
+            MSG0("Total mem usage before repeat loop for " << settings.repeatTimes << " repetitions " << totalMemUse );
         }
 
         for( int r=0; r<settings.repeatTimes; r++){
@@ -232,7 +232,7 @@ int main(int argc, char** argv) {
             {   
                 [[maybe_unused]] double memIuse, freeRam, totalMemUse;
                 std::tie(memIuse, totalMemUse) = getFreeRam(comm, freeRam, false);
-                MSG0("Total mem usage after repetition " << r << totalMemUse );
+                MSG0("Total mem usage after repetition " << r <<" " << totalMemUse );
             }
         }
 

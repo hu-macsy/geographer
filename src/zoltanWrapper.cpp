@@ -326,6 +326,12 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::runZolta
 
     metrics.MM["timeTotal"] = partitionTime;
 
+    {
+        [[maybe_unused]] double memIuse, freeRam, totalMemUse;
+        std::tie(memIuse, totalMemUse) = getFreeRam(comm, freeRam, true);
+        MSG0("Total mem usage before calling Zoltan2::PartitioningSolution::getSolution() " << totalMemUse );
+    }
+
     //
     // convert partition to a DenseVector
     //
@@ -333,8 +339,8 @@ scai::lama::DenseVector<IndexType> zoltanWrapper<IndexType, ValueType>::runZolta
 
     const Zoltan2::PartitioningSolution<Adapter> &solution = problem->getSolution();
     const int *partAssignments = solution.getPartListView();
-	const IndexType localN= dist->getLocalSize();
-	
+    const IndexType localN= dist->getLocalSize();
+// 
     for(unsigned int i=0; i<localN; i++) {
         IndexType thisBlock = partAssignments[i];
         SCAI_ASSERT_LT_ERROR( thisBlock, settings.numBlocks, "found wrong vertex id");

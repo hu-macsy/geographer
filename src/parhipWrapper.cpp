@@ -1,8 +1,6 @@
 #include "AuxiliaryFunctions.h"
 #include "parhipWrapper.h"
 
-//for parhip
-
 
 namespace ITI {
 
@@ -88,6 +86,12 @@ scai::lama::DenseVector<IndexType> parhipWrapper<IndexType, ValueType>::partitio
             throw std::invalid_argument("Error, wrong mode/tool: "+ to_string(tool) + " provided in parhipWrapper.\nAborting...");
     }
     
+    {
+        [[maybe_unused]] double memIuse, freeRam, totalMemUse;
+        std::tie(memIuse, totalMemUse) = getFreeRam(comm, freeRam, true);
+        MSG0("Total mem usage before calling ParHIPPartitionKWay() " << totalMemUse );
+    }
+
     // partition array of size localN, contains the block every vertex belongs
     //IndexType *partKway = new idx_t[ localN ];
     idxtype *partKway = new idxtype[ localN ];

@@ -1,10 +1,5 @@
 #pragma once
 
-#include "sys/types.h"
-#include "sys/sysinfo.h"
-#include "sys/times.h"
-#include "sys/vtimes.h"
-
 #include <chrono>
 #include <cxxopts.hpp>
 
@@ -15,6 +10,7 @@
 #include "MeshGenerator.h"
 #include "parseArgs.h"
 #include "CommTree.h"
+#include "system_info.h"
 
 namespace ITI{
 
@@ -299,7 +295,7 @@ std::string getOutFileName( const Settings& settings, const std::string& toolNam
     return outFile;
 }
 
-
+/*
 //taken from 
 //https://stackoverflow.com/questions/63166/how-to-determine-cpu-and-memory-consumption-from-inside-a-process
 //returns the ram this PE uses and the free ram of the compute node
@@ -375,7 +371,7 @@ std::pair<double,double> getFreeRam(const scai::dmemo::CommunicatorPtr& comm, do
 
     return std::make_pair(myMemUse,totalMemUse);
 }
-
+*/
 
 IndexType getCpuFreqLinux(const scai::dmemo::CommunicatorPtr& comm, const int nodeSize=24){
 //TODO: how to get CPU speed?
@@ -612,6 +608,7 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
 
     return commTree;
 }
+
 
 
 }//namespace ITI

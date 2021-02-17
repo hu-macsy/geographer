@@ -383,8 +383,6 @@ struct Settings {
 
 void print_message( const std::string message, IndexType rank=-1 );
 
-//void MSG0( const std::stringstream stream );
-
 
 struct int_pair {
     int32_t first;
