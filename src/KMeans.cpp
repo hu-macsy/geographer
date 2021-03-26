@@ -2193,12 +2193,15 @@ std::vector<ValueType> KMeans<IndexType,ValueType>::computeMembershipOneValue(
     const std::vector<std::vector<ValueType>> membership = computeMembership( fuzzyClustering );
     const IndexType localN = membership.size();
     const IndexType ctu = membership[0].size();
+    const ValueType oneOverCtuSq = 1/(ctu*ctu);
+    const ValueType twoOverCtu = 2/ctu;
     
     std::vector<ValueType> result( localN, 0.0);
 
     for( IndexType i=0; i<localN; i++ ){
         for( IndexType c=0; c<ctu; c++ ){
-            result[i] += std::pow( (membership[i][c]-1/ctu),2 );
+            //result[i] += std::pow( (membership[i][c]-1/ctu),2 );
+            result[i] += membership[i][c]*(membership[i][c]-twoOverCtu)+oneOverCtuSq; //TODO: check correctness
         }
     }
 

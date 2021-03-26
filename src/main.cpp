@@ -414,7 +414,7 @@ int main(int argc, char** argv) {
     
     if( vm.count("redistAndStore") ){
         aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coordinates, nodeWeights, settings, true, false);
-        const std::string fileName = settings.fileName+"_reordered" );
+        const std::string fileName = settings.fileName+"_reordered";
         ITI::FileIO<IndexType, ValueType>::writeGraph( graph, fileName );
     }
     

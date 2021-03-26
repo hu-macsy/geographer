@@ -543,7 +543,7 @@ std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType
 }
 //---------------------------------------------------------------------------------------
 // Based on algorithm Nicol found in Pinar, Aykanat, 2004, "Fast optimal load balancing algorithms for 1D partitioning"
-//TODO: In the same paper thers is a better, but more complicated, algorithm called Nicol+
+//TODO: In the same paper there is a better, but more complicated, algorithm called Nicol+
 
 template<typename IndexType, typename ValueType>
 std::pair<std::vector<IndexType>, std::vector<ValueType>> MultiSection<IndexType, ValueType>::partition1DOptimal(

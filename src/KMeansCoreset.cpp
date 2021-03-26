@@ -22,12 +22,13 @@ namespace
 			
 			std::mt19937 gen{std::random_device{}()};
 			std::uniform_int_distribution<std::size_t> dist(0,range.size()-1);
-			
+PRINT( "range.size() "<< range.size()  << " k " << k );
 			std::swap(range[0],range[dist(gen)]);
 			
 			for(std::size_t i=1;i<k;++i)
 			{
 				std::vector<distance_type> dsquared;
+PRINT( "i " << i << " range.size()-i " << range.size()-i  );
 				dsquared.resize(range.size()-i);
 				
 				for(std::size_t j=i;j<range.size();++j)
@@ -101,8 +102,13 @@ typename KMeansCorset<IndexType, ValueType>::result_type KMeansCorset<IndexType,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
     Settings settings) {
 	
+    const IndexType localN = coordinates[0].getLocalValues().size();
+    const IndexType globalN = coordinates[0].size();
+    const IndexType dimensions = coordinates.size();
+
 	std::vector<std::size_t> indices;
-	indices.resize(coordinates.size());
+	//indices.resize(coordinates.size());
+    indices.resize(localN);
 	std::iota(std::begin(indices),std::end(indices),0);
 	
 	const auto distance_fun=[&](std::size_t p0, std::size_t p1)
@@ -179,7 +185,7 @@ scai::lama::DenseVector<IndexType> KMeansCorset<IndexType, ValueType>::computePa
     const Settings settings,
     Metrics<ValueType>& metrics)
 {
-    //get the coreset from the inout data points
+    //get the coreset from the input data points
     auto coreset=ITI::KMeansCorset<IndexType,ValueType>::computeCoreset(coordinates, nodeWeights, settings);
     //get a kmeans partition of the coreset
     auto coresetKmeans = ITI::KMeans<IndexType,ValueType>::computePartition(coreset.coordinates, coreset.nodeWeights, blockSizes, settings, metrics);
