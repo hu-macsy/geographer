@@ -35,14 +35,15 @@
 \newcommand{\MI}[1]{\mintinline{c++}{#1}}
 
 
-\graphicspath{{/home/harry/wave/figures/}{/home/harry/geographer-dev/figures/}}
+\graphicspath{{../figures/}}
 
-
+\title{Geographer, a tool for distributed graph and point set partitioning.}
 
 \begin{document}
+\maketitle
 
 
-\section*{Contributing to Geographer}
+\section*{Description of Lama and Geographer}
 
 This section describes in some depth some of the lama and \geo data types and functionality intended
 mainly for anyone that wants to contribute to the project. We will take a look into the commonly
@@ -50,46 +51,84 @@ used data type and how to use them efficiently.
 
 \subsection*{Lama}
 
-Lama is a framework for developing hardware-independent, high performance code. It offers distributed 
-data types, like DenseVector or CSRSparseMatrix, and simplified functions that might include communication
-between processing elements (PEs) underneath. What it might be intricate code when writing raw MPI code,
+Lama is a framework for developing hardware-independent, high performance code. 
+It offers distributed 
+data types, like DenseVector or CSRSparseMatrix, and simplified functions that might 
+include communication between processing elements (PEs) underneath.
+What it might be intricate code when writing raw MPI code,
 it becomes a simple function call. Below, we will see some of the most used data structures and 
 functions in \geo.
+More information about lama can be found in their official web site \url{www.libama.org/},
+their gitlab repository \url{gitlab.scai.fraunhofer.de/hpcpublic/lama} (also holds information on how
+to build the documentation) and can be reached in lama$@$scai.fraunhofer.de.
+
+Both lama and \geo use template types for the integer and non-integer values, named
+\MI{IndexType} and \MI{ValueType} respectively.
+While installing lama one has to specify \MI{IndexType}. By default this is \MI{int}
+but for handling large graph this needs to be set to \MI{long int} or \MI{unsigned long int}.
+This can be done by passing \texttt{-DSCAI\_INDEX\_TYPE="long"} to cmake.
+\geo uses the same type for \MI{IndexType} as lama. All classes are instantiated for the given 
+\MI{IndexType} and for double and float for \MI{ValueType}.
 
 
 \subsubsection*{Distribution}
 
 %As we have seen, matrices and vectors are distributed among PEs.
 In high performance application, data are usually too large to fit in a single memory plus, for
-better running time, we use distributed data. For example, vectors that are distributed among several
-memory units. Since each PE owns only a part of the data, we distinguish between \emph{local} 
-and non-local data. We also have to keep in mind how indexing is done, Typically, the element
+better running time, we want distributed the data among many processing elements (PEs).
+For example, vectors that are distributed among several memory units.
+Since each PE owns only a part of the data, we distinguish between \emph{local} 
+and non-local data. We also have to keep in mind how indexing is done. Typically, the element
 of a distributed vector has two related indices, its local index referring to its position
-to the local vector, and a global index that is its position relevant to the global vector.
+to the local vector, and a global index, its position relevant to the global vector.
 A distribution can be defined as a mapping from the local to global indices and vise versa.
 
 The simplest way to distribute data
-is the \MI{scai::dmemo::BlockDistribution}. Say that the size of the data to be distributed is $n$
+is the \MI{scai::dmemo::BlockDistribution}. Assume that the size of the data to be 
+distributed is $n$
 (either this is the size of a \MI{DenseVector} or the number of rows of a matrix) and we want
-to distribute them among $p$ PEs. Using a \MI{BlockDistribution} each PE will own $\lfloor n/p \rfloor$
-consecutive elements and PE $i$ will own indices from $i\lfloor n/p \rfloor$ until $(i+1)\lfloor n/p \rfloor$,
-with the last PE possibly having more elements.
+to distribute them among $p$ PEs. Using a \MI{BlockDistribution} each PE will 
+own $\lfloor n/p \rfloor$
+consecutive elements and PE $i$ will own indices from $i\lfloor n/p \rfloor$ 
+until $(i+1)\lfloor n/p \rfloor$, with the last PE possibly having more elements.
 
 A more flexible version is the \MI{scai::dmemo::GenBlockDistribution} where again each PE owns a 
-consecutive list of indices but now the size of the elements that belong to each PE can vary.
+consecutive list of indices but now the amount of the elements that belong to each PE can vary.
 
-In the other extreme is \MI{scai::dmemo::GeneralDistribution} which allows any arbitrary distribution
-of indices. If you notice, the rows of the matrix in \cref{fig:graph} are distributed using a
+In the other extreme is \MI{scai::dmemo::GeneralDistribution} which allows any 
+arbitrary distribution of indices. 
+If you notice, the rows of the matrix in \cref{fig:graph} are distributed using a
 \MI{GeneralDistribution}. 
+
+\begin{figure}[h]
+\centering
+\includegraphics[scale=0.8]{graph}
+\caption{A graph with 10 nodes distributed among 3 PEs and the corresponding adjacency 
+matrix. Color indicates in which PE each vertex belong to. This is a \MI{scai::dmemo::GeneralDistribution}; if 5 was orange it could be a
+\MI{GenBlockDistribution}; if we swap 5 and 6, this could be a \MI{BlockDistribution}.
+\att this is not a partition in the theoretical sense, just a distribution of
+the rows of the matrix.}
+\label{fig:graph}
+\end{figure}
 
 In \cref{fig:dist} you can see a vector of 14 elements divided among 3 PEs using 3 different 
 distributions. A functional difference between distributions is how to find which PE owns a given
 index $i$. For the \MI{BlockDistribution} and the \MI{GenBlockDistribution} this is easy and each
 PE can calculate fast the owner of $i$. This is much more costly for the \MI{GeneralDistribution} 
 since $i$ can be anywhere and communication among PE is needed.
-For this, there is an optimized version \MI{computeOwners()} that returns the owners for a given array of 
-global indices. Similarly, the function \MI{local2Global()} and \MI{global2Local()} are more expensive
+For this, there is an optimized version \MI{computeOwners()} that returns the owners 
+for a given array of global indices. 
+Similarly, the function \MI{local2Global()} and \MI{global2Local()} are slower
 for a general distribution compared to a block distribution.
+
+\begin{figure}
+\centering
+\includegraphics[scale=0.7]{vector_dist}
+\caption{A block distribution, a general block distribution and a general distribution of a vector
+with 14 elements.}
+\label{fig:dist}
+\end{figure}
+
 
 
 \subsubsection*{CSR sparse matrix}
@@ -104,23 +143,18 @@ scai::lama::CSRSparseMatrix
 %and that an element or a row \emph{belongs} to a PE. Often, each element of the matrix belongs only to one PE.
 In a distributed matrix, there are two possible distributions of its elements to the available
 PEs; one along the rows and one along the columns of the matrix.
-Such distributions define assignments of elements to PEs. We say that a PE \emph{owns} an element or a row
-and that an element or a row \emph{belongs} to a PE. Often, each element of the matrix belongs only to one PE.
-Here, when using the distributed matrix to store the adjacency matrix of a graph, we use only a distribution 
-along the rows. So, the rows of the matrix are divided among PEs, and each row exists only in one PE.
-In graph theoretic term, this is equivalent to saying that each PE owns a subset of the vertices (since
+Such distributions define assignments of elements to PEs. We say that a PE \emph{owns} 
+an element or a row
+and that an element or a row \emph{belongs} to a PE. Often, each element of the matrix 
+belongs only to one PE.
+Here, when using the distributed matrix to store the adjacency matrix of a graph, 
+we use only a distribution along the rows. So, the rows of the matrix are divided among PEs,
+and each row exists only in one PE.
+In graph theoretic term, this is equivalent to saying that each PE owns a subset of 
+the vertices (since
 one row corresponds to one vertex of the graph) and knows the neighbors of every vertex. 
 So for the rest, a vertex of the matrix and a row of the matrix are equivalent.
 One example of a distributed graph (and matrix) can be seen in \cref{fig:graph}.
-
-\begin{figure}[h]
-\centering
-\includegraphics[scale=0.9]{graph}
-\caption{A graph with 10 nodes distributed among 3 PEs and the corresponding distribution of the 
-adjacency matrix. \att this is not a partition in the theoretical sense, just a distribution of
-the rows of the matrix.}
-\label{fig:graph}
-\end{figure}
 
 The CSR sparse matrix format uses three vectors to store the matrix and in the distributed case
 these vectors are distributed among PEs. Since each PE owns a part of the matrix,
@@ -130,26 +164,31 @@ such as the global size of the matrix, the row and column distribution \etc.
 For convenience, there are functions that hide these details from the user.
 For example, the function \mintinline{c++}{CSRSparseMatrix::getValue(i,j)} returns the value 
 in position $[i,j]$
-of the matrix. But indices $i$ and $j$ refer to the global indexing, that is, if matrix has dimensions
-$N\times N$ then $0\leq i,j < N$; but position $[i,j]$ exists only in a single PE. When getValue() is
+of the matrix. For this function, indices $i$ and $j$ refer to the global indexing, 
+that is, if matrix has dimensions
+$N\times N$ then $0\leq i,j < N$; but position $[i,j]$ exists only in a single PE.
+When \mintinline{c++}{getValue()} is
 called, every PE checks if it owns this position, the one PE that owns it accesses the data and 
-then it broadcasts the value to all PEs. So, using functions like that make it easier to write code
+then it broadcasts the value to all PEs. 
+So, using functions like that make it easier to write code
 but it can hide, possibly, unnecessary communications.
 
-To avoid communication cost (so to be efficient!), we want, most of the times, to access only local 
-data. To make this explicit, we retrieve the local data of the matrix. 
+To avoid communication cost (so to be efficient!), we want, most of the times, 
+to access only local data. To make this explicit, we retrieve the local data of the matrix. 
 This is done using \mintinline{c++}{scai::lama::SparseMatrix::getLocalStorage()}. 
-Through the localStorage we can then read or write the local values without worrying about unwanted 
-communications. To read and write we need to acquire a lock to the data; this is done via the
-\mintinline{c++}{scai::hmemo::ReadAccess} and \mintinline{c++}{scai::hmemo::WriteAccess}
+Through the localStorage we can then read or write the local values without 
+worrying about unwanted communications. 
+To read and write we need to acquire a lock to the data; this is done via the
+\mintinline{c++}{scai::hmemo::ReadAccess} and \mintinline{c++}{scai::hmemo::WriteAccess}.
 
-\att Because of the structure of the CSR sparse matrix, for an already initialized matrix, we can only 
+\att Because of the structure of the CSR sparse matrix, for an already initialized matrix,
+we can only 
 change already existing values. If position $[i,j]$ does not exist, i.e., is zero, then we cannot 
-access it directly and we need to adapt the CSR vectors directly.
+access it directly and we need to adapt the CSR vectors \quot{by hand}.
 
 A reoccurring pattern of code to access the data of the adjacency matrix is in \cref{alg:csrData}.
-after line \ref{code:csr1} until line \ref{code:csr2}. Along with the 2 for loops, is a common way to
-access all local edges. 
+after line \ref{code:csr1} until line \ref{code:csr2}. Along with the 2 for loops, 
+is a common way to access all local edges. 
 By getting the distribution pointer, line \ref{code:dist}, we can check if a global index is local 
 in this PE or not.
 The function to do that is \MI{scai::dmemo::Distribution::isLocal(i)} and to convert local
@@ -157,12 +196,13 @@ indices to global and vise versa, there are function
 \MI{scai::dmemo::Distribution::local2Global(i)} and \\
 \MI{scai::dmemo::Distribution::global2Local(i)}.
 
-\att  for \MI{isLocal} and \MI{global2Local}, index $i$ is taken as a global index, i.e., $0\leq i <N$; this last function returns a specific number (\texttt{invalidIndex})
+\att  for \MI{isLocal()} and \MI{global2Local()}, index $i$ is taken as a global index, i.e., $0\leq i <N$; this last function returns a specific number (\texttt{invalidIndex})
 if the requested index is not local. Similarly, for \MI{local2Global(i)} $0\leq i < localN$.
 Naturally, \MI{isLocal(i)} is true in only one PE and false at the rest.
 
 For example, for \cref{fig:graph}, \mintinline{c++}{isLocal(4)} is true only for PE 1, 
-\mintinline{c++}{global2Local(7)} will return 1 for PE 2 and \texttt{invalidIndex} for PE 0 and 1 and
+\mintinline{c++}{global2Local(7)} will return 1 for PE 2 and \texttt{invalidIndex} 
+for PE 0 and 1 and
 \mintinline{c++}{local2Global(1)} will return 1 for PE 0, 4 for PE 1 and 7 for PE 2.
 
 %
@@ -223,8 +263,8 @@ This is called the \emph{halo} of the PE. For example, in \cref{fig:graph}, the 
 are the vertices $3, 4, 5$ and $7$.
 
 Lama offers the \MI{scai::dmemo::HaloExchangePlan} class to store info about the halo 
-exchange between PEs. In \cref{alg:halo} you can see a short example of how to build and access 
-the halo of a graph. 
+exchange between PEs. In \cref{alg:halo} you can see a short example of how to build 
+and access the halo of a graph. 
 Function \MI{HaloExchangePlan::updateHalo()} includes communication between PEs as it
 will send and receive the appropriate data for each PE according to its halo.
 For the graph in \cref{fig:graph}, PE 0 will send the values of \MI{partition[0]} and \MI{[1]}
@@ -234,7 +274,7 @@ global ID, to access it we need to map the global index to the relative index of
 This is done by calling \MI{HaloExchangePlan::global2Halo(i)} (there is also the inverse,
 to get the global position of a halo index by \MI{HaloExchangePlan::halo2Global(i)}).
 
-\begin{algorithm}
+\begin{algorithm}[t]
 \begin{minted}[tabsize=4, linenos, mathescape]{c++}
 
 // given a dense vector that stores a partition of the graph as
@@ -299,14 +339,6 @@ The \MI{partition} vector has the same size as the
 dimension of the matrix but should also have the same distribution as the row distribution of the matrix.
 
 
-\begin{figure}
-\centering
-\includegraphics[scale=0.7]{vector_dist}
-\caption{A block distribution, a general block distribution and a general distribution of a vector
-with 14 elements.}
-\label{fig:dist}
-\end{figure}
-
 Some useful function for all distributions are \MI{getLocalSize()} and \MI{getGlobalSize()} that return
 the local and global size of the distribution, \MI{getCommunicator()} that returns the communicator associated
 with this distribution and \MI{isEqual()} to test if two distributions are equal.
@@ -329,23 +361,26 @@ local data.
 
 \subsection*{Geographer }
 
-In this section we present some useful functions and what should be adapted within \geo if you want 
-to contribute to the project.
-By design, the main \quot{entry point} for a new algorithm is \MI{ITI::ParcoRepart::partitionGraph()}, which
+In this section we present some useful functions and what should be adapted within 
+\geo in order to make a contribution to the project.
+By design, the main \quot{entry point} for a new algorithm is 
+\MI{ITI::ParcoRepart::partitionGraph()}, which
 is the function to call if you want to partition a graph or a point set. 
 For most (overloaded) versions of \MI{partitionGraph()}, 
-the input typically consists of 3 objects: a \MI{CSRSparseMatrix} that is the adjacency matrix of the
-graph, a \MI{std::vector<DenseVector<ValueType>>} that is used to store the coordinates of the vertices
-and a \MI{DenseVector} to store the weights of the vertices.
-For those more familiar with metis and parmetis, there is also a version that takes raw pointers and
-internally converts them to \MI{CSRSparseMatrix} and \MI{DenseVector} and then calls the core implementation
-of \MI{partitionGraph()}. The arguments of this version are the same (or similar) to the metis and
-parmetis prototypes.
-By using the \MI{Settings} struct you can choose which algorithm you want to use for partitioning and
-pass various input parameters to the partitioning algorithm.
+the input typically consists of 3 objects: a \MI{CSRSparseMatrix} that is the adjacency 
+matrix of the graph, 
+a \MI{std::vector<DenseVector<ValueType>>} that is used to store the coordinates of the 
+vertices and a \MI{DenseVector} to store the weights of the vertices.
+For those more familiar with metis and parmetis, there is also a version that takes 
+raw pointers and internally converts them to \MI{CSRSparseMatrix} and \MI{DenseVector} 
+and then calls the core implementation of \MI{partitionGraph()}. 
+The arguments of this version are the same (or similar) to the metis and parmetis prototypes.
+By using the \MI{Settings} struct you can choose which algorithm you want to use for 
+partitioning and pass various input parameters to the partitioning algorithm.
 
+\paragraph*{Geometric partition}
 If you want to contribute a new partitioning algorithm
-you should first create a separate class, add a value in \MI{Settings::Tools} and  adapt the 
+you should first create a separate class, add a value in \MI{Settings::Tools} and adapt the 
 \MI{ITI::ParcoRepart::partitionGraph()} function in order to call the desired partitioning function.
 The core implementation of \MI{partitionGraph()} is separated in two main parts: 
 first we get the initial partition of a graph or point set and then we do local refinement using 
@@ -354,17 +389,63 @@ The first part can be found in \MI{ParcoRepart::initialPartition()}; this is whe
 want to add the call to the new function. Afterwards, applying
 local refinement can improve the cut provided by your algorithm.
 By setting \MI{Settings.noRefinement} to true, local refinement is disabled.
+The return value is a \MI{scai::DenseVector<IndexType>} that holds the partition vector, i.e., 
+the block id where each every vertex belongs too.
 Any required input parameter for the new algorithm should be declared in \MI{Settings}.
 Probably, you must also adapt \MI{parseArgs} so the parameters can be passed at run time as 
 command line arguments.
 
-\att in the case that you algorithm is about local refinement you should probably do more extensive
-changes as currently we do not support different local refinement algorithms.
+To get the geometric partition of a point set there are classes \MI{ITI::KMeans},
+\MI{ITI::HilbertCurve} and \MI{ITI::MultiSection}. These classes can partition weighted point sets in the given
+number of blocks adhering to a given balance constrain. To do so, each class provides a 
+\MI{computePartition} function with similar prototypes. To see how to control the parameters for
+each class look into \MI{Settings}. Although some of them require also the
+graph, this is mainly for sanity checks and debugging reasons and only the geometric information,
+i.e., the coordinates, are used. 
+In the \geo workflow, a mesh is first partitioned using one of the above techniques and
+then is further refined using the graph.
 
+\att some of this function internally redistribute the input data in order to improve locality of the
+point and reduce running time. For example, before calling the balanced \km algorithm we redistribute
+the input using \MI{HilbertCurve::redistribute} that redistributes the points according to their
+hilbert space-filling curve (SFC) indices. Look into the documentation of each class for more details.
+
+\paragraph*{Local refinement}
+In the case that you algorithm is about local refinement, the corresponding function to
+adapt is \MI{ParcoRepart::doLocalRefinement()} and different local refinement schemes are
+controlled by \MI{Settings.localRefAlgo}. Currently, we support a refinement algorithm based 
+on local vertex swap between blocks, a geometric rebalance scheme and a refinement using
+the parmetis method (if parmetis is installed).
+
+The classes \MI{MultiLevel} and \MI{LocalRefinement} are used to coarsen the graph using the
+multilevel scheme and apply local refinement, i.e., move vertices between blocks only if moving
+the vertex improves the cut value without hurting the imbalance.
+Usually, when using the multilevel approach, we start with a non-partitioned graph and merge vertices
+together until we reach a small number of vertices. Then this graph  (the coarsest) is partitioned. 
+To improve the cut we then refine the coarsen graph and do local refinement in steps.
+
+The approach in \geo is different.
+Although the uncoarsening/refinement step is identical, for the coarsening step we start from an
+already partitioned graph, the one provided by the geometric partition. To merge vertices we
+use a matching algorithm that only matches two adjacent vertices if they belong to the same block.
+This means that cut edges (edges between blocks) are not considered in the matching and so, the cut 
+value of the initial partition and the coarsest graph should be equal.
+To do a local refinement to a partitioned graph call \MI{ITI::MultiLevel::multiLevelStep()}. 
+This function will perform the coarsening and uncoarsening and internally, while uncoarsening,
+will also perform the local refinement.
+
+\att currently, local refinement only works when $k=p$, i.e., the number of desired blocks and the
+number of PEs are the same. Additionally, vertices are actually moved between PEs. That means
+that the input graph must be redistributed according to the given partition before the local refinement
+(here, \MI{aux::redistributeFromPartition()} can be helpful)
+and that vertices are redistributed during the local refinement.
+
+\paragraph{Miscellaneous}
 Useful helper functions for graph and points sets can be found in \MI{ITI::aux}
-and \MI{ITI::GraphUtils}. For example, in \MI{GraphUtils} there are function to compute the cut, the imbalance,
-the diameter of blocks and other properties of a partitioned (or not) graph. You can also construct the 
-communication and processor graph. The communication graph has a vertex for each block and two vertices
+and \MI{ITI::GraphUtils}. For example, in \MI{GraphUtils} there are function to compute the cut,
+the imbalance, the diameter of blocks and other properties of a partitioned (or not) graph.
+You can also construct the communication and processor graph.
+The communication graph has a vertex for each block and two vertices
 are adjacent if and only if the blocks are adjacent. The processor graph does not require the graph
 to be partitioned; a vertex of the processor graph corresponds to a PE and two vertices are adjacent 
 if the local data in the respective PEs have adjacent vertices. An example can be seen in
@@ -375,6 +456,11 @@ it redistributes the input (graph, coordinates and node weights) according to th
 Many functions to read and write graphs and coordinates from and to files can be found
 in the \MI{ITI::FileIO} class.
 
+If you have an already partitioned graph and you want to repartition/rebalance it you can do
+so by setting \MI{settings.repartition} to true and call \MI{ParcoRepart::computePartition()}.
+If repartition is activated, internally we call the function \MI{KMeans::computeRepartition()}.
+You can also call this function directly to repartition a point set.
+
 \begin{figure}[h]
 \centering
 \includegraphics[scale=0.9]{graph_partitioned_with_PE_block_graph}
@@ -384,47 +470,24 @@ block graph with the weights on the edges.}
 \label{fig:part_graph}
 \end{figure}
 
-Apart from the above, to get the geometric partition of a point set there are classes \MI{ITI::KMeans},
-\MI{ITI::HilbertCurve} and \MI{ITI::MultiSection}. These classes can partition weighted point sets in the given
-number of blocks adhering to a given balance constrain. To do so, each class provides a 
-\MI{computePartition} function with similar prototypes. To see how to control the parameters for
-each class look into \MI{Settings}. Although some of them require also the
-graph, this is mainly for sanity checks and debugging reasons and only the geometric information,
-i.e., the coordinates,
-are used. In the \geo workflow, a mesh is first partitioned using one of the above techniques and
-then is further refined using the graph.
 
-\att some of this function internally redistribute the input data in order to improve locality of the
-point and reduce running time. For example, before calling the balanced \km algorithm we redistribute
-the input using \MI{HilbertCurve::redistribute} that redistributes the points according to their
-hilbert space filling curve (SFC) indices. Look into the documentation of each class for more details.
+\paragraph*{External library}
+Another possibility is to write and compile you implementation outside \geo as a library and link
+your library to \geo. For calling external libraries we use the \MI{ITI::Wrappers} class and function
+\MI{ITI::Wrappers::partition()}. There, the distributed CSR matrix and dense vectors are converted
+to appropriate data type for each external tool. The currently external libraries supported are
+metis, parmetis, parhip and zoltan.
 
-The classes \MI{MultiLevel} and  \MI{LocalRefinement} are used to coarsen the graph using the
-multilevel scheme and apply local refinement, i.e., move vertices between blocks only if moving
-the vertex improves the cut value without hurting the imbalance.
-Usually, when using the multilevel approach, we start with a non-partitioned graph and merge vertices
-together until we reach a small number of vertices. Then this graph is partitioned. To improve
-the cut we then refine the coarsen graph and do local refinement. The approach in \geo is different.
-Although the uncoarsening/refinement step is identical, for the coarsening step we start from an
-already partitioned graph, the one provided by the geometric partition. To merge vertices we
-use a matching algorithm that only matches two adjacent vertices if they belong to the same block.
-This means that cut edges (edges between blocks) are not considered in the matching and so, the cut 
-value of the initial partition and the coarsest graph should be equal.
 
-To do a local refinement to a partitioned graph call \MI{ITI::MultiLevel::multiLevelStep()}. 
-This function will do the coarsening and uncoarsening and internally, while uncoarsening,
-will do the local refinement.
+\paragraph{Tests and benchmarks}
+To test the code we use \texttt{GoogleTest}; see the documentation on how to install and use it.
+To benchmark and test the executable on your own, you can use the \texttt{testGeoStandalone.py}
+script located in the top folder that calls the \geo executable with several parameters
+and graphs.
 
-\att currently, local refinement only works when $k=p$, i.e., the number of desired blocks and the
-number of PEs are the same. Additionally, vertices are actually moved between PEs. That means
-that the input graph must be redistributed according to the given partition before the local refinement
-(here, \MI{aux::redistributeFromPartition()} can be helpful)
-and that vertices are redistributed during the local refinement.
+Another option in to use the simexpal tool from \url{https://github.com/hu-macsy/simexpal}.
+An \texttt{experiment.yml} file used by simexpal is located in the top folder.
 
-If you have an already partitioned graph and you want to repartition/rebalance it you can do
-so by setting \MI{settings.repartition} to true and call \MI{ParcoRepart::computePartition()}.
-If repartition is activated, internally we call the function \MI{KMeans::computeRepartition()}.
-You can also call this function directly to repartition a point set.
 
 \subsubsection*{Example: contribute a new partitioning algorithm}
 
@@ -446,13 +509,14 @@ possibly useful argument can be a \MI{ITI::CommTree} that is used to store the p
 graph, i.e., the physical network, and can be taken into account while partitioning. Of course,
 the function can have less input arguments.
 
-
 \att you must force instantiation of the class otherwise you will get linking error.
 One way to do it is to add the line 
 \begin{minted}{c++}
 template class MyAlgo<IndexType, ValueType>;
 \end{minted}
 within namespace ITI in file MyAlgo.cpp.
+Another way is to have only a ,h file and keep all the implementation there.
+For \MI{IndexType} we use the type used when installing lama.
 
 In order to call \MI{MyAlgo} to get the initial partition you should first add an entry to enum
 \MI{Settings::Tool} in Settings.h,
@@ -570,13 +634,35 @@ TEST_F(MyAlgoTest, testMyPartition) {
 \label{MyAlgoTest.cpp}
 \end{algorithm}
 
+\clearpage
 
-\red{TODO: expand: create MyAlgo as a library and use Wrappers}
+\section*{Future plans}
 
-Another possibility is to write and compile you implementation outside \geo as a library and link
-your library to \geo. For calling external libraries we use the \MI{ITI::Wrappers} class and function
-\MI{ITI::Wrappers::partition()}. There, the distributed CSR matrix and dense vectors are converted
-to appropriate data type for each external tool. The currently external libraries supported are
-metis, parmetis and zoltan.
+Here we list some open issues and ideas to be included in \geo.
+
+\paragraph*{Local refinement}
+In the current version, local refinement can only be performed if $k=p$, that is, if the number 
+of calling PEs is equal the number of blocks we want to partition to. 
+This is enforced because the current implementation needs to align the partition with the 
+distribution (i.e., each PE receives only one block and each block resides only in one PE) 
+and executes a series of 2-way refinements
+where each time only 2 PEs communicate. So, to allow local refinement when $k\neq p$, a new
+procedure needs to be designed.
+If parmetis is installed we can call only the refinement from parmetis that does not have 
+this restriction. This can be done by setting \MI{Settings.localRefAlgo=parMetisRefine}.
+
+\paragraph*{Mapping via refinement}
+Using a new local refinement method we can also support optimizing for the communication
+costs and not the cut. The 2-way refinement that we currently support cannot do that because
+at least 3 block must be involved for communication costs to affect the refinement. See that, if
+a vertex and its neighbors belong in only 2 blocks, optimizing for the communication costs is 
+equivalent to optimizing for the cut since communication costs between PEs are symmetric, 
+$d(a,b)=d(b,a)$.
+
+\paragraph*{Code improvement}
+Most entities in \geo are classes with static member functions and no private data. This was
+an early design decision that we got stuck with. Most likely, these can be turned into namespaces.
+This will not affect performance of the code but will make the code \quot{cleaner}.
+
 
 \end{document}

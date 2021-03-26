@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
     
     ITI::CommTree<IndexType,ValueType> commTree = createCommTree( vm, settings, comm, nodeWeights);
     commTree.adaptWeights( nodeWeights );
-
+    
     //---------------------------------------------------------------
     //
     // get previous partition, if set
@@ -227,8 +227,8 @@ int main(int argc, char** argv) {
         std::chrono::time_point<std::chrono::steady_clock> beforeReport = std::chrono::steady_clock::now();
 
         {
-            std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
-            metricsVec[r].getMetrics(graph, partition, nodeWeights, settings, blockSizes );
+            //std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+            metricsVec[r].getMetrics(graph, partition, nodeWeights, settings, commTree );
             metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
         }
 
@@ -391,7 +391,7 @@ int main(int argc, char** argv) {
     }
 
     //print memory usage information. The message is too long for more PUs
-    if( comm->getSize()<100 and settings.verbose ){   
+    if( comm->getSize()<100 and settings.verbose ){
         //redistribute to get the correct memory usage
         aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coordinates, nodeWeights, settings, true, false);
         MSG0( "" );
@@ -410,6 +410,12 @@ int main(int argc, char** argv) {
             }
             comm->synchronize();
         }
+    }
+    
+    if( vm.count("redistAndStore") ){
+        aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coordinates, nodeWeights, settings, true, false);
+        const std::string fileName = settings.fileName+"_reordered" );
+        ITI::FileIO<IndexType, ValueType>::writeGraph( graph, fileName );
     }
     
     if (vm.count("callExit")) {

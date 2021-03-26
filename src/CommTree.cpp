@@ -47,6 +47,7 @@ CommTree<IndexType, ValueType>::CommTree( const std::vector<commNode> &leaves, c
         SCAI_ASSERT_EQ_ERROR( l.getNumWeights(), numWeights, "Found leaf that does not have the same number of weights as the others before" );
     }
     this->numNodes = createTreeFromLeaves( leaves );
+    this->distances.assign( hierarchyLevels, 1.0 );
 }
 //------------------------------------------------------------------------
 
@@ -96,6 +97,7 @@ void CommTree<IndexType, ValueType>::createFromLevels( const std::vector<IndexTy
     {
         auto leaves = tmpTree.getLeaves();
         IndexType tmpHierarchyLevels = leaves.front().hierarchy.size();
+        //tmpTree.distances.assign( hierarchyLevels, 1.0 );
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
         if( comm->getRank()==0 ) {
             std::cout << "There are " << tmpHierarchyLevels << " levels of hierarchy and " << leaves.size() << " leaves.";
@@ -112,7 +114,9 @@ void CommTree<IndexType, ValueType>::createFromLevels( const std::vector<IndexTy
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vector<commNode> leaves) {
+IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( 
+    const std::vector<commNode> &leaves,
+    const std::vector<ValueType> &hierDistances) {
 
     hierarchyLevels = leaves.front().hierarchy.size()+1; //+1 is for the root
     numLeaves = leaves.size();
@@ -120,8 +124,13 @@ IndexType CommTree<IndexType, ValueType>::createTreeFromLeaves( const std::vecto
     //bottom level are the leaves
     std::vector<commNode> levelBelow = leaves;
     tree.insert( tree.begin(), levelBelow );
-    IndexType size = levelBelow.size();
+    if( hierDistances.size()==0 ){
+        distances.assign( hierarchyLevels, 1.0 );
+    }else{
+        distances = hierDistances;
+    }
 
+    IndexType size = levelBelow.size();
     IndexType tmpHierarchyLevels = leaves.front().hierarchy.size();
 
     for(int h = tmpHierarchyLevels-1; h>=0; h--) {
@@ -152,6 +161,7 @@ IndexType CommTree<IndexType, ValueType>::createFlatHomogeneous(
     this->numNodes = createTreeFromLeaves(leaves);
     this->numWeights = numNodeWeights;
     this->isProportional = std::vector<bool>(numNodeWeights, true); //TODO: check if this is correct
+    this->distances.assign( hierarchyLevels, 1.0 );
 
     return this->numNodes;
 }//createFlatHomogeneous
@@ -167,6 +177,8 @@ IndexType CommTree<IndexType, ValueType>::createFlatHeterogeneousCore(
 
     this->numNodes = createTreeFromLeaves(leaves);
     this->numWeights = leafSizes.size();
+    this->distances.assign( hierarchyLevels, 1.0 );
+
     return this->numNodes;
 }
 //------------------------------------------------------------------------
@@ -200,6 +212,21 @@ IndexType CommTree<IndexType,ValueType>::createHierHeterogeneous(
 
     std::vector<commNode> leaves = createLeaves( leafSizes, levels);
     *this = CommTree( leaves, isWeightProp);
+
+    return this->numNodes;
+
+}//createHierHeterogeneous
+//------------------------------------------------------------------------
+
+template <typename IndexType, typename ValueType>
+IndexType CommTree<IndexType,ValueType>::createHierHomogeneous(
+    const std::vector<IndexType> &hierLevels,
+    const std::vector<ValueType> &hierDistances,
+    const IndexType numNodeWeights){
+
+    //tree is homogeneous, so all blocks/leaves have the same weight: N/k
+    *this = CommTree( hierLevels, numNodeWeights );
+    this->distances = hierDistances;
 
     return this->numNodes;
 
@@ -314,7 +341,7 @@ void CommTree<IndexType, ValueType>::adaptWeights( const std::vector<scai::lama:
 
         //clear tree and rebuild. This will correctly construct the intermediate levels
         tree.clear();
-        [[maybe_unused]] IndexType size = createTreeFromLeaves( hierLevel );
+        [[maybe_unused]] IndexType size = createTreeFromLeaves( hierLevel, getDistances() );
 
         areWeightsAdaptedV = true;
 
@@ -436,7 +463,7 @@ std::vector<std::vector<ValueType>> CommTree<IndexType, ValueType>::getBalanceVe
 //------------------------------------------------------------------------
 
 template <typename IndexType, typename ValueType>
-ValueType CommTree<IndexType, ValueType>::distance( const commNode &node1, const commNode &node2 ) {
+ValueType CommTree<IndexType, ValueType>::distance( const commNode &node1, const commNode &node2 ) const {
 
     const std::vector<unsigned int> &hier1 = node1.hierarchy;
     const std::vector<unsigned int> &hier2 = node2.hierarchy;
@@ -456,7 +483,8 @@ ValueType CommTree<IndexType, ValueType>::distance( const commNode &node1, const
         PRINT("WARNING: labels are identical but nodes have different leafIDs: " << node1.leafID <<"!="<<node2.leafID );
     }
 
-    return labelSize-i;
+    //if i==labelSize it means that the two nodes are identical, i.e. it is the same node
+    return i==labelSize? 0 : distances[labelSize-i-1];
 }//distance
 //------------------------------------------------------------------------
 
@@ -475,12 +503,12 @@ scai::lama::CSRSparseMatrix<ValueType> CommTree<IndexType, ValueType>::exportAsG
         const commNode thisLeaf = leaves[i];
         //to keep matrix symmetric
         for( IndexType j=0; j<numLeaves; j++ ) {
-            if( i==j )	//explicitly avoid self loops
+            if( i==j )  //explicitly avoid self loops
                 continue;
 
             const commNode otherLeaf = leaves[j];
             const ValueType dist = distance( thisLeaf, otherLeaf );
-
+            //PRINT0("dist "<< i << ", " << j << "= " << dist );
             ja.push_back(j);
             values.push_back(dist);
         }

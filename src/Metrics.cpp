@@ -9,6 +9,7 @@
 #include "FileIO.h"
 #include "GraphUtils.h"
 
+
 using namespace ITI;
 
 template<typename ValueType>
@@ -17,12 +18,14 @@ void Metrics<ValueType>::getMetrics(
     const scai::lama::DenseVector<IndexType> &partition,
     const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
     struct Settings settings,
-    const std::vector<std::vector<ValueType>> &blockSizes){
+    const CommTree<IndexType,ValueType> &PEtree){
+
+    const std::vector<std::vector<ValueType>> blockSizes = PEtree.getBalanceVectors();
 
     if( settings.metricsDetail=="all" ) {
         getAllMetrics( graph, partition, nodeWeights, settings, blockSizes);
     }
-    if( settings.metricsDetail=="easy" ) {
+    if( settings.metricsDetail=="easy" or settings.metricsDetail=="mapping" ) {
         getEasyMetrics( graph, partition, nodeWeights, settings, blockSizes );
     }
     if( settings.metricsDetail=="mapping" ) {
@@ -33,6 +36,9 @@ void Metrics<ValueType>::getMetrics(
 
         if( settings.PEGraphFile!="-" ){ // a processor graph is provides by the user
             PEgraph = ITI::FileIO<IndexType, ValueType>::readGraph( settings.PEGraphFile, PEnodeWeights, comm, settings.fileFormat );
+        }else if(PEtree.hasDistances() ){
+            PEgraph = PEtree.exportAsGraph_local();
+            SCAI_ASSERT_EQ_ERROR( PEgraph.getNumRows(), settings.numBlocks, "PEgraph size mismatch" );
         }else{// if not, create the processor graph
             if( settings.numBlocks!=comm->getSize()){
                 if( comm->getRank()==0 ){
@@ -46,11 +52,12 @@ void Metrics<ValueType>::getMetrics(
         }
         //PE graph needs to be replicated
         PEgraph.replicate();
-        getMappingMetrics( graph, partition, PEgraph );        
+        getMappingMetrics( graph, partition, PEgraph );
     }
 }
 
 //---------------------------------------------------------------------------
+
 
 template<typename ValueType>
 void Metrics<ValueType>::getAllMetrics(
@@ -434,10 +441,11 @@ void Metrics<ValueType>::getMappingMetrics(
     SCAI_ASSERT( PEGraph.getRowDistributionPtr()->isEqual(*noDist), "Function expects the graph to be replicated" );
     SCAI_ASSERT( blockGraph.getRowDistributionPtr()->isEqual(*noDist), "Function expects the graph to be replicated" );
 
-    ValueType sumDilation = 0;
-    ValueType maxDilation = 0;
+    ValueType sumDilation = 0.0;
+    ValueType maxDilation = 0.0;
     ValueType minDilation = std::numeric_limits<ValueType>::max();
-    std::vector<ValueType> congestion( peM, 0 );
+    std::vector<ValueType> congestion( peM, 0.0 );
+    ValueType qap = 0.0;
 
     //calculate all shortest paths in PE graph
     std::vector<std::vector<ValueType>> APSP( N, std::vector<ValueType> (N, 0.0));
@@ -465,6 +473,8 @@ void Metrics<ValueType>::getMappingMetrics(
     SCAI_ASSERT_EQ_ERROR( PEia.size(), N+1, "ia size mismatch" );
     SCAI_ASSERT_LE_ERROR( PEia[N], peM, "Too large index in PE graph" );
     SCAI_ASSERT_LE_ERROR( scai::utilskernel::HArrayUtils::max(PEStorage.getIA()), peM, "some ia value is too large");
+    SCAI_ASSERT_EQ_ERROR( PEValues.size(), N*(N-1), "PE graph should be a complete undirected graph" );
+    SCAI_ASSERT_LE_ERROR( blockValues.size(), PEValues.size(), "mismatch in graph edges" );
 
     // calculate dilation and congestion for every edge
     for( IndexType v=0; v<N; v++) {
@@ -484,6 +494,9 @@ void Metrics<ValueType>::getMappingMetrics(
                 if( currDilation<minDilation ) {
                     minDilation = currDilation;
                 }
+
+                const ValueType PEdistance = PEValues[iaInd];
+                qap += thisEdgeWeight*PEdistance;
 
                 //update congestion
                 IndexType current = target;
@@ -528,6 +541,7 @@ void Metrics<ValueType>::getMappingMetrics(
     MM["maxCongestion"] = maxCongestion;
     MM["maxDilation"] = maxDilation;
     MM["avgDilation"] = avgDilation;
+    MM["qap_J(C,D,P)"] = qap;
 
 }//getMappingMetrics
 //---------------------------------------------------------------------------------------

@@ -70,6 +70,15 @@ std::ostream& ITI::operator<<( std::ostream& out, const ITI::Tool tool) {
     case Tool::parhipEcoMesh:
         token = "parhipEcoMesh";
         break;
+    case Tool::parhipFastSocial:
+        token = "parhipFastSocial";
+        break;
+    case Tool::parhipUltraFastSocial:
+        token = "parhipUltraFastSocial";
+        break;
+    case Tool::parhipEcoSocial:
+        token = "parhipEcoSocial";
+        break;
 	case Tool::myAlgo:
 		token = "myAlgo";
 		break;
@@ -145,6 +154,12 @@ std::istream& ITI::operator>>(std::istream& in, ITI::Tool& tool) {
         tool = ITI::Tool::parhipUltraFastMesh;
     else if( token=="parhipEcoMesh" or tokenLower=="parhipecomesh")
         tool = ITI::Tool::parhipEcoMesh;
+    else if( token=="parhipFastSocial" or tokenLower=="parhipfastsocial" )
+        tool = ITI::Tool::parhipFastSocial;
+    else if( token=="parhipUltraFastSocial" or tokenLower=="parhipultrafastsocial")
+        tool = ITI::Tool::parhipUltraFastSocial;
+    else if( token=="parhipEcoSocial" or tokenLower=="parhipecosocial")
+        tool = ITI::Tool::parhipEcoSocial;
 	else if( token=="myAlgo")
 		tool = ITI::Tool::myAlgo;
     else if( token=="None" or tokenLower=="none")

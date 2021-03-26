@@ -43,9 +43,9 @@ TYPED_TEST(DiffusionTest, testPotentials) {
     std::string file = DiffusionTest<ValueType>::graphPath + fileName;
     CSRSparseMatrix<ValueType> graph = FileIO<IndexType, ValueType>::readGraph(file );
     const IndexType n = graph.getNumRows();
-    scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(n));
 
     CSRSparseMatrix<ValueType> L = GraphUtils<IndexType, ValueType>::constructLaplacian(graph);
+    SCAI_ASSERT_EQ_ERROR( graph.getRowDistributionPtr(), L.getRowDistributionPtr(), "distribution mismatch" );
 
     DenseVector<ValueType> nodeWeights(L.getRowDistributionPtr(),1);
     IndexType source = 0;

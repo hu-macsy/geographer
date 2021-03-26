@@ -65,6 +65,8 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::refine
     {
         scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
         SCAI_ASSERT_EQ_ERROR( vtxDist.size(), comm->getSize()+1, "Wrong vtxDist size" );
+        const ValueType localWeightSum = std::accumulate( vVwgt.begin(), vVwgt.end(), 0.0);
+        SCAI_ASSERT_GT_ERROR( localWeightSum, 0, "Sum of local vertex weights should not be 0" );
     }
 
     // nparts: the number of parts to partition (=k)
@@ -207,6 +209,13 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
         return scai::lama::DenseVector<IndexType>(0,0);
     }
 
+    if( settings.verbose ){
+        options.resize(2);
+        MSG0("setting options[1] to " << PARMETIS_DBGLVL_REFINEINFO );
+        options[0] = 1;
+        options[1] = PARMETIS_DBGLVL_REFINEINFO; //verbosity
+    }
+    
     // nparts: the number of parts to partition (=k)
     IndexType nparts= settings.numBlocks;
     // ndims: the number of dimensions
@@ -245,7 +254,7 @@ scai::lama::DenseVector<IndexType> parmetisWrapper<IndexType, ValueType>::partit
 
     if( tool==Tool::parMetisGraph ) {
         if( comm->getRank()==0 ) 
-            std::cout<< "About to call ParMETIS_V3_PartKway" << std::endl;
+            std::cout<< "About to call ParMETIS_V3_PartKway to partition into " << nparts << " blocks" << std::endl;
 
         ParMETIS_V3_PartKway( 
             vtxDist.data(), xadj.data(), adjncy.data(), vwgt.data(), adjwgt, &wgtFlag, &numflag, &numWeights, &nparts, tpwgts.data(), ubvec.data(), options.data(), &edgecut, partKway, &metisComm );

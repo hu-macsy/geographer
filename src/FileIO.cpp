@@ -30,6 +30,7 @@
 #include <iterator>
 #include <map>
 #include <tuple>
+#include <chrono>
 
 
 using scai::lama::CSRStorage;
@@ -37,9 +38,9 @@ using scai::hmemo::HArray;
 
 namespace ITI {
 
-const IndexType fileTypeVersionNumber= 3;
 typedef unsigned long int ULONG;
 typedef unsigned long long int ULLI;
+const ULONG fileTypeVersionNumber= 3;
 
 //-------------------------------------------------------------------------------------------------
 /*Given the adjacency matrix it writes it in the file "filename" using the METIS format. In the
@@ -79,13 +80,15 @@ void FileIO<IndexType, ValueType>::writeGraph (
     if(comm->getRank()==root) {
         if( binary ){
             fNew.open(newFile, std::ios::binary | std::ios::out);
-            //const ULONG N = distPtr->getGlobalSize();
-            //const ULONG M = adjM.getNumValues()/2;
-            //fNew.write((char*)(&M), sizeof( ULONG ));
             fNew.write((char*)(&fileTypeVersionNumber), sizeof( ULONG ));
             fNew.write((char*)(&globalN), sizeof( ULONG ));
             ULONG M = globalM/2;
             fNew.write((char*)(&M), sizeof( ULONG ));
+            ULONG prSum0 = (globalN+4)*sizeof( ULONG ); // the first vertex degree prefix sum position is not 0 but global+4.
+            //this is the position where the neighbors list begins
+            //for the "*sizeof(ULONG)" see also below (brief: is needed when reading the graph)
+            fNew.write((char*)(&prSum0), sizeof( ULONG )); 
+
         }else{
             fNew.open(newFile, std::ios::out);
             // first line is the number of nodes and edges
@@ -95,12 +98,11 @@ void FileIO<IndexType, ValueType>::writeGraph (
             }
             fNew<< std::endl;
         }
+        if(not fNew.is_open()){
+            throw std::runtime_error("File "+ newFile+ " could not be opened");
+        }
     }
-/*
-    if(not fNew.is_open()){
-        throw std::runtime_error("File "+ newFile+ " could not be opened");
-    }
-*/
+
     //wait root to write header
     comm->synchronize();
     fNew.close();
@@ -136,8 +138,7 @@ void FileIO<IndexType, ValueType>::writeGraph (
             for vertex v start at position n+3+"the sum of the degrees of all v-1 vertices"
             (where v is the global id)
         */
-        
-        //ULONG headerSize = 3;
+
 
         localNodeDegrees.resize(localN);
         const scai::lama::CSRStorage<ValueType>& localAdjM = adjM.getLocalStorage();
@@ -157,22 +158,29 @@ void FileIO<IndexType, ValueType>::writeGraph (
             localMPrefixSum[i+1] += localMPrefixSum[i];
         }
         SCAI_ASSERT_EQ_ERROR( localMPrefixSum.back(), globalM, "Wrong degrees prefix sum in PE " << thisPE);
-//
-//add the localM prefix sum to the degrees
-//
-const ULONG myOffset = localMPrefixSum[thisPE];
-std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { d+=myOffset;});
-//is this needed?
+        
+        //
+        //add the localM prefix sum to the degrees
+        //
+        const ULONG myOffset = localMPrefixSum[thisPE] + globalN + 4 /*head size + 1 for the first 0*/ ;
+        std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { d+=myOffset;});
+        //not sure why and if this is needed; when reading the node degrees in the binary read, we divide by sizeof(ULONG)
+        std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { d*=sizeof(ULONG);});
+        //is this needed?
 
         //add the size of the header and all the previous
-        fNew.open(newFile, std::ios::binary | std::ios::app);
         for(IndexType p=0; p<numPEs; p++){
             if( myTurn==p){
+                fNew.open(newFile, std::ios::binary | std::ios::app);
+                //int filePos = fNew.tellp()/sizeof(ULONG);
+                //PRINT(p << ": in position " << filePos << ", first degree= " << localNodeDegrees[0] );
                 fNew.write( (char*)(localNodeDegrees.data()), localN*sizeof(ULONG));
+                fNew.close();
             }
             comm->synchronize();
         }
-        PRINT0("node degrees written");
+        MSG0("node degrees written");
+        fNew.close();
     }
 
     //
@@ -180,7 +188,7 @@ std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { 
     //
 
     std::stringstream ssBuffer;
-    std::vector<ULONG> binaryBuffer(adjM.getLocalNumValues());
+    std::vector<ULONG> binaryBuffer;
 
     {
         const scai::lama::CSRStorage<ValueType>& localAdjM = adjM.getLocalStorage();
@@ -190,10 +198,11 @@ std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { 
         assert( localN==rLocalIA.size()-1 );
 
         if(binary){
+            binaryBuffer.resize(adjM.getLocalNumValues());
             IndexType edgeInd =0;
             for(IndexType i=0; i<rLocalIA.size()-1; i++) {       // for all local nodes
                 for(IndexType j= rLocalIA[i]; j<rLocalIA[i+1]; j++) {    // for all the edges of a node
-                    binaryBuffer[edgeInd++] = (ULONG) (rLocalJA[j]+1);
+                    binaryBuffer[edgeInd++] = (ULONG) (rLocalJA[j]);
                 }
             }
             SCAI_ASSERT_EQ_ERROR( edgeInd, adjM.getLocalNumValues(), "fix edge index" );
@@ -201,7 +210,7 @@ std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { 
             for(IndexType i=0; i<rLocalIA.size()-1; i++) {       // for all local nodes
                 for(IndexType j= rLocalIA[i]; j<rLocalIA[i+1]; j++) {    // for all the edges of a node
                     if(!edgeWeights) {
-                        ssBuffer << rLocalJA[j]+1 << " ";
+                        ssBuffer << rLocalJA[j] +1 << " ";
                     } else {
                         ssBuffer << rLocalJA[j]+1 << " "<< rLocalVal[j]<< " ";
                     }
@@ -223,7 +232,7 @@ std::for_each(localNodeDegrees.begin(), localNodeDegrees.end(), [&](ULONG& d) { 
             if( binary ){
                 fNew.open(newFile, std::ios::binary | std::ios::app); //append
                 fNew.write((char*) binaryBuffer.data(), binaryBuffer.size()*sizeof(ULONG) );
-                SCAI_ASSERT_EQ_ERROR( fNew.tellp(), (localNodeDegrees[thisPE+1]*2+3)*sizeof(ULONG) , "While writing edge list in parallel: Position in file " << filename << " for PE " << thisPE << " is not correct." );
+                SCAI_ASSERT_EQ_ERROR( fNew.tellp(), (localNodeDegrees.back() ) , "While writing in parallel: Position in file " << filename << " for PE " << thisPE << " is not correct." );
                 fNew.close();
             }
             else{
@@ -860,24 +869,22 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
 
     //get distribution and local range
     const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(globalN, comm));
-    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
     IndexType beginLocalRange, endLocalRange;
     scai::dmemo::BlockDistribution::getLocalRange(beginLocalRange, endLocalRange, globalN, comm->getRank(), comm->getSize());
     const IndexType localN = endLocalRange - beginLocalRange;
     SCAI_ASSERT_LE_ERROR(localN, std::ceil(ValueType(globalN) / comm->getSize()), "localN: " << localN << ", optSize: " << std::ceil(globalN / comm->getSize()));
 
-    //std::cout << "Process " << comm->getRank() << " reading from " << beginLocalRange << " to " << endLocalRange << std::endl;
-
     //scroll to begin of local range. Neighbors of node i are in line i+1
+    std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
     IndexType ll;
     for (ll = 0; ll < beginLocalRange; ll++) {
         std::getline(file, line);
-        if( file.tellg()<0) {
-            PRINT(*comm << " : "<<  ll);
-            exit(1);
-        }
+        SCAI_ASSERT_GE_ERROR( file.tellg(), 0, "Wrong number of vertices or corrupted file?" );
     }
+    //std::chrono::duration<double> elapTime = std::chrono::steady_clock::now() - startTime;
+    //double tillMyStartTime = elapTime.count();
+    //std::cout << "Process " << comm->getRank() << " reading from " << beginLocalRange << " to " << endLocalRange <<", time to reach starting vertex " << tillMyStartTime << std::endl;
 
     std::vector<IndexType> ia(localN+1, 0);
     std::vector<IndexType> ja;
@@ -893,6 +900,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
     ja.reserve(edgeEstimate);
 
     //std::cout << "Process " << comm->getRank() << " reserved memory for  " <<  edgeEstimate << " edges." << std::endl;
+    startTime =  std::chrono::steady_clock::now();
 
     //now read in local edges
     for (IndexType i = 0; i < localN; i++) {
@@ -953,7 +961,8 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         }
     }
 
-    //std::cout << "Process " << comm->getRank() << " read " << ja.size() << " local edges. " << std::endl;
+    //elapTime = std::chrono::steady_clock::now() - startTime;
+    //std::cout << "Process " << comm->getRank() << " read " << ja.size() << " local edges in time " << elapTime.count() << std::endl;
 
 
     nodeWeights.resize(numberNodeWeights);
@@ -988,13 +997,17 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraph(c
         throw std::runtime_error("Expected " + std::to_string(2*globalM) + " edges, got " + std::to_string(comm->sum(ja.size())));
     }
 
+    startTime =  std::chrono::steady_clock::now();
     //assign matrix
     scai::lama::CSRStorage<ValueType> myStorage(localN, globalN,
             HArray<IndexType>(ia.size(), ia.data()),
             HArray<IndexType>(ja.size(), ja.data()),
             HArray<ValueType>(values.size(), values.data()));
 
-    //std::cout << "Process " << comm->getRank() << " created local storage " << std::endl;
+    //elapTime = std::chrono::steady_clock::now() - startTime;
+    //std::cout << "Process " << comm->getRank() << " created local storage in time " << elapTime.count() << std::endl;
+
+    const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution( globalN ));
 
     return scai::lama::distribute<scai::lama::CSRSparseMatrix<ValueType>>(myStorage, dist, noDist);
     //ThomasBranses ? return scai::lama::CSRSparseMatrix<ValueType>( dist, std::move(myStorage) ); // if no comm
@@ -1034,7 +1047,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
     PRINT0( "Binary read, version= " << version << ", N= " << globalN << ", M= " << M );
 
     if( version != fileTypeVersionNumber ) {
-        throw std::runtime_error( "filetype version mismatch" );
+        throw std::runtime_error( "filetype version mismatch, it should be "+std::to_string(fileTypeVersionNumber)+" but it is "+ std::to_string(version) );
     }
 
     const IndexType numPEs = comm->getSize();
@@ -1053,7 +1066,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
 
     const IndexType window_size = numPEs;// std::min( binary_io_window_size, numPEs );
     IndexType lowPE =0;
-    IndexType highPE = window_size;
+    IndexType highPE = numPEs;
 
     std::vector<IndexType> ia;//(localN+1, 0);  localN is not known yet
     std::vector<IndexType> ja;
@@ -1061,11 +1074,11 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
 
 
     while( lowPE<numPEs ) {
-        if( thisPE>=lowPE and thisPE<highPE) {
+       if( thisPE>=lowPE and thisPE<highPE) {
             std::ifstream file;
             file.open(filename.c_str(), std::ios::binary | std::ios::in);
 
-			//std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
+            //std::cout << "Process " << thisPE << " reading from " << beginLocalRange << " to " << endLocalRange << ", in total, localN= " << localN << " nodes/lines" << std::endl;
 
             ia.resize( localN +1);
             ia[0]=0;
@@ -1074,22 +1087,24 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             // read the vertices offsets
             //
             SCAI_REGION_START("FileIO.readGraphBinary.fileRead")
+            std::size_t ULONGsize = sizeof(ULONG);
 
-            const ULONG startPos = (headerSize+beginLocalRange)*(sizeof(ULONG));
+            const ULONG startPos = (headerSize+beginLocalRange);
             ULONG* vertexOffsets = new ULONG[localN+1];
-            file.seekg(startPos);
-            file.read( (char *)(vertexOffsets), (localN+1)*sizeof(ULONG) );
+            file.seekg( startPos*(ULONGsize) );
+            file.read( (char *)(vertexOffsets), (localN+1)*ULONGsize );
 
             //
             // read the edges
             //
-            ULONG edgeStartPos = vertexOffsets[0];
-
+            const ULONG edgeStartPos = vertexOffsets[0];
             const ULONG numReads = vertexOffsets[localN]-vertexOffsets[0];
-            const ULONG numEdges = numReads/sizeof(ULONG);
+            const ULONG numEdges = numReads/ULONGsize;
             ULONG* edges = new ULONG[numEdges];
+            //SCAI_ASSERT_LE_ERROR( edgeStartPos+numEdges, M*2*ULONGsize, "error in file" );
+
             file.seekg( edgeStartPos );
-            file.read( (char *)(edges), (numEdges)*sizeof(ULONG) );
+            file.read( (char *)(edges), (numEdges)*ULONGsize );
 
             SCAI_REGION_END("FileIO.readGraphBinary.fileRead")
 
@@ -1108,15 +1123,16 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readGraphBi
             for( IndexType i=0; i<localN; i++) {
                 SCAI_REGION("FileIO.readGraphBinary.buildCSRmatrix")
                 ULONG nodeDegree = (vertexOffsets[i+1]-vertexOffsets[i])/sizeof(ULONG);
-                SCAI_ASSERT_GT_ERROR( nodeDegree, 0, "Node with degree zero not allowed, for node " << i*(thisPE+1) );
+                SCAI_ASSERT_GT_ERROR( nodeDegree, 0, "Node with degree zero not allowed, for node " << i << " in PE " << thisPE );
                 neighbors.resize(nodeDegree);
 
                 for(ULONG j=0; j<nodeDegree; j++, pos++) {
                     SCAI_ASSERT_LE_ERROR(pos, numEdges, "Number of local non-zero values is greater than the total number of edges read.");
 
                     ULONG neighbor = edges[pos];
+                    //PRINT(thisPE << ": pos " << pos << " <> "<< i <<" - " << neighbor << " __ nodeDegree " << nodeDegree << "= " << vertexOffsets[i+1] << "-" << vertexOffsets[i] );
                     if (neighbor >= globalN || neighbor < 0) {
-                        throw std::runtime_error(std::string(__FILE__) +", "+std::to_string(__LINE__) + ": Found illegal neighbor " + std::to_string(neighbor) + " in line " + std::to_string(i+beginLocalRange));
+                        throw std::runtime_error(std::string(__FILE__) +", "+std::to_string(__LINE__) + ": Found illegal neighbor " + std::to_string(neighbor) + " for vertex " + std::to_string(i+beginLocalRange) + " for PE " + std::to_string(thisPE));
                     }
 
                     neighbors[j] = neighbor;
@@ -1348,7 +1364,11 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
 //TODO: handle case where number of files != numPEs
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListDistributed(const std::string prefix, const scai::dmemo::CommunicatorPtr comm) {
+scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeListDistributed(
+    const std::string prefix,
+    const scai::dmemo::CommunicatorPtr comm,
+    const bool duplicateEdges,
+    const bool removeSelfLoops) {
     SCAI_REGION( "FileIO.readEdgeListDistributed" );
 
     const IndexType thisPE = comm->getRank();
@@ -1387,7 +1407,7 @@ scai::lama::CSRSparseMatrix<ValueType> FileIO<IndexType, ValueType>::readEdgeLis
         edgeList.push_back( std::make_pair( v1, v2) );
     }
 
-    return  GraphUtils<IndexType, ValueType>::edgeList2CSR( edgeList, comm );
+    return  GraphUtils<IndexType, ValueType>::edgeList2CSR( edgeList, comm, duplicateEdges, removeSelfLoops );
 
 }
 //-------------------------------------------------------------------------------------------------

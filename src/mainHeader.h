@@ -5,6 +5,7 @@
 #include "sys/times.h"
 #include "sys/vtimes.h"
 
+#include <chrono>
 #include <cxxopts.hpp>
 
 #include "AuxiliaryFunctions.h"
@@ -35,6 +36,7 @@ IndexType readInput(
     std::vector<scai::lama::DenseVector<ValueType>>& coords,
     std::vector<scai::lama::DenseVector<ValueType>>& nodeWeights ){
 
+    std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
     IndexType N;
 
     if (vm.count("graphFile")) {
@@ -106,7 +108,11 @@ IndexType readInput(
         }
 
         //read the coordinates file
-        if (vm.count("coordFormat")) {
+        if( settings.dimensions==0 ){
+            //if dimensions are explicitly set to 0, set only one coord with the same value
+            const scai::dmemo::DistributionPtr dist(new scai::dmemo::BlockDistribution(N, comm));
+            coords.push_back( DenseVector<ValueType>( dist, 0.0 ) );
+        }else if (vm.count("coordFormat")) {
             coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, comm, settings.coordFormat);
         } else if (vm.count("fileFormat")) {
             coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, comm, settings.fileFormat);
@@ -114,7 +120,7 @@ IndexType readInput(
             coords = ITI::FileIO<IndexType, ValueType>::readCoords(coordFile, N, settings.dimensions, comm);
         }
         if( settings.dimensions>2 ){
-            SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size(), coords[1].getLocalValues().size(), "coordinates not of same size" );      
+            SCAI_ASSERT_EQUAL(coords[0].getLocalValues().size(), coords[1].getLocalValues().size(), "coordinates not of same size" );
         }
 
     }else if(vm.count("generate")) {
@@ -195,6 +201,12 @@ IndexType readInput(
         throw std::runtime_error("Input not consistent.\nAborting...");
         return -1;
     }
+    
+    std::chrono::duration<double> endTime = std::chrono::steady_clock::now() - startTime;
+    double totalTime= comm->max(endTime.count() );
+    if( comm->getRank()==0 ) {
+        std::cout<< "input read/created in " << totalTime << " seconds " << std::endl;
+    }
 
     return N;
 }
@@ -225,7 +237,6 @@ Settings initialize( const int argc, char** argv, const cxxopts::ParseResult& vm
     }
       
     std::string callingCommand = ITI::getCallingCommand(argc, argv);
-    
     Settings settings = ITI::interpretSettings(vm);
     //add the calling command to the setting so it can be extracted later
     settings.callingCommand = callingCommand;
@@ -564,6 +575,24 @@ ITI::CommTree<IndexType,ValueType> createCommTree(
             const int coresPerNode = settings.hierLevels.back(); 
             std::vector<std::vector<ValueType>> blockWeights = calculateLoadRequests<ValueType>(comm, coresPerNode);
             commTree.createFlatHeterogeneous( blockWeights, std::vector<bool>{true, false}  );
+        }else if( vm.count("distance_parameter_string") ){
+            SCAI_ASSERT( !vm.count("blockSizesFile"), "conflicting arguments");
+            SCAI_ASSERT( !vm.count("topologyFile"), "conflicting arguments");
+
+            //create the distance vector
+            std::vector<ValueType> distances;
+            {
+                std::stringstream ss( vm["distance_parameter_string"].as<std::string>() );
+                std::string item;
+
+                while (!std::getline(ss, item, ':').fail()) {
+                  distances.push_back( std::stod(item) );
+//                    distances.insert( distances.begin(), std::stod(item) );
+                }
+            }
+            //tree is homogeneous, that means that block sizes should be homogeneous, i.e., all equal to N/k or sumWeight/k
+            const IndexType numWeights = nodeWeights.size();
+            commTree.createHierHomogeneous( settings.hierLevels, distances, numWeights );
         }else{
             const IndexType numWeights = nodeWeights.size();
             commTree.createFromLevels(settings.hierLevels, numWeights );

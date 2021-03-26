@@ -1,0 +1,12 @@
+#example; supposed to be executed in the build/ folder
+cmake .. \
+-DSCAI_DIR= ~/LamaInstallation \
+-DCMAKE_INSTALL_PREFIX= ~/geographer/installation/ \
+-DUSE_NETWORKIT=OFF \
+-DPARHIP_BASE= ~/KaHIP/deploy \
+-DPARMETIS_BASE= ~/parmetis-4.0.3/build/Linux-x86_64/installation \
+-DMETIS_INCLUDE= ~/parmetis-4.0.3/metis/include \
+-DCODE_COVERAGE=OFF \
+-DBUILD_TOOLS=ON \
+-DBUILD_DOC=ON \
+-DCMAKE_BUILD_TYPE=Debug

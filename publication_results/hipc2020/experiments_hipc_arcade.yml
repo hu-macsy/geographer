@@ -1,0 +1,467 @@
+##
+## all this experiments where run in our in-house cluster, arcade
+##
+## version of simexpal used
+## https://github.com/hu-macsy/simexpal
+
+builds:
+  - name: lama
+    git: 'https://github.com/hu-macsy/lama'
+    configure:
+      - args:
+          - 'cmake'
+          - '-DCMAKE_C_COMPILER=mpicc'
+          - '-DCMAKE_CXX_COMPILER=mpicxx'
+          - '-DCMAKE_INSTALL_PREFIX=@THIS_PREFIX_DIR@'
+          - '-DCMAKE_BUILD_TYPE=Release'
+          - '-DSCAI_TRACE=OFF'
+          - '-DSCAI_LOG_LEVEL_INFO=OFF'
+          - '-DSCAI_ASSERT_LEVEL=OFF'
+          - '-DBUILD_EXAMPLES=OFF'
+          - '-DBUILD_TEST=OFF'
+          - '-DBUILD_DOC=OFF'
+          - '-DUSE_CUDA=OFF'
+          - '-DSCAI_INDEX_TYPE=long'
+          - '-DSCAI_BLAS_LIBRARY=INTERNALBLAS'
+          - '-DUSE_METIS=OFF'
+          - '-DUSE_PARMETIS=OFF'
+          - '@THIS_CLONE_DIR@/scai'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: geographer
+    git: 'https://github.com/hu-macsy/geographer.git'
+    requires: [lama, kahip, zoltan2]
+    configure:
+      - args:
+          - 'cmake'
+          - '-DCMAKE_C_COMPILER=mpicc'
+          - '-DCMAKE_CXX_COMPILER=mpicxx'
+          - '-DSCAI_DIR=@PREFIX_DIR_FOR:lama@'
+          - '-DCOMPILE_TESTS=OFF'
+          - '-DCMAKE_BUILD_TYPE=Release'
+          - '-DCMAKE_INSTALL_PREFIX=@THIS_PREFIX_DIR@'
+          - '-DPARMETIS_BASE=/opt/partitioning/parmetis/parmetis_shared_i64_r64'
+          - '-DMETIS_LIB_DIR=/opt/partitioning/parmetis/parmetis-4.0.3/build/Linux-x86_64/libmetis/'
+          - '-DMETIS_INCLUDE=/opt/partitioning/parmetis/parmetis-4.0.3/build/Linux-x86_64/metis/include/'
+          - '-DPARHIP_BASE=@SOURCE_DIR_FOR:kahip@/deploy' 
+          - '-DZOLTAN_BASE=@PREFIX_DIR_FOR:zoltan2@/'
+          - '@THIS_CLONE_DIR@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: kahip
+    git: https://github.com/hu-macsy/KaHIP.git
+    install:
+      - args: ['@THIS_CLONE_DIR@/compile_withcmake.sh']
+        workdir: '@THIS_CLONE_DIR@'
+
+  - name: pulp
+    git: https://github.com/hu-macsy/PuLP.git
+    install:
+      - args: ['@THIS_CLONE_DIR@/install']
+        workdir: '@THIS_CLONE_DIR@'
+
+  - name: zoltan2
+    git: https://github.com/trilinos/Trilinos.git
+    requires: [pulp]
+    configure:
+      - args:
+        - 'cmake'
+        - '-DTPL_ENABLE_MPI:BOOL=ON'
+        - '-DCMAKE_BUILD_TYPE=Release'
+        - '-DCMAKE_C_FLAGS="-Wformat"'
+        - '-DTrilinos_ENABLE_Fortran=OFF'
+        - '-DTrilinos_ENABLE_Zoltan2:BOOL=ON'
+        - '-DTPL_ENABLE_PuLP:BOOL=ON'
+        - '-DPuLP_LIBRARY_DIRS=@SOURCE_DIR_FOR:pulp@/lib'
+        - '-DPuLP_INCLUDE_DIRS=@SOURCE_DIR_FOR:pulp@/include'
+        - '-DTrilinos_ENABLE_EXPLICIT_INSTANTIATION=OFF'
+        - '-DBUILD_SHARED_LIBS=ON'
+        - '-DTrilinos_ENABLE_FLOAT=ON'
+        - '-DZoltan_ENABLE_UINT_IDS:Bool=OFF'
+        - '-DZoltan_ENABLE_ULONG_IDS:Bool=ON'
+        - '-DZoltan_ENABLE_ULLONG_IDS:Bool=OFF'
+        - '-DCMAKE_INSTALL_PREFIX=@THIS_PREFIX_DIR@'
+        - '@THIS_CLONE_DIR@'
+    install:
+      - args: ['make', '-j@PARALLELISM@', 'install']
+
+################################################################################################
+
+revisions:
+  - name: main
+    build_version:
+      lama: 'e8f6226549fb38016c15eaf955805b2ab189ac35'
+      geographer: 'e5fcb6c061d56bad2bcfc750dba55827988a5f03'
+      kahip: 'b64ae0cb97d4bb650c60ede030cb585d3449f7d0'
+      pulp: '1fc7b6cde31c5350ab1d47a810e3051b2ff2b00b'
+      zoltan2: 'b62dc1ae69f97ef0a0cf69f698e5806a29842094'
+
+
+################################################################################################
+
+instdir: /work/global/meshes
+
+instances:
+  - repo: local
+    set: alya3D
+    items:
+      - 'alyaTestCaseA.graph'
+      - 'alyaTestCaseB.graph'
+  - repo: local
+    set: huge_meshes_20
+    items:
+      - 'hugetric-00020.graph'
+      - 'hugetrace-00020.graph'
+      - 'hugebubbles-00020.graph'
+  - repo: local
+    set: huge_meshes_00
+    items:
+      - 'hugetric-00000.graph'
+      - 'hugetrace-00000.graph'
+      - 'hugebubbles-00000.graph'
+  - repo: local
+    set: road_networks
+    items:
+      - 'italy.osm.graph'
+      - 'germany.osm.graph'
+      - 'great-britain.osm.graph'
+  - repo: local
+    set: num_simulations
+    items:
+      - '333SP.graph'
+      - 'AS365.graph'
+      - 'M6.graph'
+      - 'NACA0015.graph'
+      - 'NLR.graph'
+
+## the graphs below are locally generated
+# generated with custom mesh generator
+  - repo: local
+    set: refined
+    items:
+      - 'refinedtrace-00006.bgf'
+      - 'refinedtrace-00007.bgf'
+#generated using kagen, https://github.com/sebalamm/KaGen, version 67123fd3480af3baf6e64ccc9a6159d811dc670a
+# with custom adaptations to also store the coordinates
+  - repo: local
+    set: rgg_rdg
+    items:
+      - 'rgg_2d_23.bgf'
+      - 'rdg_2d_23.bgf'
+  - repo: local
+    set: rgg_rdg_2d_big
+    items:
+      - 'rgg_2d_28.bgf' 
+      - 'rdg_2d_28.bgf' 
+      - 'rgg_2d_29.bgf' 
+      - 'rdg_2d_29.bgf' 
+  - repo: local
+    set: rgg_rdg_3d_big
+    items:
+      - 'rgg_3d_28.bgf' 
+
+
+################################################################################################
+
+
+experiments:
+
+  - name: geo
+    use_builds: [geographer]
+    output: 'stdout'
+    args: 
+      - 'srun'
+      -  '--mpi=pmi2'
+      - 'GeographerStandalone'
+      - '--graphFile'
+      - '@INSTANCE@'
+      - '--metricsDetail'
+      - 'easy'
+      - '--sfcResolution'
+      - '13'
+      - '--maxCGIterations'
+      - '100'
+      - '@EXTRA_ARGS@'
+    timeout: 3600
+
+  - name: allCompetitors
+    use_builds: [geographer]
+    output: 'stdout'
+    args: 
+      - 'srun'
+      -  '--mpi=pmi2'
+      - 'allCompetitors'
+      - '--graphFile'
+      - '@INSTANCE@'
+      - '--tools'
+      - 'parMetisGraph,parMetisGeom,zoltanSFC,zoltanXPulp,zoltanRCB,zoltanRIB'
+      - '--metricsDetail'
+      - 'easy'
+      - '--repeatTimes'
+      - '5'
+      - '--maxCGIterations'
+      - '100'
+      - '--noComputeDiameter'
+      - '@EXTRA_ARGS@'
+    timeout: 3600
+
+##################
+
+# for one MPI process per physical core, procs_per_node=24, num_threads=2, OMP_NUM_THREADS: 1
+variants:
+  - axis: num_cores
+    items:
+      - name: c24
+        num_nodes: 1
+        procs_per_node: 24
+        num_threads: 1
+        extra_args: [ '' ]
+        environ:
+          OMP_NUM_THREADS: 1
+      - name: c48
+        num_nodes: 2
+        procs_per_node: 24
+        num_threads: 1
+        extra_args: [ '' ]
+        environ:
+          OMP_NUM_THREADS: 1
+      - name: c96
+        num_nodes: 4
+        procs_per_node: 24
+        num_threads: 1
+        extra_args: [ '' ]
+        environ:
+          OMP_NUM_THREADS: 1
+      - name: c192
+        num_nodes: 8
+        procs_per_node: 24
+        num_threads: 1
+        extra_args:  [ '' ]
+        environ:
+          OMP_NUM_THREADS: 1
+      - name: c384
+        num_nodes: 16
+        procs_per_node: 24
+        num_threads: 1
+        extra_args: [ '' ]
+        environ:
+          OMP_NUM_THREADS: 1
+
+  - axis: num_cores_hier
+    items:
+        #if we use the plain c24, we get error because @extra_args@ is missing
+      - name: c24_hier
+        num_nodes: 1
+        procs_per_node: 24
+        num_threads: 1
+        extra_args:
+          - '--hierLevels'
+          - '2,12'
+        environ:
+          OMP_NUM_THREADS: 1 
+      - name: c48_hier
+        num_nodes: 2
+        procs_per_node: 24
+        num_threads: 1
+        extra_args:
+          - '--hierLevels'
+          - '2,2,12'
+        environ:
+          OMP_NUM_THREADS: 1
+      - name: c96_hier
+        num_nodes: 4
+        procs_per_node: 24
+        num_threads: 1
+        extra_args:
+          - '--hierLevels'
+          - '4,2,12'
+        environ:
+          OMP_NUM_THREADS: 1
+      - name: c192_hier
+        num_nodes: 8
+        procs_per_node: 24
+        num_threads: 1
+        extra_args:
+          - '--hierLevels'
+          - '8,2,12'
+        environ:
+          OMP_NUM_THREADS: 1
+      - name: c384_hier
+        num_nodes: 16
+        procs_per_node: 24
+        num_threads: 1
+        extra_args:
+          - '--hierLevels'
+          - '16,2,12'
+        environ:
+          OMP_NUM_THREADS: 1
+
+  - axis: initPart
+    items:
+      - name: kmeans
+        extra_args:
+          - '--initialPartition'
+          - 'geoKMeans'
+          - '--outDir'
+          - '/work_small_io/global/geographer_experiments/info/kmeans_noRef'
+          - '--repeatTimes'
+          - '5'
+          - '--noComputeDiameter'
+
+  - axis: initPart_kmhier
+    items:
+      - name: kmhierRepart
+        extra_args:
+          - '--initialPartition'
+          - 'geoHierRepart'
+          - '--outDir'
+          - '/work_small_io/global/geographer_experiments/info/kmeans_hierRepart_noRef'
+          - '--repeatTimes'
+          - '5'
+
+  - axis: localRefAlgo
+    items:
+      - name: noRef
+        extra_args: ['--noRefinement']
+      - name: pmRef
+        extra_args: ['--localRefAlgo', 'parMetisRefine']
+      - name: geoRef
+        extra_args: ['--localRefAlgo', 'geographer', '--autoSettings']
+
+  - axis: file_version
+    items:
+      - name: metis
+        extra_args: ['--fileFormat', 'METIS']
+      - name: bin_all
+        extra_args: ['--fileFormat', 'BINARY', '--coordFormat', 'BINARY' ]
+      - name: bin_list
+        extra_args: ['--fileFormat', 'BINARYEDGELIST', '--coordFormat', 'BINARY' ]
+        
+  - axis: dimensions
+    items: 
+      - name: dim_2
+        extra_args: ['--dimensions', '2']
+      - name: dim_3
+        extra_args: ['--dimensions', '3']
+
+
+  - axis: bSizesFile96
+    items:
+      - name: b96_f8_sk1_fs4
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp8_fs40_fm52_sk1.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f8_sk1_fs8
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp8_fs80_fm85_sk1.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f16_sk1_fs8
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp16_fs80_fm85_sk1.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f16_sk2_fs1
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp16_fs10_fm20_sk2.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f16_sk2_fs4
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp16_fs40_fm52_sk2.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f16_sk2_fs8
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp16_fs80_fm85_sk2.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f8_sk1_fs2
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp8_fs20_fm32_sk1.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f8_sk1_fs16
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp8_fs160_fm138_sk1.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f16_sk1_fs4
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp16_fs40_fm52_sk1.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f8_sk2_fs1
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp8_fs10_fm20_sk2.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f8_sk1_fs1
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp8_fs10_fm20_sk1.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f16_sk1_fs16
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp16_fs160_fm138_sk1.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f8_sk2_fs2
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp8_fs20_fm32_sk2.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f8_sk2_fs8
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp8_fs80_fm85_sk2.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f16_sk1_fs1
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp16_fs10_fm20_sk1.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f16_sk1_fs2
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp16_fs20_fm32_sk1.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f8_sk2_fs4
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp8_fs40_fm52_sk2.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f8_sk2_fs16
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp8_fs160_fm138_sk2.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f16_sk2_fs2
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp16_fs20_fm32_sk2.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+      - name: b96_f16_sk2_fs16
+        extra_args: [ '--blockSizesFile', './bSizesFiles/bSizes_p96_fp16_fs160_fm138_sk2.txt', '--w2UpperBound', '--numNodeWeights', '2' ]
+
+
+#
+# matrix
+#
+
+matrix:
+  include:
+
+# 96 cores
+    - experiments: [geo]
+      axes: [ num_cores, initPart, localRefAlgo, file_version, dimensions, bSizesFile96 ]
+      variants: [ c96, kmeans, metis, dim_2 ]
+      instsets: [num_simulations, huge_meshes_20]
+      revisions: [main]
+    - experiments: [geo]
+      axes: [ num_cores, initPart, localRefAlgo, file_version, dimensions, bSizesFile96 ]
+      variants: [ c96, kmeans, metis, dim_3 ]
+      instsets: [alya3D]
+      revisions: [main]
+    - experiments: [geo]
+      axes: [ num_cores, initPart, localRefAlgo, file_version, dimensions, bSizesFile96 ]
+      variants: [ c96, bin_list, dim_2 ]
+      instsets: [rgg_rdg]
+      revisions: [main]
+    - experiments: [geo]
+      axes: [ num_cores, initPart, localRefAlgo, file_version, dimensions, bSizesFile96 ]
+      variants: [ c96, bin_list, dim_2 ]
+      instsets: [rgg_rdg_2d_big]
+      revisions: [main]
+  #hier versions
+    - experiments: [geo]
+      axes: [ num_cores_hier, initPart_kmhier, localRefAlgo, file_version, dimensions, bSizesFile96 ]
+      variants: [ c96_hier, metis, dim_2 ]
+      instsets: [num_simulations, huge_meshes_20]
+      revisions: [main]
+    - experiments: [geo]
+      axes: [ num_cores_hier, initPart_kmhier, localRefAlgo, file_version, dimensions, bSizesFile96 ]
+      variants: [ c96_hier, metis, dim_3 ]
+      instsets: [alya3D]
+      revisions: [main]
+    - experiments: [geo]
+      axes: [ num_cores_hier, initPart_kmhier, localRefAlgo, file_version, dimensions, bSizesFile96 ]
+      variants: [ c96_hier, bin_list, dim_2 ]
+      instsets: [rgg_rdg]
+      revisions: [main]
+    - experiments: [geo]
+      axes: [ num_cores_hier, initPart_kmhier, localRefAlgo, file_version, dimensions, bSizesFile96 ]
+      variants: [ c96_hier, bin_list, dim_2 ]
+      instsets: [rgg_rdg_2d_big]
+      revisions: [main]
+  ## allCompetitors
+    - experiments: [allCompetitors]
+      axes: [ num_cores, file_version, dimensions, bSizesFile96 ]
+      variants: [ c96, metis, dim_2 ]
+      instsets: [num_simulations, huge_meshes_20]
+      revisions: [main]
+    - experiments: [allCompetitors]
+      axes: [ num_cores, file_version, dimensions, bSizesFile96 ]
+      variants: [ c96, metis, dim_3 ]
+      instsets: [alya3D]
+      revisions: [main]
+    - experiments: [allCompetitors]
+      axes: [ num_cores, file_version, dimensions, bSizesFile96 ]
+      variants: [ c96, bin_list, dim_2 ]
+      instsets: [ rgg_rdg ]
+      revisions: [main]
+    - experiments: [allCompetitors]
+      axes: [ num_cores, file_version, dimensions, bSizesFile96 ]
+      variants: [ c96, bin_list, dim_2 ]
+      instsets: [ rgg_rdg_2d_big ]
+      revisions: [main]

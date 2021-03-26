@@ -124,6 +124,7 @@ int main(int argc, char** argv) {
         comm->synchronize();
         ITI::Tool thisTool = wantedTools[t];
         std::cout.precision(5);
+        MSG0("will start partition with tool " << ITI::to_string(thisTool) );
 
         // if using unit weights, set flag for wrappers
         bool nodeWeightsUse = true;
@@ -196,8 +197,8 @@ int main(int argc, char** argv) {
                 metricsVec[r] = metricsVec[r-1];
                 metricsVec[r].MM["timeTotal"] = runTime;
             }else{
-                std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
-                metricsVec[r].getMetrics( graph, partition, nodeWeights, settings, blockSizes );
+                //std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+                metricsVec[r].getMetrics( graph, partition, nodeWeights, settings, commTree );
             }
 
             PRINT0("time to get the partition with " << ITI::to_string(thisTool) << ": " << metricsVec[r].MM["timeTotal"] );

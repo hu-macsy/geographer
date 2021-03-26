@@ -52,8 +52,6 @@ public:
      * is the number of edges. Then, row i has numbers e1, e2, e3, ... notating the edges:
      * (i, e1), (i, e2), (i, e3), ....
      *
-     * Not distributed.
-     *
      * @param[in] adjM The graph's adjacency matrix.
      * @param[in] filename The file's name to write to.
      */
@@ -144,7 +142,7 @@ public:
     /**
      * Write a DenseVector in parallel in the filename. Each PE, one after another, write its own part.
      */
-    template<typename T>
+    template<typename T>    
     static void writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename);
 
 
@@ -153,7 +151,7 @@ public:
      * @param[in] fileFormat The type of file to read from.
      * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
      */
-    static CSRSparseMatrix<ValueType> readGraph(const std::string filename, const scai::dmemo::CommunicatorPtr comm, Format = Format::METIS);
+    static CSRSparseMatrix<ValueType> readGraph(const std::string filename, const scai::dmemo::CommunicatorPtr comm, Format = Format::AUTO);
 
     /** Reads a graph from filename in the given format and returns the adjacency matrix with the node weights. \sa ITI::Format
      * @param[in] filename The file to read from.
@@ -161,7 +159,7 @@ public:
      * @param[in] fileFormat The type of file to read from.
      * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
      */
-    static CSRSparseMatrix<ValueType> readGraph(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights, const scai::dmemo::CommunicatorPtr comm, Format = Format::METIS);
+    static CSRSparseMatrix<ValueType> readGraph(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights, const scai::dmemo::CommunicatorPtr comm, Format = Format::AUTO);
 
     static CSRSparseMatrix<ValueType> readGraph(const std::string filename ){
         const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -198,7 +196,11 @@ public:
      * @param[in] filename The prefix of the file to read from.
      * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
      * */
-    static scai::lama::CSRSparseMatrix<ValueType> readEdgeListDistributed(const std::string filename, const scai::dmemo::CommunicatorPtr comm);
+    static scai::lama::CSRSparseMatrix<ValueType> readEdgeListDistributed(
+        const std::string filename,
+        const scai::dmemo::CommunicatorPtr comm,
+        const bool duplicateEdges = false,
+        const bool removeSelfLoops = true);
 
     /** @brief Reads the coordinates from file "filename" and returns then in a vector of DenseVector.
      *

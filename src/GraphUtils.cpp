@@ -515,8 +515,8 @@ std::vector<ValueType>  GraphUtils<IndexType,ValueType>::getBlocksWeights(
         globalSubsetSizes = subsetSizes;
     }
 
-ValueType globWsum = std::accumulate( globalSubsetSizes.begin(), globalSubsetSizes.end(), 0.0 );
-SCAI_ASSERT_EQ_ERROR( globWsum, comm->sum(weightSum), " global sum mismatch" );
+    ValueType globWsum = std::accumulate( globalSubsetSizes.begin(), globalSubsetSizes.end(), 0.0 );
+    SCAI_ASSERT_EQ_ERROR( globWsum, comm->sum(weightSum), " global sum mismatch" );
 
     return globalSubsetSizes;
 }
@@ -1091,6 +1091,7 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
 
             if (neighborBlock != thisBlock) {
                 IndexType index = thisBlock*k + neighborBlock;
+                //there is no += operator for HArray
                 localBlockGraphEdges[index] = localBlockGraphEdges[index] + values[j];
             }
         }
@@ -1117,9 +1118,8 @@ scai::lama::CSRSparseMatrix<ValueType>  GraphUtils<IndexType, ValueType>::getBlo
     scai::hmemo::HArray<IndexType> csrJA;
     scai::hmemo::HArray<ValueType> csrValues( numEdges, 0.0 );
     {
-        IndexType numNZ = numEdges;     // this equals the number of edges of the graph
         scai::hmemo::WriteOnlyAccess<IndexType> ia( csrIA, k +1 );
-        scai::hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numNZ );
+        scai::hmemo::WriteOnlyAccess<IndexType> ja( csrJA, numEdges );
         scai::hmemo::WriteOnlyAccess<ValueType> values( csrValues );
         scai::hmemo::ReadAccess<ValueType> globalEdges( localBlockGraphEdges );
         ia[0]= 0;
@@ -1445,7 +1445,11 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::getCSRm
 //---------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeList2CSR( std::vector< std::pair<IndexType, IndexType>> &edgeList, const scai::dmemo::CommunicatorPtr comm ) {
+scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeList2CSR(
+    std::vector< std::pair<IndexType, IndexType>> &edgeList,
+    const scai::dmemo::CommunicatorPtr comm,
+    const bool duplicateEdges,
+    const bool removeSelfLoops) {
 
     const IndexType thisPE = comm->getRank();
     IndexType localM = edgeList.size();
@@ -1463,9 +1467,14 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     //
 
     //TODO: not filling with dummy values, each localPairs can have different sizes
-    std::vector<int_pair> localPairs(localM*2);
+    std::vector<int_pair> localPairs(localM);
+    if( duplicateEdges ){
+        localPairs.reserve( 2*localM );
+        localPairs.resize( 2*localM );
+        PRINT0("will duplicate edges");
+    }
 
-    // duplicate and reverse all edges before sorting to ensure matrix will be symmetric
+    // TODO: duplicate and reverse all edges before sorting to ensure matrix will be symmetric?
     // TODO: any better way to avoid edge duplication?
 
     IndexType maxLocalVertex=0;
@@ -1492,20 +1501,30 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
 
     //if vertices are numbered starting from 1, subtract 1 by every vertex index
     const IndexType oneORzero = globalMinIndex==0 ? 0: 1;
+    IndexType selfLoopsCnt = 0;
     
     for(IndexType i=0; i<localM; i++) {
-        IndexType v1 = edgeList[i].first - oneORzero;;
-        IndexType v2 = edgeList[i].second - oneORzero;;
-        localPairs[2*i].first = v1;
-        localPairs[2*i].second = v2;
+        IndexType v1 = edgeList[i].first - oneORzero;
+        IndexType v2 = edgeList[i].second - oneORzero;
+        if( removeSelfLoops && v1==v2 ){
+            selfLoopsCnt++;
+            continue;
+        }
+        localPairs[i].first = v1;
+        localPairs[i].second = v2;
 
-        //insert also reversed edge to keep matrix symmetric
-        localPairs[2*i+1].first = v2;
-        localPairs[2*i+1].second = v1;
+        //TODO?: insert also reversed edge to keep matrix symmetric
+        if( duplicateEdges ){
+            localPairs[localM+i].first = v2;
+            localPairs[localM+i].second = v1;
+        }
     }
 
     const IndexType N = comm->max( maxLocalVertex );
-    localM *=2 ;	// for the duplicated edges
+    const IndexType globalSelfLoops = comm->sum( selfLoopsCnt );
+    //localM *=2 ;	// for the duplicated edges
+
+    PRINT0("removed globally " << globalSelfLoops << " self loops");
 
     //
     // globally sort edges
@@ -1519,6 +1538,7 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
         mpi_comm = mpiComm.getMPIComm();
     }
 
+    //sort globally
     JanusSort::sort(mpi_comm, localPairs, MPI_2INT);
 
     std::chrono::duration<double> sortTmpTime = std::chrono::steady_clock::now() - beforeSort;
@@ -1526,15 +1546,15 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     PRINT0("time to sort edges: " << sortTime);
 
     //check for isolated nodes and wrong conversions
-    IndexType lastNode = localPairs[0].first;
+    IndexType prevVertex = localPairs[0].first;
     for (int_pair edge : localPairs) {
         //TODO: should we allow isolated vertices? (see also below)
-        //not necessarilly an error
-        SCAI_ASSERT_LE_ERROR(edge.first, lastNode + 1, "Gap in sorted node IDs before edge exchange in PE " << comm->getRank() );
-        //if( edge.first>lastNode+1 /* and settings.verbose */ ){
-        //	std::cout<< "WARNING, node " << lastNode+1 << " has no edges" << std::endl;
-        //}
-        lastNode = edge.first;
+        //not necessarily an error
+        SCAI_ASSERT_LE_ERROR(edge.first, prevVertex + 1, "Gap in sorted node IDs before edge exchange in PE " << comm->getRank() );
+        if( edge.first>prevVertex+1 /* and settings.verbose */ ){
+        	std::cout<< "WARNING, node " << prevVertex << " has no edges, in PE " << comm->getRank() << std::endl;
+        }
+        prevVertex = edge.first;
     }
 
 
@@ -1565,6 +1585,8 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
             localPairs.pop_back();
         }
     }
+
+    //PRINT( thisPE << ": maxLocalVertex= " << newMaxLocalVertex << ", removed edges " << numEdgesToRemove );
 
     // make communication plan
     std::vector<IndexType> quantities(comm->getSize(), 0);
@@ -1598,31 +1620,51 @@ scai::lama::CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::edgeLis
     // insert all the received edges to your local edges
     {
         scai::hmemo::ReadAccess<IndexType> rRecvEdges(recvEdges);
+        std::vector<int_pair> recvEdgesV;
+        recvEdgesV.reserve(recvEdgesSize);
         SCAI_ASSERT_EQ_ERROR(rRecvEdges.size(), recvEdgesSize, "mismatch");
         for( IndexType i=0; i<recvEdgesSize; i+=2) {
             SCAI_ASSERT_LT_ERROR(i+1, rRecvEdges.size(), "index mismatch");
             int_pair sp;
             sp.first = rRecvEdges[i];
             sp.second = rRecvEdges[i+1];
-            localPairs.insert( localPairs.begin(), sp);//this is horribly expensive! Will move the entire list of local edges with each insertion!
-            //PRINT( thisPE << ": recved edge: "<< recvEdges[i] << " - " << recvEdges[i+1] );
+            recvEdgesV.push_back(sp);
+            //PRINT( thisPE << ": received edge: "<< recvEdges[i] << " - " << recvEdges[i+1] );
         }
+        std::sort( recvEdgesV.begin(), recvEdgesV.end() );
+
+        localPairs.insert( localPairs.begin(), recvEdgesV.begin(), recvEdgesV.end() );
     }
 
     PRINT0("rebuild local edge list");
-    SCAI_ASSERT_ERROR(std::is_sorted(localPairs.begin(), localPairs.end()), "Disorder after insertion of received edges." );
 
     //
     //remove duplicates
     //
     {
-        const IndexType numEdges = localPairs.size() ;
-        localPairs.erase(unique(localPairs.begin(), localPairs.end(), [](int_pair p1, int_pair p2) {
+        const IndexType numEdges = localPairs.size();
+        localPairs.erase( unique( localPairs.begin(), localPairs.end(), [](int_pair p1, int_pair p2) {
             return ( (p1.second==p2.second) and (p1.first==p2.first));
         }), localPairs.end() );
         const IndexType numRemoved = numEdges - localPairs.size();
         const IndexType totalNumRemoved = comm->sum(numRemoved);
         PRINT0("removed duplicates, total removed edges: " << totalNumRemoved);
+    }
+
+    SCAI_ASSERT_ERROR( std::is_sorted(localPairs.begin(), localPairs.end()), \
+        "Disorder after insertion of received edges in PE " << thisPE );
+
+    //remove self loops one more time; probably not needed
+    if(removeSelfLoops) {
+        const IndexType numEdges = localPairs.size();
+        std::remove_if( localPairs.begin(), localPairs.end(), 
+            [](int_pair p) {
+                return p.first==p.second;
+            }
+        );
+        const IndexType numRemoved = numEdges - localPairs.size();
+        const IndexType totalNumRemoved = comm->sum(numRemoved);
+        PRINT0("removed self loops, total removed edges: " << totalNumRemoved);
     }
 
     //
@@ -1848,8 +1890,8 @@ CSRSparseMatrix<ValueType> GraphUtils<IndexType, ValueType>::constructLaplacian(
     //TODO: check, this might break the matrix's consistency
     //L = D-A
     L.matrixPlusMatrix( 1.0, degreeM, -1.0, graph );
-    //L *= -1.0;
-    //L += degreeM;
+
+    SCAI_ASSERT_EQ_ERROR( dist, L.getRowDistributionPtr(), "distribution mismatch" );
     SCAI_ASSERT_ERROR(L.isConsistent(), "laplacian matrix not consistent");
 
     return L;

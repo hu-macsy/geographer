@@ -287,9 +287,14 @@ public:
      Go over the vector of the local edges, sort the edges, construct the local part of CSR sparse matrix and
      build the global matrix in the end.
      * @param[in] edgeList The local list of edges for this PE; edgeList[i].first is one vertex of the edge and .second the other.
+     * @param[in] duplicateEdges Will duplicate all edges to make sure matrix is symmetric. This will convert a directed graph to undirected.
      * @return The distributed adjacency matrix.
      */
-    static scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( std::vector< std::pair<IndexType, IndexType>>& edgeList, const scai::dmemo::CommunicatorPtr comm );
+    static scai::lama::CSRSparseMatrix<ValueType> edgeList2CSR( 
+        std::vector< std::pair<IndexType, IndexType>>& edgeList,
+        const scai::dmemo::CommunicatorPtr comm,
+        const bool duplicateEdges=false,
+        const bool removeSelfLoops =true );
 
 
     /** Given a CSR sparse matrix, it calculates its edge list representations.

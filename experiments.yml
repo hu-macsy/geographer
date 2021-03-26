@@ -1,0 +1,290 @@
+builds:
+  - name: lama
+    git: 'https://github.com/hu-macsy/lama'
+    configure:
+      - args:
+          - 'cmake'
+          - '-DCMAKE_C_COMPILER=/sw/comm/openmpi/3.1.5/skl/gcc/bin/mpicc'
+          - '-DCMAKE_CXX_COMPILER=/sw/comm/openmpi/3.1.5/skl/gcc/bin/mpicxx'
+          - '-DCMAKE_INSTALL_PREFIX=@THIS_PREFIX_DIR@'
+          - '-DCMAKE_BUILD_TYPE=Release'
+          - '-DSCAI_TRACE=OFF'
+          - '-DSCAI_LOG_LEVEL_INFO=OFF'
+          - '-DSCAI_ASSERT_LEVEL=OFF'
+          - '-DBUILD_EXAMPLES=OFF'
+          - '-DBUILD_TEST=OFF'
+          - '-DBUILD_DOC=OFF'
+          - '-DUSE_CUDA=OFF'
+          - '-DSCAI_INDEX_TYPE=long'
+          - '-DSCAI_BLAS_LIBRARY=INTERNALBLAS'
+          - '-DUSE_METIS=OFF'
+          - '-DUSE_PARMETIS=OFF'
+          - '@THIS_CLONE_DIR@/scai'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: geographer
+    git: 'https://github.com/hu-macsy/geographer'
+    requires: [lama, kahip, zoltan2]
+    configure:
+      - args:
+          - 'cmake'      
+          #automatically, if the next lines are removed, compiler is set to 4.2
+          - '-DCMAKE_C_COMPILER=/sw/comm/openmpi/3.1.5/skl/gcc/bin/mpicc'
+          - '-DCMAKE_CXX_COMPILER=/sw/comm/openmpi/3.1.5/skl/gcc/bin/mpicxx'
+          - '-DSCAI_DIR=@THIS_PREFIX_DIR@/../lama@main'
+          - '-DCOMPILE_TESTS=OFF'
+          - '-DCMAKE_BUILD_TYPE=Release'
+          - '-DCMAKE_INSTALL_PREFIX=@THIS_PREFIX_DIR@'
+          - '-DPARMETIS_BASE=/sw/numerics/parmetis/4.0.3/skl/openmpi.3.1.5-gcc.9.2.0'
+          - '-DMETIS_LIB_DIR=/sw/numerics/metis/5.1.0/skl/gcc.9.2.0/lib'
+          - '-DMETIS_INCLUDE=/sw/numerics/metis/5.1.0/skl/gcc.9.2.0/include'
+          - '-DPARHIP_BASE=@SOURCE_DIR_FOR:kahip@/deploy' 
+          - '-DZOLTAN_BASE=@PREFIX_DIR_FOR:zoltan2@/'
+          - '@THIS_CLONE_DIR@'
+    compile:
+      - args: ['make', '-j@PARALLELISM@']
+    install:
+      - args: ['make', 'install']
+
+  - name: kahip
+    git: https://github.com/hu-macsy/KaHIP.git
+    #I did NOT do yet a manual export PATH=$PATH:/opt/scons/bin/
+    # had to add
+    #   -DCMAKE_C_COMPILER=/sw/compiler/gcc/9.2.0/skl/bin/gcc \
+    #   -DCMAKE_CXX_COMPILER=/sw/compiler/gcc/9.2.0/skl/bin/g++ \
+    # in kahip@main.clone/compile_withcnake_lise.sh
+    install:
+      - args: ['@THIS_CLONE_DIR@/compile_withcmake_lise.sh']
+        workdir: '@THIS_CLONE_DIR@'
+
+  - name: pulp
+    git: https://github.com/hu-macsy/PuLP.git
+    install:
+      - args: ['@THIS_CLONE_DIR@/install']
+        workdir: '@THIS_CLONE_DIR@'
+    
+  - name: zoltan2
+    git: https://github.com/trilinos/Trilinos.git
+    requires: [pulp]
+    configure:
+      - args:
+        - 'cmake'
+        - '-DTPL_ENABLE_MPI:BOOL=ON'
+        - '-DCMAKE_C_COMPILER=/sw/comm/openmpi/3.1.5/skl/gcc/bin/mpicc'
+        - '-DCMAKE_CXX_COMPILER=/sw/comm/openmpi/3.1.5/skl/gcc/bin/mpicxx'
+        - '-DCMAKE_BUILD_TYPE=Release'
+        - '-DCMAKE_C_FLAGS="-Wformat"'
+        - '-DTrilinos_ENABLE_Fortran=OFF'
+        - '-DTrilinos_ENABLE_Zoltan2:BOOL=ON'
+        - '-DTPL_ENABLE_PuLP:BOOL=ON'
+        - '-DPuLP_LIBRARY_DIRS=@THIS_PREFIX_DIR@/../pulp@main.clone/lib'
+        - '-DPuLP_INCLUDE_DIRS=@THIS_PREFIX_DIR@/../pulp@main.clone/include'
+        - '-DTrilinos_ENABLE_EXPLICIT_INSTANTIATION=OFF'
+        - '-DBUILD_SHARED_LIBS=ON'
+        - '-DTrilinos_ENABLE_FLOAT=ON'
+        - '-DZoltan_ENABLE_UINT_IDS:Bool=OFF'
+        - '-DZoltan_ENABLE_ULONG_IDS:Bool=ON'
+        - '-DZoltan_ENABLE_ULLONG_IDS:Bool=OFF'
+        - '-DCMAKE_INSTALL_PREFIX=@THIS_PREFIX_DIR@'
+        - '@THIS_CLONE_DIR@'
+    install:
+      - args: ['make', '-j@PARALLELISM@', 'install'] 
+
+
+################################################################################################
+
+revisions:
+  - name: main
+    build_version:
+      lama: 'master'
+      geographer: 'Dev'
+      kahip: 'master'
+      pulp: 'master'
+      zoltan2: 'master'
+    
+
+################################################################################################
+
+instdir: /local_graphs
+
+instances:
+  - repo: local
+    set: alya3D
+    items:
+      - 'alyaTestCaseA.graph'
+      - 'alyaTestCaseB.graph'
+  - repo: local
+    set: huge_meshes
+    items:
+      - 'hugetric-00000.graph'
+      - 'hugetric-00020.graph'
+      - 'hugetrace-00020.graph'
+      - 'hugebubbles-00000.graph'
+      - 'hugebubbles-00020.graph'
+  - repo: local      
+    set: road_networks
+    items:
+      - 'italy.osm.graph'
+      - 'germany.osm.graph'
+      - 'great-britain.osm.graph'
+  - repo: local      
+    set: num_simulations
+    items:
+      - 'AS365.graph'
+      - 'M6.graph'
+      - 'NACA0015.graph'
+      - 'NLR.graph'
+
+
+################################################################################################
+
+#experiment to be submitted via slurm for the HLRN Lise cluster
+experiments:
+
+  - name: geo
+    use_builds: [geographer]
+    output: 'stdout'
+    args: 
+      - 'mpirun'
+      - 'GeographerStandalone'
+      - '--graphFile'
+      - '@INSTANCE@'
+      - '--metricsDetail'
+      - 'all'
+      - '--sfcResolution'
+      - '13'
+      - '--maxCGIterations'
+      - '300'
+      - '@EXTRA_ARGS@'
+    timeout: 9600
+
+
+  - name: allCompetitors
+    use_builds: [geographer]
+    output: 'stdout'
+    args:
+      #- 'srun'
+      #-  '--mpi=pmi2'
+      - 'mpirun'
+      - 'allCompetitors'
+      - '--graphFile'
+      - '@INSTANCE@'
+      - '--tools'
+      - 'parMetisGraph,parMetisGeom,parhipFastMesh,parhipUltraFastMesh,zoltanXPulp,zoltanMJ'
+      - '--metricsDetail'
+      - 'all'
+      - '--outDir'
+      - '/scratch/usr/bembratu/geographer_experiments/info'
+      - '--repeatTimes'
+      - '5'
+      - '--maxCGIterations'
+      - '300'
+      - '@EXTRA_ARGS@'
+    timeout: 9600
+
+
+# for one MPI process per physical core, procs_per_node=24, num_threads=2, OMP_NUM_THREADS: 1
+variants:
+  - axis: num_cores
+    items:
+
+      - name: c48
+        num_nodes: 1
+        procs_per_node: 48
+        num_threads: 1
+        extra_args: [ '' ]
+        environ:
+          OMP_NUM_THREADS: 1
+
+      - name: c96
+        num_nodes: 1
+        procs_per_node: 96
+        num_threads: 1
+        extra_args: [ '' ]
+        environ:
+          OMP_NUM_THREADS: 1
+
+      - name: c192
+        num_nodes: 2
+        procs_per_node: 96
+        num_threads: 1
+        extra_args: ['']
+        environ:
+          OMP_NUM_THREADS: 1
+
+      - name: c384
+        num_nodes: 4
+        procs_per_node: 96
+        num_threads: 1
+        extra_args: ['']
+        environ:
+          OMP_NUM_THREADS: 1    
+
+  - axis: geo_version
+    items:
+      - name: km_noRef
+        extra_args:
+          - '--initialPartition'
+          - 'geoKMeans'
+          - '--noRefinement'
+          - '--outDir'
+          - './out_dir/kmeans_noRef'
+          - '--repeatTimes'
+          - '5'
+      - name: km_parMetisRef
+        extra_args:
+          - '--initialPartition'
+          - 'geoKMeans'
+          - '--localRefAlgo'
+          - 'parMetisRefine'
+          - '--outDir'
+          - './out_dir/kmeans_parMetis_LR'
+          - '--repeatTimes'
+          - '3'
+      - name: km_geoRef
+        extra_args:
+          - '--initialPartition'
+          - 'geoKMeans'
+          - '--localRefAlgo'
+          - 'geographer'
+          - '--outDir'
+          - './out_dir/kmeans_geo_LR'
+          - '--repeatTimes'
+          - '3'
+          - '--autoSettings'
+          - '--noComputeDiameter'
+
+  - axis: file_version
+    items:
+      - name: metis
+        extra_args: ['--fileFormat', 'METIS']
+      - name: binary
+        extra_args: ['--fileFormat', 'BINARY', '--coordFormat', 'METIS' ]
+      - name: edgelist
+        extra_args: ['--fileFormat', 'EDGELIST', '--coordFormat', 'METIS' ]
+      - name: all_bin
+        extra_args: ['--fileFormat', 'BINARYEDGELIST', '--coordFormat', 'BINARY' ]
+
+  - axis: dimensions
+    items: 
+      - name: dim_2
+        extra_args: ['--dimensions', '2']
+      - name: dim_3
+        extra_args: ['--dimensions', '3']
+
+
+matrix:
+  include:
+    - experiments: [geo]
+      axes: [num_cores, geo_version, file_version, dimensions]
+      variants: [ c48, km_geoRef, metis, dim_2]
+      instsets: [test_set]
+      revisions: [main]
+    - experiments: [ allCompetitors]
+      axes: [num_cores, file_version, dimensions]
+      variants: [ c48, all_bin, dim_3]
+      instsets: [kagen_3d]
+      revisions: [main] 
