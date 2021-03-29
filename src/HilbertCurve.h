@@ -16,8 +16,6 @@
 #include <scai/lama.hpp>
 #include <scai/lama/matrix/all.hpp>
 #include <scai/lama/Vector.hpp>
-
-
 #include <scai/sparsekernel/openmp/OpenMPCSRUtils.hpp>
 #include <scai/tracing.hpp>
 
