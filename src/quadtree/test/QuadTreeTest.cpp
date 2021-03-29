@@ -365,6 +365,7 @@ TYPED_TEST(QuadTreeTest, testGetGraphMatrixFromTree_Distributed_3D) {
     settings.dimensions = dimension;
     settings.minGainForNextRound = 5;
     settings.storeInfo = false;
+    settings.noRefinement= true;
 
     Metrics<ValueType> metrics(settings);
 

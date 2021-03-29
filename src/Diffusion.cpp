@@ -36,7 +36,11 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::computeFlow(const CSRSpa
         throw std::logic_error("Residual weight sum " + std::to_string(newWeightSum) + " too large!");
     }
 
-    scai::dmemo::DistributionPtr dist(laplacian.getRowDistributionPtr());
+    //create a  copy as we need to change the column distribution if the matrix
+    //TODO: not the fastest way but we maintain the const-ness of the laplacian
+    CSRSparseMatrix<ValueType> laplacianCopy(laplacian);
+    scai::dmemo::DistributionPtr dist( laplacianCopy.getRowDistributionPtr() );
+    laplacianCopy.redistribute(dist, dist);
 
     auto solution = fill<DenseVector<ValueType>>( dist, 0.0 );
 
@@ -53,7 +57,7 @@ DenseVector<ValueType> Diffusion<IndexType, ValueType>::computeFlow(const CSRSpa
 
     solver.setStoppingCriterion( rt );
 
-    solver.initialize( laplacian );
+    solver.initialize( laplacianCopy );
     solver.solve( solution, demand );
 
     return solution;

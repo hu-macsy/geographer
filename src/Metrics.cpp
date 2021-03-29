@@ -1,24 +1,75 @@
+#include <scai/solver/criteria/IterationCount.hpp>
+#include <scai/solver/CG.hpp>
+
+#include <scai/solver/logger/CommonLogger.hpp>
+#include <scai/solver/criteria/ResidualThreshold.hpp>
+#include <scai/lama/norm/L2Norm.hpp>
+
 #include "Metrics.h"
+#include "FileIO.h"
+#include "GraphUtils.h"
+
 
 using namespace ITI;
 
 template<typename ValueType>
-void Metrics<ValueType>::getMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings){
+void Metrics<ValueType>::getMetrics(
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const scai::lama::DenseVector<IndexType> &partition,
+    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+    struct Settings settings,
+    const CommTree<IndexType,ValueType> &PEtree){
+
+    const std::vector<std::vector<ValueType>> blockSizes = PEtree.getBalanceVectors();
 
     if( settings.metricsDetail=="all" ) {
-        getAllMetrics( graph, partition, nodeWeights, settings );
+        getAllMetrics( graph, partition, nodeWeights, settings, blockSizes);
     }
-    if( settings.metricsDetail=="easy" ) {
-        getEasyMetrics( graph, partition, nodeWeights, settings );
+    if( settings.metricsDetail=="easy" or settings.metricsDetail=="mapping" ) {
+        getEasyMetrics( graph, partition, nodeWeights, settings, blockSizes );
+    }
+    if( settings.metricsDetail=="mapping" ) {
+        const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
+
+        scai::lama::CSRSparseMatrix<ValueType> PEgraph;
+        std::vector<scai::lama::DenseVector<ValueType>>  PEnodeWeights;
+
+        if( settings.PEGraphFile!="-" ){ // a processor graph is provides by the user
+            PEgraph = ITI::FileIO<IndexType, ValueType>::readGraph( settings.PEGraphFile, PEnodeWeights, comm, settings.fileFormat );
+        }else if(PEtree.hasDistances() ){
+            PEgraph = PEtree.exportAsGraph_local();
+            SCAI_ASSERT_EQ_ERROR( PEgraph.getNumRows(), settings.numBlocks, "PEgraph size mismatch" );
+        }else{// if not, create the processor graph
+            if( settings.numBlocks!=comm->getSize()){
+                if( comm->getRank()==0 ){
+                    std::cout<< "ERROR: no processor (aka communication) graph was provided for the mapping metrics." << std::endl;
+                    std::cout<< "\tAlso, the currently used processor network does not have the same number of PEs as the provided partition."<< std::endl;
+                    std::cout<< "\tWill not calculate mapping metrics."<< std::endl;
+                }
+                return;
+            }
+            PEgraph = ITI::GraphUtils<IndexType, ValueType>::getPEGraph( graph );
+        }
+        //PE graph needs to be replicated
+        PEgraph.replicate();
+        getMappingMetrics( graph, partition, PEgraph );
     }
 }
 
 //---------------------------------------------------------------------------
 
-template<typename ValueType>
-void Metrics<ValueType>::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
 
-    getEasyMetrics( graph, partition, nodeWeights, settings );
+template<typename ValueType>
+void Metrics<ValueType>::getAllMetrics(
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const scai::lama::DenseVector<IndexType> &partition,
+    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+    struct Settings settings,
+    const std::vector<std::vector<ValueType>> &blockSizes ) {
+
+    Settings tmpSettings = settings;
+    settings.computeDiameter=false; //diameter will be computed inside getRedistRequiredMetrics
+    getEasyMetrics( graph, partition, nodeWeights, tmpSettings, blockSizes );
 
     scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     if (settings.numBlocks == comm->getSize()) {
@@ -26,10 +77,12 @@ void Metrics<ValueType>::getAllMetrics(const scai::lama::CSRSparseMatrix<ValueTy
         getRedistRequiredMetrics( graph, partition, settings, numIter );
     }
 }
+//---------------------------------------------------------------------------
 
 template<typename ValueType>
 void Metrics<ValueType>::print( std::ostream& out) const {
 
+    out.precision(5);
     out<<"\nMetrics:" << std::endl;
     for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ) {
         if( mapIt->second!=-1)
@@ -42,6 +95,7 @@ void Metrics<ValueType>::print( std::ostream& out) const {
 template<typename ValueType>
 void Metrics<ValueType>::printHorizontal( std::ostream& out) const {
 
+    out.precision(5);
     for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ) {
         if( mapIt->second!=-1)
             out<< mapIt->first << ", ";
@@ -58,6 +112,7 @@ void Metrics<ValueType>::printHorizontal( std::ostream& out) const {
 template<typename ValueType>
 void Metrics<ValueType>::printHorizontal2( std::ostream& out) const {
 
+    out.precision(5);
     for( auto mapIt= MM.begin(); mapIt!=MM.end(); mapIt++ ) {
         if( mapIt->second!=-1)
             out<< mapIt->first <<" " << mapIt->second << " , ";
@@ -74,7 +129,11 @@ void Metrics<ValueType>::printKMeansProfiling( std::ostream& out ) const {
 //---------------------------------------------------------------------------
 
 template<typename ValueType>
-void Metrics<ValueType>::getRedistMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
+void Metrics<ValueType>::getRedistMetrics( 
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const scai::lama::DenseVector<IndexType> &partition,
+    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+    struct Settings settings ) {
 
     getAllMetrics( graph, partition, nodeWeights, settings);
 
@@ -87,13 +146,28 @@ void Metrics<ValueType>::getRedistMetrics( const scai::lama::CSRSparseMatrix<Val
 //---------------------------------------------------------------------------
 
 template<typename ValueType>
-void Metrics<ValueType>::getEasyMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, const std::vector<scai::lama::DenseVector<ValueType>> nodeWeights, struct Settings settings ) {
+void Metrics<ValueType>::getEasyMetrics( 
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const scai::lama::DenseVector<IndexType> &partition,
+    const std::vector<scai::lama::DenseVector<ValueType>> &nodeWeights,
+    struct Settings settings,
+    const std::vector<std::vector<ValueType>> &blockSizes ) {
 
     MM["finalCut"] = ITI::GraphUtils<IndexType, ValueType>::computeCut(graph, partition, true);
+
+    std::vector<ValueType> imbalances;
+    
     for( unsigned int w=0; w<nodeWeights.size(); w++ ) {
-        imbalances.push_back(  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights[w]) );
+        if( blockSizes.size()==0 ){
+            //do not use block sizes as they are not given
+            imbalances.push_back(  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights[w]) );
+        }else{
+            assert( blockSizes[w].size()==settings.numBlocks );
+            imbalances.push_back(  ITI::GraphUtils<IndexType, ValueType>::computeImbalance( partition, settings.numBlocks, nodeWeights[w], blockSizes[w]) );
+        }
         MM["finalImbalance_w"+std::to_string(w)] = imbalances.back();
     }
+
     MM["finalImbalance"] = *std::max_element( imbalances.begin(), imbalances.end() );
 
     //TODO: getting the block graph probably fails for p>5000, removed this metric since we do not use it so much
@@ -141,7 +215,10 @@ void Metrics<ValueType>::getEasyMetrics( const scai::lama::CSRSparseMatrix<Value
 //---------------------------------------------------------------------------
 
 template<typename ValueType>
-std::tuple<IndexType,IndexType,IndexType> Metrics<ValueType>::getDiameter( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings ) {
+std::tuple<IndexType,IndexType,IndexType> Metrics<ValueType>::getDiameter( 
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const scai::lama::DenseVector<IndexType> &partition,
+    struct Settings settings ) {
 
     std::chrono::time_point<std::chrono::high_resolution_clock> diameterStart = std::chrono::high_resolution_clock::now();
     IndexType maxBlockDiameter = 0;
@@ -190,7 +267,9 @@ std::tuple<IndexType,IndexType,IndexType> Metrics<ValueType>::getDiameter( const
             maxBlockDiameter = comm->max(localDiameter);
 
         } else {
-            PRINT0("WARNING: Not computing diameter, not all vertices are in same block everywhere");
+            if(comm->getRank()==0){
+                std::cout<< "WARNING: Not computing diameter, not all vertices are in same block everywhere" << std::endl;
+            }
         }
     }
     std::chrono::duration<ValueType,std::ratio<1>> diameterTime = std::chrono::high_resolution_clock::now() - diameterStart;
@@ -204,7 +283,11 @@ std::tuple<IndexType,IndexType,IndexType> Metrics<ValueType>::getDiameter( const
 //---------------------------------------------------------------------------
 
 template<typename ValueType>
-void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMatrix<ValueType> graph, const scai::lama::DenseVector<IndexType> partition, struct Settings settings, const IndexType repeatTimes ) {
+void Metrics<ValueType>::getRedistRequiredMetrics( 
+    const scai::lama::CSRSparseMatrix<ValueType> &graph,
+    const scai::lama::DenseVector<IndexType> &partition,
+    struct Settings settings,
+    const IndexType repeatTimes ) {
 
     scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
     const IndexType N = graph.getNumRows();
@@ -219,7 +302,7 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
 
     //TODO: change NoDist with graph.getColumnDistribution() ?
     scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( graph.getNumRows() ));
-    scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph );
+    scai::lama::CSRSparseMatrix<ValueType> copyGraph( graph ); 
     copyGraph.redistribute(distFromPartition, noDistPtr);
 
     std::chrono::duration<ValueType> redistributionTime =  std::chrono::steady_clock::now() - beforeRedistribution;
@@ -245,10 +328,35 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
         std::tie( MM["maxBlockDiameter"], MM["harmMeanDiam"], MM["numDisconBlocks"] ) = getDiameter(copyGraph, copyPartition, settings);
     }
 
-    // redistribute for SpMV and commTime
+    //get the NNZ imbalance
+    {
+        const IndexType localNNZ = copyGraph.getLocalNumValues();   
+        const IndexType sumNNZ = comm->sum(localNNZ);
+        //this fails because the cut edges are not counted; it is sumNNZ+ 2*cutedges = copyGraph.getNumValues()
+        //SCAI_ASSERT_EQ_ERROR( sumNNZ, copyGraph.getNumValues(), "??" ); 
+        
+        const IndexType optNNZ = sumNNZ/comm->getSize();
+        const IndexType maxLocalNNZ = comm->max(localNNZ);
+        const IndexType minLocalNNZ = comm->min(localNNZ);
+
+        ValueType edgeImbalance = ValueType( maxLocalNNZ - optNNZ)/optNNZ;
+        PRINT0("minLocalNNZ= "<< minLocalNNZ <<", maxLocalNNZ= " << maxLocalNNZ << ", edge imbalance= " << edgeImbalance);
+        MM["edgeImbalance"] = edgeImbalance;
+    }
+
+    //
+    // redistribute for SpMV, linear solver and commTime
+    //
+
     copyGraph.redistribute( distFromPartition, distFromPartition );
 
     MM["SpMVtime"] = getSPMVtime(copyGraph, repeatTimes);
+
+    //TODO: take a percentage of repeatTimes; maybe all repeatTimes are too much for CG
+    //in rhs: all 1s
+    std::tie( MM["CGtime_a1"], MM["CGiterations_a1"], MM["CGresidual_a1"] ) = getCGTime( copyGraph, 10, settings.maxCGIterations, settings.CGResidual, false); 
+    //in rhs: one 1 and all others 0
+    std::tie( MM["CGtime_o1"], MM["CGiterations_o1"], MM["CGresidual_o1"] ) = getCGTime( copyGraph, 10, settings.maxCGIterations, settings.CGResidual, true); 
 
     //TODO: maybe extract this time from the actual SpMV above
     // comm time in SpMV
@@ -283,7 +391,9 @@ void Metrics<ValueType>::getRedistRequiredMetrics( const scai::lama::CSRSparseMa
 /* Calculate the volume, aka the data that will be exchanged when redistributing from oldDist to newDist.
  */
 template<typename ValueType>
-std::pair<IndexType,IndexType> Metrics<ValueType>::getRedistributionVol( const scai::dmemo::DistributionPtr newDist, const scai::dmemo::DistributionPtr oldDist) {
+std::pair<IndexType,IndexType> Metrics<ValueType>::getRedistributionVol( 
+    const scai::dmemo::DistributionPtr newDist,
+    const scai::dmemo::DistributionPtr oldDist) {
 
     //const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
     const scai::dmemo::CommunicatorPtr comm = newDist->getCommunicatorPtr();
@@ -313,9 +423,9 @@ std::pair<IndexType,IndexType> Metrics<ValueType>::getRedistributionVol( const s
 
 template<typename ValueType>
 void Metrics<ValueType>::getMappingMetrics(
-    const scai::lama::CSRSparseMatrix<ValueType> blockGraph,
-    const scai::lama::CSRSparseMatrix<ValueType> PEGraph,
-    const std::vector<IndexType> mapping) {
+    const scai::lama::CSRSparseMatrix<ValueType> &blockGraph,
+    const scai::lama::CSRSparseMatrix<ValueType> &PEGraph,
+    const std::vector<IndexType> &mapping) {
 
     const IndexType N = blockGraph.getNumRows();
     //congestion is defined for every edge of the processor graph
@@ -327,13 +437,14 @@ void Metrics<ValueType>::getMappingMetrics(
     SCAI_ASSERT_EQ_ERROR( std::accumulate(mapping.begin(), mapping.end(), 0), (N*(N-1)/2), "Wrong mapping" );
 
     const scai::dmemo::DistributionPtr noDist(new scai::dmemo::NoDistribution(N));
-    SCAI_ASSERT( PEGraph.getRowDistributionPtr()->isEqual(*noDist), "Function expects the graph to bre relicated" );
-    SCAI_ASSERT( blockGraph.getRowDistributionPtr()->isEqual(*noDist), "Function expects the graph to bre relicated" );
+    SCAI_ASSERT( PEGraph.getRowDistributionPtr()->isEqual(*noDist), "Function expects the graph to be replicated" );
+    SCAI_ASSERT( blockGraph.getRowDistributionPtr()->isEqual(*noDist), "Function expects the graph to be replicated" );
 
-    ValueType sumDilation = 0;
-    ValueType maxDilation = 0;
+    ValueType sumDilation = 0.0;
+    ValueType maxDilation = 0.0;
     ValueType minDilation = std::numeric_limits<ValueType>::max();
-    std::vector<ValueType> congestion( peM, 0 );
+    std::vector<ValueType> congestion( peM, 0.0 );
+    ValueType qap = 0.0;
 
     //calculate all shortest paths in PE graph
     std::vector<std::vector<ValueType>> APSP( N, std::vector<ValueType> (N, 0.0));
@@ -361,6 +472,8 @@ void Metrics<ValueType>::getMappingMetrics(
     SCAI_ASSERT_EQ_ERROR( PEia.size(), N+1, "ia size mismatch" );
     SCAI_ASSERT_LE_ERROR( PEia[N], peM, "Too large index in PE graph" );
     SCAI_ASSERT_LE_ERROR( scai::utilskernel::HArrayUtils::max(PEStorage.getIA()), peM, "some ia value is too large");
+    SCAI_ASSERT_EQ_ERROR( PEValues.size(), N*(N-1), "PE graph should be a complete undirected graph" );
+    SCAI_ASSERT_LE_ERROR( blockValues.size(), PEValues.size(), "mismatch in graph edges" );
 
     // calculate dilation and congestion for every edge
     for( IndexType v=0; v<N; v++) {
@@ -380,6 +493,9 @@ void Metrics<ValueType>::getMappingMetrics(
                 if( currDilation<minDilation ) {
                     minDilation = currDilation;
                 }
+
+                const ValueType PEdistance = PEValues[iaInd];
+                qap += thisEdgeWeight*PEdistance;
 
                 //update congestion
                 IndexType current = target;
@@ -424,14 +540,15 @@ void Metrics<ValueType>::getMappingMetrics(
     MM["maxCongestion"] = maxCongestion;
     MM["maxDilation"] = maxDilation;
     MM["avgDilation"] = avgDilation;
+    MM["qap_J(C,D,P)"] = qap;
 
 }//getMappingMetrics
 //---------------------------------------------------------------------------------------
 template<typename ValueType>
 void Metrics<ValueType>::getMappingMetrics(
-    const scai::lama::CSRSparseMatrix<ValueType> appGraph,
-    const scai::lama::DenseVector<IndexType> partition,
-    const scai::lama::CSRSparseMatrix<ValueType> PEGraph ) {
+    const scai::lama::CSRSparseMatrix<ValueType> &appGraph,
+    const scai::lama::DenseVector<IndexType> &partition,
+    const scai::lama::CSRSparseMatrix<ValueType> &PEGraph ) {
 
     const IndexType k = partition.max()+1;
     SCAI_ASSERT_EQ_ERROR( k, PEGraph.getNumRows(), "Max value in partition (aka, k) should be equal with the number of vertices of the PE graph." );
@@ -447,6 +564,7 @@ void Metrics<ValueType>::getMappingMetrics(
     getMappingMetrics( blockGraph, PEGraph, identityMapping);
 }//getMappingMetrics
 //---------------------------------------------------------------------------------------
+
 template<typename ValueType>
 ValueType Metrics<ValueType>::getSPMVtime(
     scai::lama::CSRSparseMatrix<ValueType> graph,
@@ -461,7 +579,7 @@ ValueType Metrics<ValueType>::getSPMVtime(
     graph.setCommunicationKind( scai::lama::SyncKind::ASYNC_COMM );
     comm->synchronize();
     
-    // perfom the actual multiplication
+    // perform the actual multiplication
     std::chrono::time_point<std::chrono::steady_clock> beforeSpMVTime = std::chrono::steady_clock::now();
     for(IndexType r=0; r<repeatTimes; r++) {
         y = graph *x +y;
@@ -471,14 +589,110 @@ ValueType Metrics<ValueType>::getSPMVtime(
     //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
 
     ValueType time = comm->max(SpMVTime.count());
-    time = time/repeatTimes;
+    PRINT0("max time for " << repeatTimes <<" SpMVs: " << time );
 
-    ValueType minTime = comm->min( SpMVTime.count() );
-    PRINT0("max time for " << repeatTimes <<" SpMVs: " << time << " , min time " << minTime);
-
-    return time;
+    return time/repeatTimes;
 }
+//---------------------------------------------------------------------------------------
 
+//for the initial values of solution and rhs see papers
+//Parallel Conjugate Gradient: Effects of Ordering Strategies, Programming Paradigms and Architectural Platforms.
+//Oliker, Xi, Heber et al., section 4
+//High-performance conjugate-gradient benchmark: A new metric for ranking high-performance computing systems
+// Dongarra1, Michael A Heroux2and Piotr Luszczek, section 4
+template<typename ValueType>
+std::tuple<ValueType,ValueType,ValueType> Metrics<ValueType>::getCGTime( 
+    const scai::lama::CSRSparseMatrix<ValueType>& graph,
+    const IndexType repeatTimes,
+    const IndexType maxIterations,
+    const ValueType residual,
+    const bool oneOne){
+
+    const scai::dmemo::CommunicatorPtr comm = graph.getRowDistributionPtr()->getCommunicatorPtr();
+    const scai::dmemo::DistributionPtr rowDist = graph.getRowDistributionPtr();
+    const scai::dmemo::DistributionPtr colDist = graph.getColDistributionPtr();
+
+    //the laplacian
+	std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
+    //scai::lama::CSRSparseMatrix<ValueType> laplacian = GraphUtils<IndexType,ValueType>::constructLaplacian(graph);
+	scai::lama::CSRSparseMatrix<ValueType> laplacian;
+	{
+		scai::dmemo::DistributionPtr noDistPtr( new scai::dmemo::NoDistribution( graph.getNumRows() ));
+		scai::lama::CSRSparseMatrix<ValueType> copyGraph = graph;
+		copyGraph.redistribute( rowDist, noDistPtr);
+		laplacian = GraphUtils<IndexType,ValueType>::constructLaplacianPlusIdentity(copyGraph);
+		laplacian.redistribute( rowDist, colDist);
+	}
+	std::chrono::duration<double> endTime = std::chrono::steady_clock::now() - startTime;
+	double totalTimeLapl= comm->max(endTime.count() );
+	if( comm->getRank()==0 ) {
+	    std::cout<< " time to construct laplacian is " << totalTimeLapl << " seconds " << std::endl;
+	}
+
+    //add the identity matrix to make the laplacian positive definite
+    //CSRSparseMatrix<ValueType> identity;
+    //identity.setIdentity(rowDist);
+    //laplacian += identity;
+
+    //this assertion fails because lama does not set up the local data of the matrix correctly
+    //SCAI_ASSERT_EQ_ERROR( laplacian.l1Norm(), 2*graph.l1Norm(), "wrong l1Norm in laplacian");
+    SCAI_ASSERT_EQ_ERROR( laplacian.getNumValues(), graph.getNumValues()+graph.getNumRows(), "wrong numValues in laplacian");
+    SCAI_ASSERT_EQ_ERROR( laplacian.getLocalNumValues(), graph.getLocalNumValues()+graph.getLocalNumRows(), "laplacian is wrong");
+	
+    // Allocate a common logger that prints convergenceHistory
+    //bool isDisabled = comm->getRank() > 0;
+    //scai::solver::LoggerPtr logger( new scai::solver::CommonLogger( "CGLogger: ", scai::solver::LogLevel::convergenceHistory, scai::solver::LoggerWriteBehaviour::toConsoleOnly, isDisabled ) );
+
+    //scai::solver::CG<ValueType> solver("CGSolver", logger);
+    scai::solver::CG<ValueType> solver("CGSolver");
+
+    scai::lama::NormPtr<ValueType> norm( new scai::lama::L2Norm<ValueType>( ) );
+
+    scai::solver::CriterionPtr<ValueType> criterion1( new scai::solver::ResidualThreshold<ValueType>( norm, residual, scai::solver::ResidualCheck::Absolute ) );
+    scai::solver::CriterionPtr<ValueType> criterion2( new scai::solver::IterationCount<ValueType>( maxIterations ) );
+    scai::solver::CriterionPtr<ValueType> criterion( new scai::solver::Criterion<ValueType>( criterion1, criterion2, scai::solver::BooleanOp::OR ) );
+
+    solver.setStoppingCriterion( criterion );
+    ValueType totalTime = 0.0;
+    IndexType totalIterations = 0;
+    ValueType retResidual = 0.0;
+
+    for(IndexType r=0; r<repeatTimes; r++) {
+        scai::lama::DenseVector<ValueType> rhs;
+        if(oneOne){
+            rhs.setSameValue( colDist, ValueType(0.0) );
+            const IndexType globalN = laplacian.getNumRows();
+            const IndexType globIndex = scai::common::Math::random<IndexType>( globalN );
+            assert( globIndex<= globalN);
+            rhs.setValue( globIndex, 1.0);
+        }else{
+            //just all ones
+            rhs.setSameValue( colDist, ValueType(1.0) );
+        }
+
+        scai::lama::DenseVector<ValueType> solution( colDist, ValueType(0.0) );
+        solver.initialize( laplacian );
+
+        std::chrono::time_point<std::chrono::steady_clock> beforeTime = std::chrono::steady_clock::now();
+        solver.solve(solution, rhs);
+
+        std::chrono::duration<ValueType> elapTime = std::chrono::steady_clock::now() - beforeTime;
+        totalTime += elapTime.count();
+        //number of iterations is (should be!) always the same; maybe just get them outside the loop?
+        totalIterations += solver.getIterationCount();
+        //PRINT(" SpMV time for PE "<< comm->getRank() << " = " << SpMVTime.count() );
+        retResidual += solver.getResidual().l2Norm();
+    }
+    ValueType globTime = comm->max(totalTime)/repeatTimes;
+    ValueType avgIterations = ((ValueType) totalIterations)/repeatTimes;
+    ValueType avgResidual = retResidual/repeatTimes;
+
+    PRINT0("total time for "<< repeatTimes << " calls to CG solver: " << totalTime << 
+            " and " << avgIterations << " average iterations and average residual reached " << avgResidual );
+
+    return std::make_tuple( globTime, avgIterations, avgResidual);
+}
 
 template class Metrics<double>;
 template class Metrics<float>;
+

@@ -30,14 +30,24 @@ Options populateOptions() {
     ("seed", "random seed, default is current time", value<double>()->default_value(std::to_string(time(NULL))))
     //mapping
     ("PEgraphFile", "read communication graph from file", value<std::string>())
-    ("blockSizesFile", " file to read the block sizes for every block", value<std::string>() )
+    ("topologyFile", "read system topology  from file: a line per processor with CPU, MEM and number of cores", value<std::string>())
+    ("blockSizesFile", "file to read the block sizes for every block", value<std::string>() )
+    ("autoSetCpuMem", "if set, geographer will gather cpu and memory info and use them to build a heterogeneous communication tree used for partitioning")
+    ("w2UpperBound", "if true, when given a file with the block sizes or the topology, treat the second weight as an upper bound (usually, this is used so the second weight corresponds to the memory capacity of the PEs)")
+    ("processPerNode", "the number of processes per compute node. Is used with autoSetCpuMem to determine the internal cpu/core ID within a compute node and query the cpu frequency.",  value<IndexType>())
+    ("useMemFromFile", "when a topology or block sizes file is given, if true, use the actual values in the file for memory. otherwise set the max memory to 1.2*number of graph rows.")
+    ("mappingRenumbering", "map blocks to PEs using the SFC index of the block's center. This works better when PUs are numbered consecutively." )
+    ("hierarchy_parameter_string", "a sequence of h number separated by : that indicate the structure of a tree-like architecture from leaves to root. For example, the system 12:4:2 has 2 nodes that each has 4 sockets (for example) and each socket has 12 cores, summing to 12*4*2=96 PEs", value<std::string>() )
+    ("distance_parameter_string", "The communication costs between PEs that belong to different subtrees of a tree-like system from leaves to root. For example, 1:10:500 means that two leaves/PEs with the same socket have communication cost 1, to leaves/PEs in different sockets but in the same node have communication cost 10 and two leaves/PEs in different nodes have cost 500", value<std::string>())
     //repartitioning
     ("previousPartition", "file of previous partition, used for repartitioning", value<std::string>())
     //multi-level and local refinement
     ("initialPartition", "Choose initial partitioning method between space-filling curves (geoSFC), balanced k-means (geoKmeans) or the hierarchical version (geoHierKM) and MultiJagged (geoMS). If parmetis or zoltan are installed, you can also choose to partition with them using for example, parMetisGraph or zoltanMJ. For more information, see src/Settings.h file.", value<std::string>())
+    ("initialMigration", "The preprocessing step to distribute data before calling the partitioning algorithm", value<std::string>())
     ("noRefinement", "skip local refinement steps")
     ("multiLevelRounds", "Tuning Parameter: How many multi-level rounds with coarsening to perform", value<IndexType>()->default_value(std::to_string(settings.multiLevelRounds)))
     ("minBorderNodes", "Tuning parameter: Minimum number of border nodes used in each refinement step", value<IndexType>())
+    ("minBorderNodesPercent", "Tuning parameter: Percentage of local nodes used in each refinement step. Recommended  are values around 0.05", value<double>())
     ("stopAfterNoGainRounds", "Tuning parameter: Number of rounds without gain after which to abort localFM. 0 means no stopping.", value<IndexType>())
     ("minGainForNextGlobalRound", "Tuning parameter: Minimum Gain above which the next global FM round is started", value<IndexType>())
     ("gainOverBalance", "Tuning parameter: In local FM step, choose queue with best gain over queue with best balance", value<bool>())
@@ -50,6 +60,8 @@ Options populateOptions() {
     ("bisect", "Used for the multisection method. If set to true the algorithm perfoms bisections (not multisection) until the desired number of parts is reached", value<bool>())
     ("cutsPerDim", "If MultiSection is chosen, then provide d values that define the number of cuts per dimension. You must provide as many numbers as the dimensions separated with commas. For example, --cutsPerDim=3,4,10 for 3 dimensions resulting in 3*4*10=120 blocks", value<std::string>())
     ("pixeledSideLen", "The resolution for the pixeled partition or the spectral", value<IndexType>())
+    //sfc
+    ("sfcResolution", "The resolution depth of the hilbert space filling curve", value<IndexType>())
     // K-Means
     ("minSamplingNodes", "Tuning parameter for K-Means", value<IndexType>())
     ("influenceExponent", "Tuning parameter for K-Means, default is ", value<double>()->default_value(std::to_string(settings.influenceExponent)))
@@ -57,13 +69,18 @@ Options populateOptions() {
     ("balanceIterations", "Tuning parameter for K-Means", value<IndexType>())
     ("maxKMeansIterations", "Tuning parameter for K-Means", value<IndexType>())
     ("tightenBounds", "Tuning parameter for K-Means")
+    ("keepMostBalanced", "Tuning parameter for K-Means. When activated, k-means will return the solution with the minimum balance that was found.")
     ("erodeInfluence", "Tuning parameter for K-Means, in case of large deltas and imbalances.")
+    ("KMBalanceMethod", "used in KMeans to partition targeting for a better imbalance. Possible values are 'repart', 'reb_lex' and 'reb_sqImba'. First repartition, the two other apply a rebalance method and repartition.", value<std::string>())
+    ("focusOnBalance", "Used in hierarchical versions of K-Means to rebalance at every step.")
     // using '/' to separate the lines breaks the output message
-    ("hierLevels", "The number of blocks per level. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 3,4,10 there are 3 levels. In the first one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
+    ("hierLevels", "The number of blocks per level starting from the leaves. Total number of PEs (=number of leaves) is the product for all hierLevels[i] and there are hierLevels.size() hierarchy levels. Example: --hierLevels 10,4,3 there are 3 levels. In the first/top one, each node has 3 children, in the next one each node has 4 and in the last, each node has 10. In total 3*4*10= 120 leaves/PEs", value<std::string>())
     //output
     ("outFile", "write result partition into file", value<std::string>())
+    ("redistAndStore", "redistribute and store the graph after partitioning", value<bool>())
     //debug
     ("writeDebugCoordinates", "Write Coordinates of nodes in each block", value<bool>())
+    ("writePEgraph", "Write the processor graph to a file", value<bool>())
     ("verbose", "Increase output.")
     ("debugMode", "Increase output and more expensive checks")
     ("storeInfo", "Store timing and other metrics in file.")
@@ -74,8 +91,11 @@ Options populateOptions() {
     ("repeatTimes", "How many times we repeat the partitioning process.", value<IndexType>())
     ("computeDiameter", "Compute diameter of resulting block files.")
     ("maxDiameterRounds", "abort diameter algorithm after that many BFS rounds", value<IndexType>())
+    ("maxCGIterations", "max number of iterations of the CG solver in metrics",  value<IndexType>())
+    ("CGResidual", "solution precision of the CG solver in metrics",  value<double>())
     ("metricsDetail", "no: no metrics, easy:cut, imbalance, communication volume and diameter if possible, all: easy + SpMV time and communication time in SpMV", value<std::string>())
     ("autoSettings", "Set some settings automatically to some values possibly overwriting some user passed parameters. ", value<bool>() )
+    ("partition", "file of partition (typically used by tools/analyzePartition)", value<std::string>())
     //used for the competitors main
     ("outDir", "write result partition into folder", value<std::string>())
     ("tools", "choose which supported tools to use. For multiple tool use comma to separate without spaces. See in Settings::Tools for the supported tools and how to call them.", value<std::string>() )
@@ -97,11 +117,19 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
 
     Settings settings;
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
+
     srand(vm["seed"].as<double>());
+    settings.seed = vm["seed"].as<double>();
 
     if (vm.count("version")) {
         std::cout << "Git commit " << version << std::endl;
-        settings.isValid = false;
+        settings.isValid = true;
+        exit(0);
+        return settings;
+    }
+
+    if (vm.count("help")) {
+        settings.isValid = true;
         return settings;
     }
 
@@ -137,18 +165,25 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         settings.coordFormat = settings.fileFormat;
     }
 
-    if( settings.storeInfo && settings.outFile=="-" ) {
-        PRINT0("Option to store information used but no output file given to write to. Specify an output file using the option --outFile. Aborting.");
-        settings.isValid = false;
-        //return 126;
+    if (vm.count("outFile")) {
+        settings.outFile = vm["outFile"].as<std::string>();
+        settings.storeInfo = true;
+    }
+
+    if (vm.count("outDir")) {
+        settings.outDir = vm["outDir"].as<std::string>();
+        settings.storeInfo = true;
     }
 
     if (!vm.count("influenceExponent")) {
         settings.influenceExponent = 1.0/settings.dimensions;
     }
+    if (vm.count("metricsDetail")) {
+        settings.metricsDetail = vm["metricsDetail"].as<std::string>();
+    }
 
     if( vm.count("metricsDetail") ) {
-        if( not (settings.metricsDetail=="no" or settings.metricsDetail=="easy" or settings.metricsDetail=="all") ) {
+        if( not (settings.metricsDetail=="no" or settings.metricsDetail=="easy" or settings.metricsDetail=="all" or settings.metricsDetail=="mapping") ) {
             if(comm->getRank() ==0 ) {
                 std::cout<<"WARNING: wrong value for parameter metricsDetail= " << settings.metricsDetail << ". Setting to all" <<std::endl;
                 settings.metricsDetail="all";
@@ -159,11 +194,12 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     using std::vector;
     settings.verbose = vm.count("verbose");
     settings.debugMode = vm.count("debugMode");
-    settings.storeInfo = vm.count("storeInfo");
-    settings.computeDiameter = vm.count("computeDiameter");
+    //settings.storeInfo = vm.count("storeInfo");
     settings.storePartition = vm.count("storePartition");
     settings.erodeInfluence = vm.count("erodeInfluence");
+    settings.focusOnBalance = vm.count("focusOnBalance");
     settings.tightenBounds = vm.count("tightenBounds");
+    settings.keepMostBalanced = vm.count("keepMostBalanced");
     settings.noRefinement = vm.count("noRefinement");
     settings.useDiffusionCoordinates = vm.count("useDiffusionCoordinates");
     settings.gainOverBalance = vm.count("gainOverBalance");
@@ -173,21 +209,40 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     settings.nnCoarsening = vm.count("nnCoarsening");
     settings.bisect = vm.count("bisect");
     settings.writeDebugCoordinates = vm.count("writeDebugCoordinates");
-    settings.setAutoSettings = vm.count("autoSettings");
     settings.writePEgraph = vm.count("writePEgraph");
+    settings.setAutoSettings = vm.count("autoSettings");
+    settings.mappingRenumbering = vm.count("mappingRenumbering");
+    settings.autoSetCpuMem = vm.count("autoSetCpuMem");
+    settings.w2UpperBound = vm.count("w2UpperBound");
+    settings.useMemFromFile = vm.count("useMemFromFile");
 
+    //28/11/19, deprecate storeInfo parameter. Leaving it as an option for backwards compatibility.    
+    //if outFile was provided but storeInfo was not given as an argument
+    if( vm.count("storeInfo") ) {
+        if(comm->getRank()==0){
+            std::cout << "WARNING: Option --storeInfo is deprecated and (most probably) will be ignored; metrics will be stored depending on the options --outFile and --outDir" << std::endl;
+        }
+        settings.storeInfo = true;
+    }
+
+    if (vm.count("graphFile")) {
+        settings.fileName = vm["graphFile"].as<std::string>();
+    }
     if (vm.count("fileFormat")) {
         settings.fileFormat = vm["fileFormat"].as<ITI::Format>();
     }
     if (vm.count("coordFormat")) {
         settings.coordFormat = vm["coordFormat"].as<ITI::Format>();
     }
+
     if (vm.count("PEgraphFile")) {
         settings.PEGraphFile = vm["PEgraphFile"].as<std::string>();
     }
+
     if (vm.count("numNodeWeights")) {
         settings.numNodeWeights = vm["numNodeWeights"].as<IndexType>();
     }
+
     if (vm.count("dimensions")) {
         settings.dimensions = vm["dimensions"].as<IndexType>();
     }
@@ -205,12 +260,20 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     } else {
         settings.numBlocks = comm->getSize();
     }
+    if (vm.count("sfcResolution")) {
+        settings.sfcResolution = vm["sfcResolution"].as<IndexType>();
+    }
 
     if (vm.count("epsilon")) {
         settings.epsilon = vm["epsilon"].as<double>();
     }
-    if (vm.count("blockSizesFile")) {
-        settings.blockSizesFile = vm["blockSizesFile"].as<std::string>();
+
+    if (vm.count("processPerNode")) {
+        settings.processPerNode = vm["processPerNode"].as<IndexType>();
+    }    
+    if ( vm.count("initialMigration") ){
+        std::string s = vm["initialMigration"].as<std::string>();
+        settings.initialMigration = to_tool(s);        
     }
     if (vm.count("initialPartition")) {
         std::string s = vm["initialPartition"].as<std::string>();
@@ -221,6 +284,9 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     }
     if (vm.count("minBorderNodes")) {
         settings.minBorderNodes = vm["minBorderNodes"].as<IndexType>();
+    }
+    if (vm.count("minBorderNodesPercent")) {
+        settings.minBorderNodesPercent = vm["minBorderNodesPercent"].as<double>();
     }
     if (vm.count("stopAfterNoGainRounds")) {
         settings.stopAfterNoGainRounds = vm["stopAfterNoGainRounds"].as<IndexType>();
@@ -273,15 +339,28 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
     if (vm.count("maxKMeansIterations")) {
         settings.maxKMeansIterations = vm["maxKMeansIterations"].as<IndexType>();
     }
-    if (vm.count("hierLevels")) {  
-        std::stringstream ss( vm["hierLevels"].as<std::string>() );
+
+    if (vm.count("hierLevels") or vm.count("hierarchy_parameter_string")) {  
+        if (vm.count("hierLevels") and vm.count("hierarchy_parameter_string")){
+            throw std::invalid_argument("Conflicting arguments, provide either argument hierLevels or hierarchy_parameter_string");
+        }
+
+        std::stringstream ss;
+        char delim = ',';
+        if (vm.count("hierLevels") ){
+            ss << vm["hierLevels"].as<std::string>();
+        }else{
+            ss << vm["hierarchy_parameter_string"].as<std::string>();
+            delim = ':';
+        }
+        //std::stringstream ss( vm["hierLevels"].as<std::string>() );
         std::string item;
         std::vector<IndexType> hierLevels;
         IndexType product = 1;
 
-        while (!std::getline(ss, item, ',').fail()) {
+        while (!std::getline(ss, item, delim).fail()) {
             IndexType blocksInLevel = std::stoi(item);
-            hierLevels.push_back(blocksInLevel);
+            hierLevels.insert( hierLevels.begin(), blocksInLevel );
             product *= blocksInLevel;
         }
 
@@ -292,25 +371,36 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         } else {
             if (vm["numBlocks"].as<IndexType>() != product) {
                 std::cout << vm["numBlocks"].as<IndexType>() << " " << product << std::endl;
-                throw std::invalid_argument("When giving --hierLevels, either omit --numBlocks or set it to the product of level entries.");
+                throw std::invalid_argument("When giving --hierLevels or --hierarchy_parameter_string, either omit --numBlocks or set it to the product of level entries. Hierarchy given results to " + std::to_string(product) + " blocks");
             }
         }
     }
-    if (vm.count("outFile")) {
-        settings.outFile = vm["outFile"].as<std::string>();
+
+    if( vm.count("KMBalanceMethod") ) {
+        settings.KMBalanceMethod = vm["KMBalanceMethod"].as<std::string>();
+        if( not (settings.KMBalanceMethod=="repart" 
+            or settings.KMBalanceMethod=="reb_sqImba"
+            or settings.KMBalanceMethod=="reb_lex") ) {
+            if(comm->getRank() ==0 ) {
+                std::cout<<"WARNING: wrong value for parameter KMBalanceMethod= " << settings.KMBalanceMethod << ". Setting to reb_lex" <<std::endl;
+                settings.KMBalanceMethod="lex";
+            }
+        }
     }
+
     if (vm.count("repeatTimes")) {
         settings.repeatTimes = vm["repeatTimes"].as<IndexType>();
     }
     if (vm.count("maxDiameterRounds")) {
         settings.maxDiameterRounds = vm["maxDiameterRounds"].as<IndexType>();
     }
-    if (vm.count("metricsDetail")) {
-        settings.metricsDetail = vm["metricsDetail"].as<std::string>();
+    if (vm.count("maxCGIterations")) {
+        settings.maxCGIterations = vm["maxCGIterations"].as<IndexType>();
     }
-    if (vm.count("outDir")) {
-        settings.outDir = vm["outDir"].as<std::string>();
+    if (vm.count("CGResidual")) {
+        settings.CGResidual = vm["CGResidual"].as<double>();
     }
+
 
     /*** consistency checks ***/
     if (vm.count("previousPartition")) {
@@ -332,7 +422,7 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
                 || settings.initialPartition == Tool::geoHierRepart)) {
             if(comm->getRank() ==0 ) {
                 std::cout << " WARNING: Without using hierarchical partitioning, ";
-                std::cout << "the given hierarchy levels will be ignored." << std::endl;
+                std::cout << "the given hierarchy levels will be ignored during partitioning." << std::endl;
             }
         }
 
@@ -356,6 +446,14 @@ Settings interpretSettings(cxxopts::ParseResult vm) {
         }
 
         settings.tools = tools;
+    }
+
+    if( vm.count("PEgraphFile") or vm.count("topologyFile")){
+        if( vm.count("distance_parameter_string") or vm.count("hierarchy_parameter_string") ){
+            if(comm->getRank() ==0 ) {
+                throw std::invalid_argument("Conflicting input parameters. Give either distance and hierarchy parameters for the system or a file");
+            }
+        }
     }
 
     return settings;

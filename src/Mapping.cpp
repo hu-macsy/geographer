@@ -6,6 +6,7 @@
  */
 
 #include "Mapping.h"
+#include "KMeans.h" //needed for findCenters in sfcMapping
 
 namespace ITI {
 
@@ -394,7 +395,7 @@ std::vector<IndexType> Mapping<IndexType, ValueType>::getSfcRenumber(
     using point = std::vector<ValueType>;
 
     //the center for each block
-    std::vector<point> blockCenters = KMeans<IndexType,ValueType>::findCenters(coordinates, partition, k, firstIndex, lastIndex, nodeWeights[0]);
+    std::vector<point> blockCenters = KMeans<IndexType,ValueType>::findCenters(coordinates, partition, k, firstIndex, lastIndex, nodeWeights);
 
     //remember: blockCenters.size()=dim, blockCenters[i].size()=numBlocks
     SCAI_ASSERT_EQ_ERROR( blockCenters.size(), dim, "Wrong size of centers vector." );

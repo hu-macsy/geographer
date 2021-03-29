@@ -51,37 +51,28 @@ int main(int argc, char** argv) {
     using namespace ITI;
     typedef double ValueType;   //use double
 
-    std::chrono::time_point<std::chrono::steady_clock> startTime =  std::chrono::steady_clock::now();
+#if ZOLTAN_FOUND
+    Tpetra::ScopeGuard tscope(&argc, &argv);
+#endif
 
+    // timing information
+    std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
+
+    //global communicator
     scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    if (comm->getType() != scai::dmemo::CommunicatorType::MPI) {
-        std::cout << "The linked lama version was compiled without MPI. Only sequential partitioning is supported." << std::endl;
-    }
 
-    std::string callingCommand = "";
-    for (IndexType i = 0; i < argc; i++) {
-        callingCommand += std::string(argv[i]) + " ";
-    }
+    const int prevArgc = argc; // options.parse(argc, argv) changed argc
 
     cxxopts::Options options = ITI::populateOptions();
     cxxopts::ParseResult vm = options.parse(argc, argv);
+    Settings settings = initialize( prevArgc, argv, vm, comm);
 
     if (vm.count("help")) {
         std::cout << options.help() << std::endl;
         return 0;
-    }
+    } 
 
-    struct Settings settings = ITI::interpretSettings(vm);
-    if( !settings.isValid )
-        return -1;
-
-    if( comm->getRank() ==0 ) {
-        std::cout <<"Starting file " << __FILE__ << std::endl;
-
-        std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
-        std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
-        std::cout << "date and time: " << std::ctime(&timeNow) << std::endl;
-    }
+    printInfo( std::cout, comm, settings);
 
     //-----------------------------------------
     //
@@ -96,6 +87,14 @@ int main(int argc, char** argv) {
 
     scai::dmemo::DistributionPtr dist = graph.getRowDistributionPtr();
 
+    //---------------------------------------------------------------
+    //
+    // read the communication graph or the block sizes if provided
+    //
+    
+    ITI::CommTree<IndexType,ValueType> commTree = createCommTree( vm, settings, comm, nodeWeights);
+    commTree.adaptWeights( nodeWeights );
+
     //---------------------------------------------------------------------------------
     //
     // start main for loop for all tools
@@ -103,14 +102,7 @@ int main(int argc, char** argv) {
 
     //WARNING: 1) removed parmetis sfc
     //WARNING: 2) parMetisGraph should be last because it often crashes
-    std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph, ITI::Tool::parhipFastMesh, ITI::Tool::parhipUltraFastMesh, ITI::Tool::parhipEcoMesh  };
-
-    //used for printing and creating filenames
-    std::map<ITI::Tool, std::string> toolName = {
-        {ITI::Tool::zoltanRCB,"zoltanRcb"}, {ITI::Tool::zoltanRIB,"zoltanRib"}, {ITI::Tool::zoltanMJ,"zoltanMJ"}, {ITI::Tool::zoltanSFC,"zoltanHsfc"},
-        {ITI::Tool::parMetisSFC,"parMetisSFC"}, {ITI::Tool::parMetisGeom,"parMetisGeom"}, {ITI::Tool::parMetisGraph,"parMetisGraph"},
-        {ITI::Tool::parhipFastMesh,"parhipFastMesh"}, {ITI::Tool::parhipUltraFastMesh,"parhipUltraFastMesh"}, {ITI::Tool::parhipEcoMesh,"parhipEcoMesh"}
-    };
+    std::vector<ITI::Tool> allTools = {ITI::Tool::zoltanRCB, ITI::Tool::zoltanRIB, ITI::Tool::zoltanMJ, ITI::Tool::zoltanXPulp, ITI::Tool::zoltanSFC, ITI::Tool::parMetisSFC, ITI::Tool::parMetisGeom, ITI::Tool::parMetisGraph, ITI::Tool::parhipFastMesh, ITI::Tool::parhipUltraFastMesh, ITI::Tool::parhipEcoMesh  };
 
     std::vector<ITI::Tool> wantedTools;
     std::vector<std::string> tools = settings.tools; //not really needed
@@ -119,106 +111,110 @@ int main(int argc, char** argv) {
     if( tools.size()==0 ){
         wantedTools = allTools;
     } else {
-        for( std::vector<std::string>::iterator tool=tools.begin(); tool!=tools.end(); tool++) {    
+        for( std::vector<std::string>::iterator tool=tools.begin(); tool!=tools.end(); tool++) {
             wantedTools.push_back( to_tool(*tool) );
         }
     }
 
 
-    std::string machine = settings.machine;
-    const IndexType thisPE = comm->getRank();
-    
+    const IndexType thisPE = comm->getRank();   
 
     for( int t=0; t<wantedTools.size(); t++) {
 
+        comm->synchronize();
         ITI::Tool thisTool = wantedTools[t];
-
-        // get the partition and metrics
-        //
-        scai::lama::DenseVector<IndexType> partition;
-
-        // the constructor with metrics(comm->getSize()) is needed for ParcoRepart timing details
-        Metrics<ValueType> metrics( settings );
-        //metrics.numBlocks = settings.numBlocks;
+        std::cout.precision(5);
+        MSG0("will start partition with tool " << ITI::to_string(thisTool) );
 
         // if using unit weights, set flag for wrappers
         bool nodeWeightsUse = true;
 
         // if graph is too big, repeat less times to avoid memory and time problems
         if( N>std::pow(2,29) ) {
-            settings.repeatTimes = 2;
-        } 
-        
-        //set outFile depending if we get outDir or outFile parameter
-        std::string outFile = settings.outFile;
-		
-        if( vm.count("outDir") and vm.count("storeInfo") ) {
-            //set the graphName in order to create the outFile name
-            std::string copyName;
-            if( vm.count("graphFile") ){
-                copyName = vm["graphFile"].as<std::string>();
-            }else{     
-                copyName = "generate_"+vm["numX"].as<std::string>()+"_"+vm["numY"].as<std::string>();
-                //if( settings.dimensions==3 ){
-                //    copyName += "_"+vm["numZ"].as<std::string>();
-               // }
+            settings.repeatTimes = 3;
+            if( thisPE==0 ) {
+                std::cout << "WARNING: because the graph is too big, we repeat only " << settings.repeatTimes << " times" << std::endl;
             }
-            std::reverse( copyName.begin(), copyName.end() );
-            std::vector<std::string> strs = aux<IndexType,ValueType>::split( copyName, '/' );
-            std::string graphName = aux<IndexType,ValueType>::split(strs.back(), '.')[0];
-            std::reverse( graphName.begin(), graphName.end() );
-            //PRINT0( graphName );
-            //add specific folder for each tool
-            outFile = settings.outDir+ toolName[thisTool]+ "/"+ graphName+ "_k"+ std::to_string(settings.numBlocks)+ "_"+ toolName[thisTool]+ ".info";
-        }
+        } 
+     
+        //set outFile depending if we get outDir or outFile parameter
+        std::string outFile = getOutFileName(settings, ITI::to_string(thisTool), comm);
 
         std::ifstream f(outFile);
         if( f.good() and settings.storeInfo ) {
             comm->synchronize();	// maybe not needed
-            PRINT0("\n\tWARNING: File " << outFile << " allready exists. Skipping partition with " << toolName[thisTool]);
+            PRINT0("\n\tWARNING: File " << outFile << " already exists. Skipping partition with " << ITI::to_string(thisTool));
             continue;
         }
-PRINT0(toolName[thisTool]);
+
         //get the partition
         ITI::Wrappers<IndexType,ValueType>* partitioner;
-        if( toolName[thisTool].rfind("zoltan",0)==0 ){
+        if( ITI::to_string(thisTool).rfind("zoltan",0)==0 ){
 #if ZOLTAN_FOUND            
             partitioner = new zoltanWrapper<IndexType,ValueType>;
 #else
             throw std::runtime_error("Requested a zoltan tool but zoltan is not found. Pick another tool.\nAborting...");
 #endif            
-        }else if( toolName[thisTool].rfind("parMetis",0)==0 ){
+        }else if( ITI::to_string(thisTool).rfind("parMetis",0)==0 ){
 #if PARMETIS_FOUND            
             partitioner = new parmetisWrapper<IndexType,ValueType>;
 #else
             throw std::runtime_error("Requested a parmetis tool but parmetis is not found. Pick another tool.\nAborting...");
 #endif
         }
-        else if(toolName[thisTool].rfind("parhip",0)==0 ){
+        else if(ITI::to_string(thisTool).rfind("parhip",0)==0 ){
 #if PARHIP_FOUND
             partitioner = new parhipWrapper<IndexType,ValueType>;
 #else         
             throw std::runtime_error("Requested a parhip tool but parhip is not found. Pick another tool.\nAborting...");
 #endif   
         }else{
-            throw std::runtime_error("Provided tool: "+ toolName[thisTool] + " not supported.\nAborting..." );
+            throw std::runtime_error("Provided tool: "+ ITI::to_string(thisTool) + " not supported.\nAborting..." );
         }
 
-        partition = partitioner->partition( graph, coords, nodeWeights, nodeWeightsUse, thisTool, settings, metrics);
+        // get the partition and metrics
+        //
+        scai::lama::DenseVector<IndexType> partition;
+        scai::lama::DenseVector<IndexType> oldPartition(dist, 1);
+        std::vector<Metrics<ValueType>> metricsVec;
 
-        PRINT0("time to get the partition: " <<  metrics.MM["timeTotal"] );
+        for( int r=0; r<settings.repeatTimes; r++){
+            metricsVec.push_back( Metrics<ValueType>( settings ) );
 
-        // partition has the the same distribution as the graph rows
-        SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
+            partition = partitioner->partition( graph, coords, nodeWeights, nodeWeightsUse, thisTool, commTree, settings, metricsVec[r]);
+            
+            // partition has the the same distribution as the graph rows
+            SCAI_ASSERT_ERROR( partition.getDistribution().isEqual( graph.getRowDistribution() ), "Distribution mismatch.")
 
+            //ValueType partDiff = oldPartition.maxDiffNorm(partition); // another way to check if partitions are close but is more expensive
+            bool isIdentical = partition.all(scai::common::CompareOp::EQ, oldPartition);
+            if( isIdentical ){
+                if(comm->getRank()==0){
+                    std::cout<< "Partition is identical, not calculating metrics" << std::endl;  
+                }
+                //keep only the run time of this run
+                ValueType runTime = metricsVec[r].MM["timeTotal"];
+                metricsVec[r] = metricsVec[r-1];
+                metricsVec[r].MM["timeTotal"] = runTime;
+            }else{
+                //std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+                metricsVec[r].getMetrics( graph, partition, nodeWeights, settings, commTree );
+            }
 
-        if( settings.metricsDetail=="all" ) {
-            metrics.getAllMetrics( graph, partition, nodeWeights, settings );
+            PRINT0("time to get the partition with " << ITI::to_string(thisTool) << ": " << metricsVec[r].MM["timeTotal"] );
+
+            //if one run exceeds the time limit, do not execute the rest of the runs
+            if( metricsVec[r].MM["timeTotal"]>ITI::HARD_TIME_LIMIT) {
+                if(comm->getRank()==0){
+                    std::cout<< "Stopping runs because of excessive running total running time: " << metricsVec[r].MM["timeTotal"] << std::endl;
+                }
+                break;
+            }
+            oldPartition = partition;
         }
-        if( settings.metricsDetail=="easy" ) {
-            metrics.getEasyMetrics( graph, partition, nodeWeights, settings );
-        }
 
+        //aggregate metrics in one struct
+        const Metrics<ValueType> aggrMetrics = aggregateVectorMetrics( metricsVec, comm );
 
         //---------------------------------------------------------------
         //
@@ -226,36 +222,26 @@ PRINT0(toolName[thisTool]);
         //
 
         if( thisPE==0 ) {
-            if( vm.count("generate") ) {
-                std::cout << std::endl << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon;
-            } else {
-                std::cout << std::endl << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon;
-            }
-            std::cout << "\nFinished tool" << std::endl;
-            std::cout << "\033[1;36m";
-            std::cout << "\n >>>> " << toolName[thisTool];
-            std::cout<<  "\033[0m" << std::endl;
-
-            metrics.print( std::cout );
+            printInfo( std::cout, comm, settings);
+            std::cout << "\nFinished tool: " << ITI::to_string(thisTool) << std::endl;
+            
+            aggrMetrics.print( std::cout );
 
             // write in a file
-            if( outFile!= "-" ) {
+            if( outFile!= "-" and settings.storeInfo) {
                 std::ofstream outF( outFile, std::ios::out);
                 if(outF.is_open()) {
-                    outF << "Running " << __FILE__ << " for tool " << toolName[thisTool] << std::endl;
-                    if( vm.count("generate") ) {
-                        outF << "machine:" << machine << " input: generated mesh,  nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
-                    } else {
-                        outF << "machine:" << machine << " input: " << vm["graphFile"].as<std::string>() << " nodes:" << N << " epsilon:" << settings.epsilon<< std::endl;
-                    }
+                    outF << "Running " << __FILE__ << " for tool " << ITI::to_string(thisTool) << std::endl;
+                    printInfo( outF, comm, settings);
 
-                    metrics.print( outF );
-                    //printMetricsShort( metrics, outF);
+                    aggrMetrics.print( outF );
+                    //printMetricsShort( aggrMetrics, outF);
                     std::cout<< "Output information written to file " << outFile << std::endl;
                 } else {
                     std::cout<< "\n\tWARNING: Could not open file " << outFile << " informations not stored.\n"<< std::endl;
                 }
             }
+            std::cout<< "###" << std::endl;
         }
 
         if( outFile!="-" and settings.storePartition ) {
@@ -285,7 +271,7 @@ PRINT0(toolName[thisTool]);
                 coordinateCopy[dim].redistribute( distFromPartition );
             }
 
-            std::string destPath = "partResults/" +  toolName[thisTool] +"/blocks_" + std::to_string(settings.numBlocks) ;
+            std::string destPath = "partResults/" +  ITI::to_string(thisTool) +"/blocks_" + std::to_string(settings.numBlocks) ;
             struct stat sb;
             if (stat(destPath.data(), &sb) == 0 && S_ISDIR(sb.st_mode)) {
                 ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinateCopy, settings.dimensions, destPath + "/debugResult");
@@ -294,7 +280,8 @@ PRINT0(toolName[thisTool]);
                 std::cout<< "WARNING: directrory " << destPath << " does not exist. De buf coordinates were not stored. Create directory and re-run" << std::endl;
             }
         }
-
+        if( thisPE==0) std::cout<< std::endl;
+        comm->synchronize();    // needed when storing files 
     } // for wantedTools.size()
 
     std::chrono::duration<ValueType> totalTimeLocal = std::chrono::steady_clock::now() - startTime;

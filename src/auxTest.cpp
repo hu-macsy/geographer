@@ -142,7 +142,9 @@ TYPED_TEST (auxTest, testInitialPartitions) {
     uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
     scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
     Metrics<ValueType> metrics(settings);
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, pixeledPartition, uniformWeights, coordinates, halo, settings, metrics);
+    typename ITI::CommTree<IndexType,ValueType>::CommTree commTree;
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(
+        graph, pixeledPartition, uniformWeights, coordinates, halo, commTree, settings, metrics);
     if(dimensions==2) {
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"finalWithPixel");
     }
@@ -193,7 +195,7 @@ TYPED_TEST (auxTest, testInitialPartitions) {
     uniformWeights = DenseVector<ValueType>(graph.getRowDistributionPtr(), 1);
     halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(graph);
 
-    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, halo, settings, metrics);
+    ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(graph, hilbertPartition, uniformWeights, coordinates, halo, commTree, settings, metrics);
     if(dimensions==2) {
         ITI::FileIO<IndexType, ValueType>::writeCoordsDistributed( coordinates, dimensions, destPath+"finalWithHilbert");
     }
@@ -394,17 +396,15 @@ TYPED_TEST(auxTest, testRedistributeFromPartition) {
     Settings settings;
     settings.numBlocks = comm->getSize();
 
-    for( bool useRedistributor: std::vector<bool>({false, true}) ){
-        for( bool renumberPEs: std::vector<bool>({true, false}) ){
+    for( bool useRedistributor: std::vector<bool>({true, false}) ){
+        for( bool renumberPEs: std::vector<bool>({false, true}) ){
 
             PRINT0("useRedistributor: " << useRedistributor << ", renumberPEs: "<< renumberPEs);
             
-            CSRSparseMatrix<ValueType> copyGraph = graph;
+            CSRSparseMatrix<ValueType> copyGraph = graph;            
             DenseVector<IndexType> copyPartition = partition;
             std::vector<DenseVector<ValueType>> copyCoordinates = coordinates;
             std::vector<DenseVector<ValueType>> copyWeights = nodeWeights;
-
-            //graph.redistribute( inputDist );
 
             //get some metrics of the current partition to verify that it does not change after renumbering
             std::pair<std::vector<IndexType>,std::vector<IndexType>> borderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( copyGraph, copyPartition, settings);
@@ -424,13 +424,11 @@ TYPED_TEST(auxTest, testRedistributeFromPartition) {
                 renumberPEs);
 
             //checks
-            EXPECT_TRUE( graph.isConsistent() );
-
             SCAI_ASSERT_DEBUG( copyPartition.isConsistent(), copyPartition << ": is invalid vector after redistribution" );
             SCAI_ASSERT_DEBUG( copyCoordinates[0].isConsistent(), copyCoordinates[0] << ": is invalid vector after redistribution" );
             SCAI_ASSERT_DEBUG( copyWeights[0].isConsistent(), copyWeights[0] << ": is invalid vector after redistribution" );
             EXPECT_TRUE( copyGraph.checkSymmetry() );
-            SCAI_ASSERT_DEBUG( copyGraph.isConsistent(), copyGraph << ": is invalid matrix after redistribution" )
+            SCAI_ASSERT_DEBUG( copyGraph.isConsistent(), copyGraph << ": matrix is invalid after redistribution" );
             
             const scai::dmemo::DistributionPtr newDist = copyGraph.getRowDistributionPtr();
             EXPECT_TRUE( copyWeights[0].getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
@@ -509,8 +507,7 @@ TYPED_TEST(auxTest, benchmarkRedistributeFromPartition) {
     PRINT( comm->getRank() << ": localN= " << localN);
 
     //unit weights
-    std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, DenseVector<ValueType>(graph.getRowDistributionPtr(), 1));
-
+    std::vector<scai::lama::DenseVector<ValueType>> nodeWeights(1, DenseVector<ValueType>( inputDist, 1));
     EXPECT_TRUE( coordinates[0].getDistributionPtr()->isEqual( *inputDist ) );
 
     Settings settings;
@@ -518,26 +515,30 @@ TYPED_TEST(auxTest, benchmarkRedistributeFromPartition) {
     settings.noRefinement = true;
     settings.dimensions = dimensions;
     settings.verbose = false;
-    settings.debugMode = false;
+    settings.debugMode = true;
     //settings.initialPartition = InitialPartitioningMethods::SFC;
 
     const DenseVector<IndexType> initPartition = ParcoRepart<IndexType, ValueType>::partitionGraph(graph, coordinates, settings);
 
     scai::dmemo::DistributionPtr intermediateDist = initPartition.getDistributionPtr();
-
+    SCAI_ASSERT_EQ_ERROR( *intermediateDist, graph.getRowDistribution(), "Distributions do not agree");
 
     for( bool useRedistributor: std::vector<bool>({true, false}) ){
         for( bool renumberPEs: std::vector<bool>({false, true}) ){
 
-            DenseVector<IndexType> partition = initPartition;
+            //after each for loop data are redistributed; copy them every time
+            DenseVector<IndexType> copyPartition = initPartition;
+            CSRSparseMatrix<ValueType> copyGraph = graph;
+            std::vector<DenseVector<ValueType>> copyCoordinates = coordinates;
+            std::vector<DenseVector<ValueType>> copyWeights = nodeWeights;
 
             std::chrono::time_point<std::chrono::steady_clock> start= std::chrono::steady_clock::now();
             //redistribute
             scai::dmemo::DistributionPtr distFromPart = aux<IndexType,ValueType>::redistributeFromPartition(
-                        partition,
-                        graph,
-                        coordinates,
-                        nodeWeights,
+                        copyPartition,
+                        copyGraph,
+                        copyCoordinates,
+                        copyWeights,
                         settings,
                         useRedistributor,
                         renumberPEs);
@@ -549,14 +550,17 @@ TYPED_TEST(auxTest, benchmarkRedistributeFromPartition) {
 
             //checks
 
-            const scai::dmemo::DistributionPtr newDist = graph.getRowDistributionPtr();
-            EXPECT_TRUE( nodeWeights[0].getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
-            SCAI_ASSERT_ERROR( coordinates[0].getDistribution().isEqual(*newDist), "Distribution mismatch" );
-            SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*newDist), "Distribution mismatch" );
-            SCAI_ASSERT_ERROR( partition.getDistribution().isEqual(*distFromPart), "Distribution mismatch" );
+            const scai::dmemo::DistributionPtr newDist = copyGraph.getRowDistributionPtr();
+            EXPECT_TRUE( copyWeights[0].getDistribution().isEqual(*newDist) );//, "Distribution mismatch" );
+            SCAI_ASSERT_ERROR( copyCoordinates[0].getDistribution().isEqual(*newDist), "Distribution mismatch" );
+            SCAI_ASSERT_ERROR( copyPartition.getDistribution().isEqual(*newDist), "Distribution mismatch" );
+            SCAI_ASSERT_ERROR( copyPartition.getDistribution().isEqual(*distFromPart), "Distribution mismatch" );
+            SCAI_ASSERT_LT_ERROR( copyPartition.max(), settings.numBlocks, "Wrong number of parts");
+            SCAI_ASSERT_DEBUG( copyGraph.isConsistent(), copyGraph << ": matrix is invalid after redistribution" );
+            EXPECT_LT( copyPartition.max(), settings.numBlocks) << "Wrong number of parts";
 
-            //the border nodes, inner nodes, cut and imbalance shoulb be the same
-            std::pair<std::vector<IndexType>,std::vector<IndexType>> newborderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( graph, partition, settings);
+            //the border nodes, inner nodes, cut and imbalance should be the same
+            std::pair<std::vector<IndexType>,std::vector<IndexType>> newborderAndInnerNodes = GraphUtils<IndexType,ValueType>::getNumBorderInnerNodes( copyGraph, copyPartition, settings);
 
             comm->synchronize();
             //(targetDistribution, sourceDistribution)
@@ -622,13 +626,13 @@ TYPED_TEST (auxTest, testMetisInterface) {
     // tpwgts: array that is used to specify the fraction of
     // vertex weight that should be distributed to each sub-domain for each balance constraint.
     // Here we want equal sizes, so every value is 1/nparts; size = ncons*nparts 
-    std::vector<ValueType> tpwgts;
+    std::vector<double> tpwgts;
 
     // the xyz array for coordinates of size dim*localN contains the local coords
-    std::vector<ValueType> xyzLocal;
+    std::vector<double> xyzLocal;
     // ubvec: array of size ncon to specify imbalance for every vertex weigth.
     // 1 is perfect balance and nparts perfect imbalance. Here 1 for now
-    std::vector<ValueType> ubvec;
+    std::vector<double> ubvec;
 
     //local number of edges; number of node weights; flag about edge and vertex weights 
     IndexType numWeights=0, wgtFlag=0;

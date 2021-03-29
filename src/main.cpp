@@ -43,135 +43,74 @@
 
 //----------------------------------------------------------------------------
 
-//void memusage(size_t *, size_t *,size_t *,size_t *,size_t *);
 
 int main(int argc, char** argv) {
 
     using namespace ITI;
     typedef double ValueType;   //use double
 
-    std::string blockSizesFile;
-    //ITI::Format coordFormat;
-
-    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
-    if (comm->getType() != scai::dmemo::CommunicatorType::MPI) {
-        std::cout << "The linked lama version was compiled without MPI. Only sequential partitioning is supported." << std::endl;
-    }
-
-    std::string callingCommand = "";
-    for (IndexType i = 0; i < argc; i++) {
-        callingCommand += std::string(argv[i]) + " ";
-    }
-
-    cxxopts::Options options = ITI::populateOptions();
-    cxxopts::ParseResult vm = options.parse(argc, argv);
-
-    if (vm.count("help")) {
-        std::cout << options.help() << std::endl;
-        return 0;
-    }
-
-    struct Settings settings = ITI::interpretSettings(vm);
-    if( !settings.isValid )
-        return -1;
-
     //--------------------------------------------------------
     //
     // initialize
     //
 
-    if( comm->getRank() ==0 ) {
-        std::chrono::time_point<std::chrono::system_clock> now =  std::chrono::system_clock::now();
-        std::time_t timeNow = std::chrono::system_clock::to_time_t(now);
-        std::cout << "date and time: " << std::ctime(&timeNow);
-    }
-
-    IndexType N = -1; 		// total number of points
-    std::string machine = settings.machine; //machine name
-    
     // timing information
-    //
-
     std::chrono::time_point<std::chrono::steady_clock> startTime = std::chrono::steady_clock::now();
 
-    if (comm->getRank() == 0) {
+    //global communicator
+    scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
 
-        std::cout<< "commit:"<< version<< " main file: "<< __FILE__ << " machine:" << machine << " p:"<< comm->getSize();
+    const int prevArgc = argc; // options.parse(argc, argv) changed argc
 
-        auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
-        std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
-        std::cout.precision(oldprecision);
+    //As stated in https://github.com/jarro2783/cxxopts
+    //"Note that the result of options.parse should only be used as long as the 
+    //  options object that created it, is in scope."
+    cxxopts::Options options = ITI::populateOptions();
+    cxxopts::ParseResult vm = options.parse(argc, argv);
+    Settings settings = initialize( prevArgc, argv, vm, comm);
 
-        std::cout << "Calling command:" << std::endl;
-        std::cout << callingCommand << std::endl << std::endl;
+    if (vm.count("help")) {
+        std::cout << options.help() << std::endl;
+        return 0;
+    } 
 
-    }
+    printInfo( std::cout, comm, settings);
 
     //---------------------------------------------------------
     //
     // generate or read graph and coordinates
     //
+    
+    std::chrono::time_point<std::chrono::steady_clock> beforeRead = std::chrono::steady_clock::now();
 
     scai::lama::CSRSparseMatrix<ValueType> graph; 	// the adjacency matrix of the graph
     std::vector<scai::lama::DenseVector<ValueType>> coordinates(settings.dimensions); // the coordinates of the graph
     std::vector<scai::lama::DenseVector<ValueType>> nodeWeights;		//the weights for each node
 
-    N = readInput<ValueType>( vm, settings, comm, graph, coordinates, nodeWeights );
+    // total number of points
+    const IndexType N = readInput<ValueType>( vm, settings, comm, graph, coordinates, nodeWeights );
 
     if( settings.setAutoSettings ){
         settings = settings.setDefault( graph );
-        if( !settings.isValid )
-               return -1;
+    }
+    settings.isValid = settings.checkValidity(comm);
+    if( !settings.isValid ){
+       throw std::runtime_error("Settings struct is not valid, check the input parameter values.");
+    }
+
+    std::chrono::duration<double> readTime =  std::chrono::steady_clock::now() - beforeRead;
+    if( comm->getRank()==0) {
+        std::cout << "Time to read/create input: " << readTime.count() << std::endl;
     }
 
     //---------------------------------------------------------------
     //
     // read the communication graph or the block sizes if provided
     //
-
-    if( vm.count("PEgraphFile") and vm.count("blockSizesFile") ) {
-        throw std::runtime_error("You should provide either a file for a communication graph OR a file for block sizes. Not both.");
-    }
-
-    ITI::CommTree<IndexType,ValueType> commTree;
-
-    if(vm.count("PEgraphFile")) {
-        throw std::logic_error("Reading of communication trees not yet implemented here.");
-        //commTree =  FileIO<IndexType, ValueType>::readPETree( settings.PEGraphFile );
-    } else if( vm.count("blockSizesFile") ) {
-        //blockSizes.size()=number of weights, blockSizes[i].size()= number of blocks
-        blockSizesFile = vm["blockSizesFile"].as<std::string>();
-        std::vector<std::vector<ValueType>> blockSizes = ITI::FileIO<IndexType, ValueType>::readBlockSizes( blockSizesFile, settings.numBlocks );
-        if (blockSizes.size() < nodeWeights.size()) {
-            throw std::invalid_argument("Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
-                                        + "but nodes have " + std::to_string(nodeWeights.size()) + " weights.");
-        }
-
-        if (blockSizes.size() > nodeWeights.size()) {
-            blockSizes.resize(nodeWeights.size());
-            if (comm->getRank() == 0) {
-                std::cout << "Block size file " + blockSizesFile + " has " + std::to_string(blockSizes.size()) + " weights per block, "
-                          + "but nodes have " + std::to_string(nodeWeights.size()) + " weights. Discarding surplus block sizes." << std::endl;
-            }
-        }
-
-        for (IndexType i = 0; i < nodeWeights.size(); i++) {
-            const ValueType blockSizesSum  = std::accumulate( blockSizes[i].begin(), blockSizes[i].end(), 0);
-            const ValueType nodeWeightsSum = nodeWeights[i].sum();
-            SCAI_ASSERT_GE( blockSizesSum, nodeWeightsSum, "The block sizes provided are not enough to fit the total weight of the input" );
-        }
-
-        commTree.createFlatHeterogeneous( blockSizes );
-    }else if( settings.hierLevels.size()!=0 ){
-        const IndexType numWeights = nodeWeights.size();
-        commTree.createFromLevels(settings.hierLevels, numWeights );
-    } else {
-        commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
-    }
-
+    
+    ITI::CommTree<IndexType,ValueType> commTree = createCommTree( vm, settings, comm, nodeWeights);
     commTree.adaptWeights( nodeWeights );
-
-
+    
     //---------------------------------------------------------------
     //
     // get previous partition, if set
@@ -199,7 +138,6 @@ int main(int argc, char** argv) {
 
     comm->synchronize();
     std::chrono::duration<double> inputTime = std::chrono::steady_clock::now() - startTime;
-
     assert(N > 0);
 
     if (settings.repartition && comm->getSize() == settings.numBlocks) {
@@ -219,6 +157,8 @@ int main(int argc, char** argv) {
     }
 
     std::vector<Metrics<ValueType>> metricsVec;
+
+    const std::string outFile = getOutFileName(settings, "", comm);
 
     //------------------------------------------------------------
     //
@@ -262,7 +202,6 @@ int main(int argc, char** argv) {
             }
         }
 
-        //metricsVec.push_back( Metrics( comm->getSize()) );
         metricsVec.push_back( Metrics<ValueType>( settings ) );
 
         std::chrono::time_point<std::chrono::steady_clock> beforePartTime =  std::chrono::steady_clock::now();
@@ -287,10 +226,11 @@ int main(int argc, char** argv) {
 
         std::chrono::time_point<std::chrono::steady_clock> beforeReport = std::chrono::steady_clock::now();
 
-        metricsVec[r].getMetrics(graph, partition, nodeWeights, settings );
-
-        metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
-        //metricsVec[r].MM["timeFinalPartition"] = ValueType (comm->max(partitionTime.count()));
+        {
+            //std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+            metricsVec[r].getMetrics(graph, partition, nodeWeights, settings, commTree );
+            metricsVec[r].MM["inputTime"] = ValueType ( comm->max(inputTime.count() ));
+        }
 
         std::chrono::duration<double> reportTime =  std::chrono::steady_clock::now() - beforeReport;
 
@@ -300,17 +240,17 @@ int main(int argc, char** argv) {
         //
 
         if (comm->getRank() == 0 ) {
-            std::cout<< "commit:"<< version << " machine:" << machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
+            std::cout<< "commit:"<< version << " machine:" << settings.machine << " input:"<< ( vm.count("graphFile") ? vm["graphFile"].as<std::string>() :"generate");
             std::cout << " p:"<< comm->getSize() << " k:"<< settings.numBlocks;
             auto oldprecision = std::cout.precision(std::numeric_limits<double>::max_digits10);
             std::cout <<" seed:" << vm["seed"].as<double>() << std::endl;
             std::cout.precision(oldprecision);
-            metricsVec[r].printHorizontal2( std::cout ); //TODO: remove?
+            metricsVec[r].printHorizontal2( std::cout );  //TODO: remove?
         }
 
         //---------------------------------------------------------------
         //
-        // Reporting output to std::cout and file for this repeatition
+        // Reporting output to std::cout and file for this repetition
         //
 
         metricsVec[r].MM["reportTime"] = ValueType (comm->max(reportTime.count()));
@@ -318,14 +258,13 @@ int main(int argc, char** argv) {
         if (comm->getRank() == 0 && settings.metricsDetail.compare("no") != 0) {
             metricsVec[r].print( std::cout );
         }
-        if( settings.storeInfo && settings.outFile!="-" ) {
+        if( settings.storeInfo && outFile!="-" ) {
             //TODO: create a better tmp name
-            std::string fileName = settings.outFile+ "_r"+ std::to_string(r);
+            std::string fileName = outFile+ "_r"+ std::to_string(r);
             if( comm->getRank()==0 ) {
                 std::ofstream outF( fileName, std::ios::out);
                 if(outF.is_open()) {
-					outF << "Calling command:" << std::endl;
-					outF<< callingCommand << std::endl << std::endl;
+					printInfo( outF, comm, settings);
                     settings.print( outF, comm);
                     outF << "\nMetrics" << std::endl;
                     metricsVec[r].print( outF );
@@ -348,19 +287,18 @@ int main(int argc, char** argv) {
 
     if (repeatTimes > 1) {
         if (comm->getRank() == 0) {
-			std::cout<< "\nMetrics, averaged for all runs:" << std::endl;
-            std::cout<<  "\033[1;36m";
+            std::cout<< "\n Average metrics for all runs:" << std::endl;
             aggrMetrics.print( std::cout );
-            std::cout << " \033[0m";
         }
     }
 
 
-    if( settings.storeInfo && settings.outFile!="-" ) {
+    if( settings.storeInfo && outFile!="-" ) {
         if( comm->getRank()==0) {
-            std::ofstream outF( settings.outFile, std::ios::out);
+            std::ofstream outF( outFile, std::ios::out);
             if(outF.is_open()) {
                 outF << "Running " << __FILE__ << std::endl;
+                printInfo( outF, comm, settings);
                 settings.print( outF, comm);
 
                 outF << "\nMetrics" << std::endl;
@@ -385,23 +323,39 @@ int main(int argc, char** argv) {
                 //
 
                 //printVectorMetrics( metricsVec, outF );
-                std::cout<< "Output information written to file " << settings.outFile << " in total time " << totalT << std::endl;
-            }	else	{
-                std::cout<< "Could not open file " << settings.outFile << " information not stored"<< std::endl;
+                std::cout<< "Output information written to file " << outFile  << std::endl;
+            }else{
+                std::cout<< "Could not open file " << outFile << " information not stored"<< std::endl;
             }
         }
     }
 
+    if( comm->getRank()==0) {
+        std::cout<< "Total time " << totalT << std::endl;
+    }
+
+    if( settings.outFile=="-" and settings.storePartition ){
+        settings.outFile = ITI::to_string(settings.initialPartition)+"_"+std::to_string(settings.numBlocks);
+        if( comm->getRank()==0 ) {
+            std::cout << "WARNING: partition file name not specified, setting it to " << settings.outFile << std::endl;
+        }
+    }
 
     if( settings.outFile!="-" and settings.storePartition ) {
         std::chrono::time_point<std::chrono::steady_clock> beforePartWrite = std::chrono::steady_clock::now();
         std::string partOutFile = settings.outFile+".part";
-        ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+        if( settings.noRefinement ){
+            ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+        }else{
+            //refinement redistributes the data and must be redistributes before writing the partition
+            aux<IndexType,ValueType>::redistributeInput( rowDistPtr, partition, graph, coordinates, nodeWeights);
+            ITI::FileIO<IndexType, ValueType>::writePartitionParallel( partition, partOutFile );
+        }
 
         std::chrono::duration<double> writePartTime =  std::chrono::steady_clock::now() - beforePartWrite;
         if( comm->getRank()==0 ) {
             std::cout << " and last partition of the series in file " << partOutFile << std::endl;
-            std::cout<< " Time needed to write .part file: " << writePartTime.count() <<  std::endl;
+            std::cout<< "Time needed to write .part file: " << writePartTime.count() <<  std::endl;
         }
     }
 
@@ -421,6 +375,52 @@ int main(int argc, char** argv) {
         comm->synchronize();
     }
 
+    // write the PE graph for further experiments
+    if(settings.writePEgraph) { 
+        std::string filename;
+        if( settings.outFile!="-"){
+            filename = settings.outFile + ".PEgraph";
+        }else if( settings.fileName!="-"){
+            filename = settings.fileName + ".PEgraph";
+        }else{
+            filename = "someGraph.PEgraph";
+        }
+        scai::lama::CSRSparseMatrix<ValueType> processGraph = GraphUtils<IndexType, ValueType>::getPEGraph(graph);
+        if( not ITI::FileIO<IndexType,ValueType>::fileExists(filename) ) {
+            ITI::FileIO<IndexType,ValueType>::writeGraph(processGraph, filename, 1);
+        }
+        
+        PRINT0("PE graph stored in " << filename );
+    }
+
+    //print memory usage information. The message is too long for more PUs
+    if( comm->getSize()<100 and settings.verbose ){
+        //redistribute to get the correct memory usage
+        aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coordinates, nodeWeights, settings, true, false);
+        MSG0( "" );
+        double memIuse;
+        getFreeRam(comm, memIuse, false);
+        int myRank= comm->getRank() ;
+        const std::vector<cNode<IndexType,ValueType>> leaves = commTree.getLeaves();
+        SCAI_ASSERT_EQ_ERROR( leaves.size(), comm->getSize(), "leaves size mismatch" );
+        if( settings.w2UpperBound ){
+            SCAI_ASSERT_EQ_ERROR( commTree.getNumWeights(), 2, "leaves weights size mismatch" );
+        }
+        for( int i=0; i<comm->getSize(); i++){
+            if( myRank==i ){
+                MSG( "I use " << memIuse << " MB of RAM and my assigned block weight is " << 
+                    leaves[comm->getRank()].weights[0] << ", local num values " << graph.getLocalNumValues(), myRank);
+            }
+            comm->synchronize();
+        }
+    }
+    
+    if( vm.count("redistAndStore") ){
+        aux<IndexType, ValueType>::redistributeFromPartition( partition, graph, coordinates, nodeWeights, settings, true, false);
+        const std::string fileName = settings.fileName+"_reordered";
+        ITI::FileIO<IndexType, ValueType>::writeGraph( graph, fileName );
+    }
+    
     if (vm.count("callExit")) {
         //this is needed for supermuc
         std::exit(0);

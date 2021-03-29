@@ -7,7 +7,9 @@
 #include "config.h"
 
 #define PRINT( msg ) std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl
-#define PRINT0( msg ) if(comm->getRank()==0)  std::cout<< __FILE__<< ", "<< __LINE__ << ": "<< msg << std::endl //not happy with these macros
+#define MSG( msg, rank ) {std::stringstream ss; ss << msg; print_message( ss.str(), rank );}
+#define MSG0( msg ) {std::stringstream ss; ss << msg; print_message( ss.str(), 0 );}
+#define PRINT0( msg ) {std::stringstream ss; ss<< __FILE__<< ", "<< __LINE__ << ": "<< msg; print_message( ss.str(), 0 );}
 
 namespace ITI {
 
@@ -128,7 +130,7 @@ inline std::ostream& operator<<(std::ostream& out, Format method) {
 - zoltanMJ Partition a point set (no graph is needed) using the Multijagged algorithm of zoltan2.
 - zoltanMJ Partition a point set (no graph is needed) using the space filling curves algorithm of zoltan2.
 */
-enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoSFC, geoMS, parMetisGraph, parMetisGeom, parMetisSFC, parMetisRefine, zoltanRIB, zoltanRCB, zoltanMJ, zoltanSFC, parhipFastMesh, parhipUltraFastMesh, parhipEcoMesh, myAlgo, none, unknown};
+enum class Tool { geographer, geoKmeans, geoHierKM, geoHierRepart, geoKmeansBalance, geoSFC, geoMS, geomRebalance, parMetisGraph, parMetisGeom, parMetisSFC, parMetisRefine, zoltanRIB, zoltanRCB, zoltanMJ, zoltanXPulp, zoltanSFC, parhipFastMesh, parhipUltraFastMesh, parhipEcoMesh, parhipFastSocial, parhipUltraFastSocial, parhipEcoSocial, myAlgo, none, unknown};
 
 
 std::istream& operator>>(std::istream& in, ITI::Tool& tool);
@@ -141,12 +143,13 @@ std::string to_string(const ITI::Format& f);
 
 ITI::Tool to_tool(const std::string& s);
 
+std::string getCallingCommand( const int argc, char** argv );
 
 /** @brief A structure that holds several options for partitioning, input, output, metrics e.t.c.
 */
 struct Settings {
     Settings();
-    bool checkValidity();
+    bool checkValidity(const scai::dmemo::CommunicatorPtr comm );
 
     /** @name General partition settings
     */
@@ -154,9 +157,11 @@ struct Settings {
     IndexType numBlocks = 2; 	///< number of blocks to partition to
     double epsilon = 0.03;		///< maximum allowed imbalance of the output partition
     bool repartition = false; 	///< set to true to respect the initial partition
+    std::vector<double> epsilons;
 
     ITI::Tool initialPartition = ITI::Tool::geoKmeans;			///< the tool to use to get the initial partition, \sa Tool
-    static const ITI::Tool initialMigration = ITI::Tool::geoSFC;///< pre-processing step to redistribute/migrate coordinates
+    //static const ITI::Tool initialMigration = ITI::Tool::geoSFC;///< pre-processing step to redistribute/migrate coordinates
+    ITI::Tool initialMigration = ITI::Tool::geoSFC;
     //@}
 
     /** @name Input data and other info
@@ -167,13 +172,18 @@ struct Settings {
     std::string outFile = "-";	///< name of the file to store metrics (if desired)
     std::string outDir = "-"; 	//this is used by the competitors main
     std::string PEGraphFile = "-"; //TODO: this should not be in settings
-    std::string blockSizesFile = "-"; //TODO: this should not be in settings
     ITI::Format fileFormat = ITI::Format::AUTO;   	///< the format of the input file, \sa Format
     ITI::Format coordFormat = ITI::Format::AUTO; 	///< the format of the coordinated input file, \sa Format
     bool useDiffusionCoordinates = false;		///< if not coordinates are provided, we can use artificial coordinates
     IndexType diffusionRounds = 20;				///< number of rounds to create the diffusion coordinates
-    IndexType numNodeWeights = -1;		///< number of vertex weights
-    std::string machine;
+    IndexType numNodeWeights = 0;		///< number of vertex weights
+    std::string machine;                ///< name of the machine that the executable is running
+    double seed;                        ///< random seed used for some routines
+    std::string callingCommand;         ///< the complete calling command used
+    bool autoSetCpuMem = false;         ///< if set, geographer will gather cpu and memory info and use them for partitioning
+    IndexType processPerNode = 24;      ///< the number of processes per compute node. Is used with autoSetCpuMem to determine the cpu ID
+    bool w2UpperBound = false;          ///< when given a file with the block sizes or the topology, treat the second weight as an upper bound(usually, this is used so the second weight corresponds to the memory capacity of the PEs)
+    bool useMemFromFile = false;        ///< when a topology or block sizes file is given, if true, use the actual values in the file for memory. otherwise set the max memory to 1.2*number of graph rows.
     //@}
 
     /** @name Mesh generation settings
@@ -189,6 +199,7 @@ struct Settings {
      */
     //@{
     IndexType minBorderNodes = 1;			///< minimum number of border nodes for the local refinement
+    double minBorderNodesPercent = 0.001;
     IndexType stopAfterNoGainRounds = 0; 	///< number of rounds to stop local refinement if no gain is achieved
     IndexType minGainForNextRound = 1;		///< minimum gain to be achieved so local refinement proceeds to next round
     IndexType numberOfRestarts = 0;
@@ -202,15 +213,13 @@ struct Settings {
     /** @name Space filling curve parameters
     */
     //@{
-    IndexType sfcResolution = 7; 			///<tuning parameters for SFC, the resolution depth for the curve
+    IndexType sfcResolution = 9; 			///<tuning parameters for SFC, the resolution depth for the curve
     //@}
 
 
     /** @name Tuning parameters balanced K-Means
     */
     //@{
-//TODO?: in the heterogenous and hierarchical case, minSamplingNodes
-//makes more sense to be a percentage of the nodes, not a number. Or not?
     IndexType minSamplingNodes = 100;		///< the starting number of sampled nodes. If set to -1, all nodes are considered from the start
 
     double influenceExponent = 0.5;
@@ -220,7 +229,11 @@ struct Settings {
     bool tightenBounds = false;
     bool freezeBalancedInfluence = false;
     bool erodeInfluence = false;
-    //bool manhattanDistance = false;
+    bool keepMostBalanced = false;
+    std::string KMBalanceMethod = "reb_lex";
+    //IndexType batchSize = 100;              ///< after how many moves we calculate the global sum in KMeans::rebalance()
+    double batchPercent = 0.01;          ///< calculate the batch size as a percentage of the number of local points
+    bool focusOnBalance = false;            ///< used in hierarchical versions to rebalance at every step
     std::vector<IndexType> hierLevels; 		///< for hierarchial kMeans, the number of blocks per level
     //@}
 
@@ -238,7 +251,7 @@ struct Settings {
     */
     //@{
     bool noRefinement = false;				///< if we will do local refinement or not
-    IndexType multiLevelRounds = 0;			///< number of multilevel rounds
+    IndexType multiLevelRounds = 3;			///< number of multilevel rounds
     IndexType coarseningStepsBetweenRefinement = 3; ///< number of rounds every which we do coarsening
     bool nnCoarsening = false;              ///< when matching vertices, use the nearest neighbor to match (and contract with)
     //@}
@@ -250,8 +263,9 @@ struct Settings {
     bool debugMode = false; 				///< even more checks and prints
     bool writeDebugCoordinates = false;		///< store coordinates and block id
     bool writePEgraph = false;				///< store the processor graph
+    //TODO: storeInfo is mostly ignore. remove?
     bool storeInfo = false;					///< store metrics info
-    bool storePartition = false;            ///< store metrics info
+    bool storePartition = false;            ///< store partition info
     IndexType repeatTimes = 1;				///< for benchmarking, how many times is the partition repeated
     IndexType thisRound=-1; //TODO: what is this? This has nothing to do with the settings.
 
@@ -259,6 +273,8 @@ struct Settings {
     //calculate expensive performance metrics?
     bool computeDiameter = false;			///< if the diameter should be computed (can be expensive)
     IndexType maxDiameterRounds = 2;		///< max number of rounds to approximate the diameter
+    IndexType maxCGIterations = 300;        ///< max number of iterations of the CG solver in metrics
+    double CGResidual = 1e-6;
     //@}
 
     /** @name Various parameters
@@ -315,17 +331,27 @@ struct Settings {
         }
 
         out<< "initial migration: " << initialMigration << std::endl;
+        out<< "initial partition: " << initialPartition << std::endl;
 
-        if (initialPartition==ITI::Tool::geoSFC) {
-            out<< "initial partition: hilbert curve" << std::endl;
+        if(ITI::to_string(initialPartition).rfind("geoSFC",0)==0 ){
+        //if (initialPartition==ITI::Tool::geoSFC) {
             out<< "\tsfcResolution: " << sfcResolution << std::endl;
         }
-        else if (initialPartition==ITI::Tool::geoKmeans) {
-            out<< "initial partition: K-Means" << std::endl;
+        //else if (initialPartition==ITI::Tool::geoKmeans) {
+        else if(ITI::to_string(initialPartition).rfind("geoKmeans",0)==0 ){
             out<< "\tminSamplingNodes: " << minSamplingNodes << std::endl;
             out<< "\tinfluenceExponent: " << influenceExponent << std::endl;
-        } else if (initialPartition==ITI::Tool::geoMS) {
-            out<< "initial partition: MultiSection" << std::endl;
+        }
+        else if(ITI::to_string(initialPartition).rfind("geoHier",0)==0 ){
+            out<< "\tminSamplingNodes: " << minSamplingNodes << std::endl;
+            out<< "\thier levels: ";
+            for(unsigned int i=0; i<hierLevels.size(); i++) {
+               out<< hierLevels[i] << ", ";
+            }
+            out<< std::endl;
+        }
+        // else if (initialPartition==ITI::Tool::geoMS) {
+        else if(ITI::to_string(initialPartition).rfind("geoMS",0)==0 ){
             out<< "\tbisect: " << bisect << std::endl;
             out<< "\tuseIter "<< useIter << std::endl;
         } else {
@@ -354,6 +380,10 @@ struct Settings {
 
 }; //struct Settings
 
+
+void print_message( const std::string message, IndexType rank=-1 );
+
+//void MSG0( const std::stringstream stream );
 
 
 struct int_pair {

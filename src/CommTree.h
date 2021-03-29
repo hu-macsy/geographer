@@ -67,7 +67,7 @@ public:
         @param[in] isLeaf If this node is a leaf or not
         */
         commNode( std::vector<unsigned int> hier, std::vector<ValueType> allWeights, bool isLeaf=true)
-            :	hierarchy(hier),
+            : hierarchy(hier),
               numChildren(0),
               weights(allWeights),
               isLeaf(isLeaf)
@@ -86,7 +86,7 @@ public:
         /** Default constructor for non-leaf nodes.
         */
         commNode()
-            :	hierarchy( std::vector<unsigned int>(1,1)), //TODO: is this right?
+            : hierarchy( std::vector<unsigned int>(1,1)), //TODO: is this right?
               numChildren(0), //TODO: check
               numCores(0),
               isLeaf(false)
@@ -142,7 +142,7 @@ public:
             return not (*this==c);
         }
 
-//TODO: these are only leaf nodes or all the nodes of the subtree?
+        //TODO: these are only leaf nodes or all the nodes of the subtree?
         /* @brief Return the number of all ancestors this node has.
         */
         //TODO: probably children should be removed but this function is needed
@@ -194,7 +194,7 @@ public:
 
     /** @brief Default constructor.
     */
-//TODO: remove?
+
     CommTree();
 
     /**	@brief Constructor to create tree from a vector of leaves.
@@ -210,7 +210,7 @@ public:
     /** This creates a homogeneous but not flat tree. The tree has levels.size() number of levels
     	and number of leaves=levels[0]*levels[1]*...*levels.back(). Each leaf node has the given
     	number of weights set to 1 and all weights are proportional.
-    	Example: leaves = {3,4,5,6}, the first level has 3 children, each node in the next level
+    	Example: levels = {3,4,5,6}, the first level has 3 children, each node in the next level
     	has 4 children, each node in the next 5 and the nodes before the leaves has 6 children each.
     	In total, 4 levels and 3*4*5*6 = 360 leaves.
 
@@ -267,10 +267,30 @@ public:
         return hierarchyLevels;
     }
 
-    bool areWeightsAdapted(){
+    std::vector<bool> getIfWeightsAreProportional() const {
+        return isProportional;
+    }
+
+    bool areWeightsAdapted() const{
         return areWeightsAdaptedV;
     }
 
+    bool hasDistances() const{
+        return this->distances.size()>0;
+    }
+
+    void setDistances(const std::vector<ValueType> &dist){
+        this->distances = dist;
+    }
+    
+    std::vector<ValueType> getDistances() const{
+        return this->distances;
+    }
+
+    /** Check if the system if homogeneous or heterogeneous. That is, if all weights in all leaves
+    are (nearly) identical, then the system is homogeneous.
+    */
+    bool isHomogeneous() const;
 
     /** Creates a homogeneous tree with levels.size() number of levels
     and each node in level i has levels[i] children. \sa CommTree()
@@ -283,7 +303,7 @@ public:
     @param[in] leaves A vector with all the leaf nodes.
     @return The size of the tree, i.e., numNodes.
     */
-    IndexType createTreeFromLeaves( const std::vector<commNode> leaves);
+    IndexType createTreeFromLeaves( const std::vector<commNode> &leaves, const std::vector<ValueType> &hierDistances = std::vector<ValueType>(0,0) );
 
     /** Creates an artificial flat tree with only one hierarchy level.
     This mainly used when no communication is provided. All leaf nodes have the same weight.
@@ -291,7 +311,7 @@ public:
     @param[in] numLeaves The number of the leaves.
     @param[in] numNodeWeights Number of weights that each node has.
     @return The size of the tree, i.e., numNodes. Since this is a flat tree with one hierarchy level,
-    numNodes=numLeanes+1, where +1 is for the root node.
+    numNodes=numLeaves+1, where +1 is for the root node.
     */
     IndexType createFlatHomogeneous( const IndexType numLeaves, const IndexType numNodeWeights = 1 );
 
@@ -306,6 +326,25 @@ public:
     **/
     IndexType createFlatHeterogeneous( const std::vector<std::vector<ValueType>> &leafSizes );
 
+    /** Overloaded with vector of size equal the number of weights to indicate which 
+    nodes weights are proportional and which are to be taken as absolute values.
+    */
+    IndexType createFlatHeterogeneous( 
+        const std::vector<std::vector<ValueType>> &leafSizes,
+        const std::vector<bool> &isWeightProp);
+
+
+    IndexType createHierHeterogeneous(
+        const std::vector<std::vector<ValueType>> &leafSizes,
+        const std::vector<bool> &isWeightProp,
+        const std::vector<IndexType> &levels);
+
+    IndexType createHierHomogeneous( 
+        const std::vector<IndexType> &levels,
+        const std::vector<ValueType> &hierDistances,
+        const IndexType numNodeWeights);
+
+
     /** Creates a vector of leaves with only one hierarchy level, i.e., a flat
     tree. There can be multiple weights for each leaf.
 
@@ -314,6 +353,12 @@ public:
     @return A vector with all the leaves.
     **/
     std::vector<commNode> createLeaves( const std::vector<std::vector<ValueType>> &sizes);
+
+    /** Creates leaves according to the provided levels.
+    */
+    std::vector<commNode> createLeaves( 
+        const std::vector<std::vector<ValueType>> &sizes,
+        const std::vector<IndexType> &levels);
 
     /* Takes a level of the tree and creates the level above it by grouping together nodes that
      have the same last hierarchy index.
@@ -369,7 +414,7 @@ public:
     	@param[in] node2 The second node
     	@return Their distance in the tree.
     */
-    static ValueType distance( const commNode &node1, const commNode &node2 );
+    ValueType distance( const commNode &node1, const commNode &node2 ) const ;
 
     /** Export the tree as a weighted graph. The edge weight between two nodes
     	is the distance of the nodes in the tree as it is calculates by the function distance.
@@ -427,12 +472,28 @@ public:
     */
     bool checkTree( bool allTests=false ) const;
 
-
+    /** Copy from other tree and convert the ValueType
+    */
+    template<typename ValueType2>
+    void copyFrom( const CommTree<IndexType,ValueType2> &otherTree ){
+        this->hierarchyLevels = otherTree.getNumHierLevels();
+        this->numNodes = otherTree.getNumNodes();
+        this->numLeaves = otherTree.getNumLeaves();
+        this->numWeights = otherTree.getNumWeights();
+        this->areWeightsAdaptedV = otherTree.areWeightsAdapted();
+        this->isProportional = otherTree.getIfWeightsAreProportional();
+        typedef typename ITI::CommTree<IndexType,ValueType2>::commNode commNode2;
+        std::vector<commNode2> leaves = otherTree.getLeaves();
+    }
 
 private:
 
     scai::lama::CSRSparseMatrix<ValueType> exportAsGraph_local(const std::vector<commNode> leaves) const;
 
+    /** @brief The part of the function that does not set the boolean vector of
+    whether a wight is proportional or not
+    */
+    IndexType createFlatHeterogeneousCore( const std::vector<std::vector<ValueType>> &leafSizes );
 
     /**The root of the communication tree; used for hierarchical partitioning
 
@@ -442,16 +503,15 @@ private:
     */
     std::vector<std::vector<commNode>> tree;
 
-//must be known how many levels the tree has
-//(well, it can inferred but it is just easier)
     IndexType hierarchyLevels; 			///< how many hierarchy levels exist, hierarchyLevels = tree.size()
     IndexType numNodes;					///< all the nodes of the tree
     IndexType numLeaves;				///< the leafs of the tree
     IndexType numWeights;				///< how many weights each node has
     bool areWeightsAdaptedV = false;		///< if relative weights are adapted, \sa adaptWeights
-/// if isProportional[i] is true, then weight i is proportional and if false, weight i is absolute; isProportional.size()=numWeights
+    /// if isProportional[i] is true, then weight i is proportional and if false, weight i is absolute; isProportional.size()=numWeights
     std::vector<bool> isProportional;
 
+    std::vector<ValueType> distances;
 
 //------------------------------------------------------------------------
 

@@ -118,7 +118,16 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     assert(!settings.repartition);
 
     CommTree<IndexType,ValueType> commTree;
-    commTree.createFlatHomogeneous( settings.numBlocks );
+    
+    //if argument hierLevels is provided
+    if( settings.hierLevels.size()!=0 ){
+        const IndexType numWeights = nodeWeights.size();
+        commTree.createFromLevels(settings.hierLevels, numWeights );
+    } else {
+        commTree.createFlatHomogeneous( settings.numBlocks, nodeWeights.size() );
+    }
+
+    //commTree.createFlatHomogeneous( settings.numBlocks );
     commTree.adaptWeights( nodeWeights );
 
     return partitionGraph(input, coordinates, nodeWeights, previous, commTree, comm, settings, metrics);
@@ -295,39 +304,42 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::partitionGraph(
     //
     // At this point we have the initial, geometric partition.
     //
+    
+    std::chrono::time_point<std::chrono::system_clock> beforeLR =  std::chrono::system_clock::now();
 
-    //
-    // Possible (if also k=p) local refinement.
-    //
+    //WARNING: the result  is not redistributed. must redistribute afterwards
+    if( !settings.noRefinement ) {
 
-	std::chrono::time_point<std::chrono::system_clock> beforeLR =  std::chrono::system_clock::now();
-
-    if (comm->getSize() == k) {
-        //WARNING: the result  is not redistributed. must redistribute afterwards
-        if( !settings.noRefinement ) {
-			
-            //store some metrics before local refinement
-            if( settings.metricsDetail.compare("no")!=0 ){
-                Metrics<ValueType> tmpMetrics(settings);
-                Settings tmpSettings = settings;
-                tmpSettings.computeDiameter = false;
-                tmpMetrics.getEasyMetrics( input, result, nodeWeights, tmpSettings);
-                metrics.MM["preliminaryMaxCommVol"] = tmpMetrics.MM["maxCommVolume"];
-                metrics.MM["preliminaryTotalCommVol"] = tmpMetrics.MM["totalCommVolume"];
+        if (comm->getSize()!=k and settings.localRefAlgo==ITI::Tool::geographer) {
+            throw std::runtime_error( "Local refinement only implemented for one block per process. Called with " + std::to_string(comm->getSize()) + " processes and " + std::to_string(k) + " blocks.");
+        }
+        //store some metrics before local refinement
+        if( settings.metricsDetail.compare("no")!=0 ){
+            Metrics<ValueType> tmpMetrics(settings);
+            Settings tmpSettings = settings;
+            tmpSettings.computeDiameter = false;
+            std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
+            tmpMetrics.getEasyMetrics( input, result, nodeWeights, tmpSettings, blockSizes);
+            //now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
+            metrics.MM["preliminaryMaxCommVol"] = tmpMetrics.MM["maxCommVolume"];
+            metrics.MM["preliminaryTotalCommVol"] = tmpMetrics.MM["totalCommVolume"];
+            metrics.MM["preliminaryCut"] = tmpMetrics.MM["finalCut"];
+            metrics.MM["preliminaryImbalance"] = tmpMetrics.MM["finalImbalance"];
+            const IndexType numWeights = nodeWeights.size();
+            if(numWeights>1){
+                for( int w=0; w<numWeights; w++){
+                    std::string key = "finalImbalance_w"+ std::to_string(w);
+                    if( tmpMetrics.MM.count(key)!=0 ){
+                        std::string newKey = "preliminaryImbalance_w"+ std::to_string(w);
+                        metrics.MM[newKey] = tmpMetrics.MM[key];
+                    }
+                }
             }
-
-			doLocalRefinement( result,  input, coordinates, nodeWeights, comm, settings, metrics );
-
         }
+
+        doLocalRefinement( result,  input, coordinates, nodeWeights, commTree, comm, settings, metrics );
+
     } else {
-        //result.redistribute(inputDist);
-        if (comm->getRank() == 0 && !settings.noRefinement) {
-            std::cout << "Local refinement only implemented for one block per process. Called with " << comm->getSize() << " processes and " << k << " blocks." << std::endl;
-        }
-
-        //TODO: should this be here? probably no, we cannot redistribute
-        // if k!=p
-        //aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, true);
 
     }
 
@@ -377,10 +389,10 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
     Settings settings,
     Metrics<ValueType>& metrics){
     
-	SCAI_REGION( "ParcoRepart.initialPartition" )
+    SCAI_REGION( "ParcoRepart.initialPartition" )
 
-	const IndexType k = settings.numBlocks;
-	std::chrono::time_point<std::chrono::steady_clock> beforeInitPart =  std::chrono::steady_clock::now();
+    const IndexType k = settings.numBlocks;
+    std::chrono::time_point<std::chrono::steady_clock> beforeInitPart =  std::chrono::steady_clock::now();
 
     //to be returned
     DenseVector<IndexType> result;
@@ -396,7 +408,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         }
     }
     else if (settings.initialPartition == ITI::Tool::geoKmeans or settings.initialPartition == ITI::Tool::geoHierKM \
-             or  settings.initialPartition == ITI::Tool::geoHierRepart) {
+             or  settings.initialPartition == ITI::Tool::geoHierRepart \
+             or settings.initialPartition == ITI::Tool::geoKmeansBalance) {
         if (comm->getRank() == 0) {
             std::cout << "Initial partition with K-Means" << std::endl;
         }
@@ -408,11 +421,13 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
 //SCAI_REGION("ParcoRepart.initialPartition.prepareForKMeans")
 
             if (!settings.repartition || comm->getSize() != settings.numBlocks) {
-
-                if (settings.initialMigration != ITI::Tool::geoSFC) {
-                    throw std::logic_error("KMeans depends on pre-sorting with space filling curves.");
+                if (settings.initialMigration == ITI::Tool::geoSFC) {
+                    HilbertCurve<IndexType,ValueType>::redistribute(coordinateCopy, nodeWeightCopy, settings, metrics);
+                }else if(settings.initialMigration == ITI::Tool::none) {
+                    //do nothing
+                }else{
+                    throw std::logic_error("Wrong option for data migration: " + to_string(settings.initialMigration) );
                 }
-                HilbertCurve<IndexType,ValueType>::redistribute(coordinateCopy, nodeWeightCopy, settings, metrics);
             }
         }
 
@@ -425,6 +440,7 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
         std::vector<std::vector<ValueType>> blockSizes = commTree.getBalanceVectors();
         SCAI_ASSERT_EQ_ERROR( blockSizes.size(), nodeWeights.size(), "Wrong number of weights");
         SCAI_ASSERT_EQ_ERROR( blockSizes[0].size(), settings.numBlocks, "Wrong size of weights" );
+
         if( blockSizes.empty() ) {
             blockSizes = std::vector<std::vector<ValueType> >(nodeWeights.size());
             for (int i = 0; i < nodeWeights.size(); i++) {
@@ -436,12 +452,18 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
 
         if (settings.repartition) {
             result = ITI::KMeans<IndexType,ValueType>::computeRepartition(coordinateCopy, nodeWeightCopy, blockSizes, previous, settings);
-        } else if (settings.initialPartition == ITI::Tool::geoKmeans) {
+        }else if (settings.initialPartition == ITI::Tool::geoKmeans) {
             result = ITI::KMeans<IndexType,ValueType>::computePartition(coordinateCopy, nodeWeightCopy, blockSizes, settings, metrics);
-        } else if (settings.initialPartition == ITI::Tool::geoHierKM or settings.initialPartition == ITI::Tool::geoHierRepart) {
+		}else if(settings.initialPartition == ITI::Tool::geoKmeansBalance) {
+            settings.keepMostBalanced = true;
+            settings.balanceIterations = 30;
+            //settings.erodeInfluence = true;
+            result = ITI::KMeans<IndexType,ValueType>::computePartition_targetBalance(coordinateCopy, nodeWeightCopy, blockSizes, result, settings, metrics);
+        }else if (  settings.initialPartition == ITI::Tool::geoHierKM 
+                    or settings.initialPartition == ITI::Tool::geoHierRepart) {
 
             SCAI_ASSERT_ERROR( commTree.areWeightsAdapted(), "The weight of the tree are not adapted; should call tree.adaptWeights()" );
-            SCAI_ASSERT_EQ_ERROR( commTree.getNumLeaves(), settings.numBlocks, "The number of leaves and blocks should agree" );            
+            SCAI_ASSERT_EQ_ERROR( commTree.getNumLeaves(), settings.numBlocks, "The number of leaves and blocks should agree" );
             if (settings.initialPartition == ITI::Tool::geoHierKM) {
                 result = ITI::KMeans<IndexType,ValueType>::computeHierarchicalPartition( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
             }
@@ -449,16 +471,22 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
                 //settings.debugMode = true;
                 result = ITI::KMeans<IndexType,ValueType>::computeHierPlusRepart( coordinateCopy, nodeWeightCopy, commTree, settings, metrics);
             }
+
             SCAI_ASSERT_EQ_ERROR( nodeWeightCopy[0].getDistributionPtr()->getLocalSize(), \
                 result.getDistributionPtr()->getLocalSize(), "Partition distribution mismatch(?)");
+        }else{
+            throw std::runtime_error("Something is wrong. Initial partition tool is not known: " + ITI::to_string(settings.initialPartition) );
         }
 
-        std::chrono::duration<double>  kMeansTime = std::chrono::steady_clock::now() - beforeKMeans;
+        std::chrono::duration<double> kMeansTime = std::chrono::steady_clock::now() - beforeKMeans;
         assert(scai::utilskernel::HArrayUtils::min(result.getLocalValues()) >= 0);
         SCAI_ASSERT_LT_ERROR(scai::utilskernel::HArrayUtils::max(result.getLocalValues()),k, "");
 
-        if (settings.verbose) {
-            ValueType totKMeansTime = ValueType( comm->max(kMeansTime.count()) );
+        //warning: this comm->max implies a barrier but (probably) does not affect much
+        ValueType totKMeansTime = ValueType( comm->max(kMeansTime.count()) ); 
+        metrics.MM["timeKmeans"] = totKMeansTime; //possible overwrite but this time is more realistic
+
+        if (settings.verbose) {            
             if(comm->getRank() == 0)
                 std::cout << "K-Means, Time:" << totKMeansTime << std::endl;
         }
@@ -498,7 +526,15 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::initialPartition(
 
     //if using k-means the result has different distribution
     if( not result.getDistributionPtr()->isEqual( coordinates[0].getDistribution()) ){
+        std::chrono::time_point<std::chrono::steady_clock> beforeRedist =  std::chrono::steady_clock::now();
+
         result.redistribute( coordinates[0].getDistributionPtr() );
+
+        std::chrono::duration<double> redistTime = std::chrono::steady_clock::now() - beforeRedist;
+        ValueType totRedistTime = ValueType( comm->max(redistTime.count()) );
+        if(comm->getRank() == 0){
+            std::cout << "redistribution after K-Means, Time: " << totRedistTime << std::endl;
+        }
     }
 
     return result;
@@ -511,11 +547,12 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
     CSRSparseMatrix<ValueType> &input,
     std::vector<DenseVector<ValueType>> &coordinates,
     std::vector<DenseVector<ValueType>> &nodeWeights,
+    CommTree<IndexType,ValueType> &commTree,
 	scai::dmemo::CommunicatorPtr comm,
     Settings settings,
 	Metrics<ValueType>& metrics){
 
-	SCAI_REGION("ParcoRepart.doLocalRefinement");		
+	SCAI_REGION("ParcoRepart.doLocalRefinement");
 	
 	//uncomment to store the first, geometric partition into a file that then can be visualized using matlab and GPI's code
 	//std::string filename = "geomPart.mtx";
@@ -568,11 +605,8 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 
             [[maybe_unused]] bool didRedistribution = aux<IndexType,ValueType>::alignDistributions( input, coordinates, nodeWeights, result, settings );
 
-            //result =  Wrappers<IndexType,ValueType>::refine( input, coordinates, nodeWeights, result, settings, metrics );
-
-            //Wrappers<IndexType,ValueType>* parMetis = new parmetisWrapper<IndexType,ValueType>;
             parmetisWrapper<IndexType,ValueType> parMetis;
-            result =  parMetis.refine( input, coordinates, nodeWeights, result, settings, metrics );
+            result =  parMetis.refine( input, coordinates, nodeWeights, result, commTree, settings, metrics );
             
         }else{
             //TODO: with constexpr this is not even compiled; does it make sense to have it here or should it be removed?
@@ -592,8 +626,11 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
             for(int w=0; w<nodeWeights.size(); w++ ){
                 copyWeights[w].assign( nodeWeights[w] );
             }
+            CommTree<IndexType,real_t> copyCommTree;
+            copyCommTree.copyFrom( commTree );
+
             parmetisWrapper<IndexType,real_t> parMetis;
-            result =  parMetis.refine( copyGraph, copyCoords, copyWeights, result, settings, copyMetrics );
+            result =  parMetis.refine( copyGraph, copyCoords, copyWeights, result, copyCommTree, settings, copyMetrics );
             
         }
         if( not std::is_same<ValueType,real_t>() ){
@@ -602,19 +639,72 @@ void ParcoRepart<IndexType, ValueType>::doLocalRefinement(
 #else
         throw std::runtime_error("*** ERROR: requested local refinement using parmetis (settings.localRefAlgo) but parmetis was not installed. Either install parmetis or pick another local refinement method.\nAborting...");
 #endif
-    } else if( settings.localRefAlgo==Tool::geographer){
+    } else if( settings.localRefAlgo==Tool::geographer ){
     	SCAI_REGION("ParcoRepart.doLocalRefinement.multiLevelStep")
-        std::chrono::time_point<std::chrono::steady_clock> start = std::chrono::steady_clock::now();
+        if (nodeWeights.size() > 1) {
+            throw std::logic_error("Local refinement not yet implemented for multiple weights.");
+        }
 
-    	scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
-    	ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights[0], coordinates, halo, settings, metrics);
+        /*
+         * redistribute to prepare for geographer's local refinement
+         */
+        bool useRedistributor = true;
+        bool renumberPEs = true;
 
-        std::chrono::duration<double> LRtime = std::chrono::steady_clock::now() - start;
-        metrics.MM["timeLocalRef"] = comm->max( LRtime.count() );
+        //if we have heterogeneous system, renumbering should not happen as it may swap blocks with different max allowed sizes
+        if( not commTree.isHomogeneous() ){
+            renumberPEs = false;
+        }
+
+        aux<IndexType, ValueType>::redistributeFromPartition( result, input, coordinates, nodeWeights, settings, useRedistributor, renumberPEs);
+
+        std::chrono::duration<double> redistTime =  std::chrono::steady_clock::now() - start;
+        //now, every PE store its own times. These will be maxed afterwards, before printing in Metrics
+        metrics.MM["timeSecondDistribution"] = redistTime.count();
+
+        //
+        // output: in std and file
+        //  
+        if (settings.verbose ) {
+            ValueType timeForSecondRedistr = comm->max( redistTime.count() );
+            if(comm->getRank() == 0 ) {
+                std::cout<< std::endl << "\033[1;32mTiming: 2nd redist before local refinement: "<< timeForSecondRedistr << std::endl;
+                std::cout << "# of cut edges:" << metrics.MM["preliminaryCut"] << ", imbalance:" << metrics.MM["preliminaryImbalance"]<< " \033[0m" <<std::endl << std::endl;
+            }
+        }
+
+        scai::dmemo::HaloExchangePlan halo = GraphUtils<IndexType, ValueType>::buildNeighborHalo(input);
+
+        if( settings.setAutoSettings ){
+            IndexType localCutNodes = halo.getLocalIndexes().size(); 
+            IndexType sumLocalCutNodes = comm->sum(localCutNodes); //equal to total communication volume
+
+            //WARNING: minGainForNextRound should be same in all PEs because otherwise, in the one-to-one 
+            // communication scheme later, only one PE may exit the loop and the other hangs
+            // set gain to at least 1% of the average local cut
+            settings.minGainForNextRound = std::max( int(sumLocalCutNodes*0.01/settings.numBlocks), 1);
+            if(comm->getRank() == 0 ){
+                std::cout << "\tsetting minGainForNextRound to " << settings.minGainForNextRound << std::endl;
+            }
+        }
+
+        ITI::MultiLevel<IndexType, ValueType>::multiLevelStep(input, result, nodeWeights[0], coordinates, halo, commTree, settings, metrics);
+
+    }else if( settings.localRefAlgo==Tool::geomRebalance ){
+        SCAI_REGION("ParcoRepart.doLocalRefinement.geomRebalance")
+        std::vector<std::vector<ValueType>> targetBlockWeights = commTree.getBalanceVectors();
+        SCAI_ASSERT_EQ_ERROR(targetBlockWeights.size(), nodeWeights.size(), "Wrong number of weights");
+        SCAI_ASSERT_EQ_ERROR(targetBlockWeights[0].size(), settings.numBlocks, "Wrong size of weights");
+        settings.keepMostBalanced = true;
+
+        result = ITI::KMeans<IndexType,ValueType>::computePartition_targetBalance(
+            coordinates, nodeWeights, targetBlockWeights, result, settings, metrics);
     }else{
         throw std::runtime_error("Provided algorithm for local refinement is "+ to_string(settings.localRefAlgo) + " but is not currently supported. Pick geographer or parMetisRefine. \nAborting...");
     }
-			
+
+    std::chrono::duration<double> LRtime = std::chrono::steady_clock::now() - start;
+    metrics.MM["timeLocalRef"] = comm->max( LRtime.count() );
 }//doLocalRefinement
 //---------------------------------------------------------------------------------------
 
@@ -797,8 +887,8 @@ DenseVector<IndexType> ParcoRepart<IndexType, ValueType>::pixelPartition(const s
                 toInsert.first = neighbours[j];
                 SCAI_ASSERT(neighbours[j] < sumDensity.size(), "Too big index: " + std::to_string(neighbours[j]));
                 SCAI_ASSERT(neighbours[j] >= 0, "Negative index: " + std::to_string(neighbours[j]));
-                geomSpread = 1 + 1/std::log2(sideLen)*( std::abs(sideLen/2 - neighbours[j]/sideLen)/(0.8*sideLen/2) + std::abs(sideLen/2 - neighbours[j]%sideLen)/(0.8*sideLen/2) );
-                //PRINT0( geomSpread );
+                geomSpread = 1 + 1/std::log2(sideLen)*( aux<IndexType,ValueType>::absDiff(sideLen/2, neighbours[j]/sideLen)/(0.8*sideLen/2) + aux<IndexType,ValueType>::absDiff(sideLen/2, neighbours[j]%sideLen)/(0.8*sideLen/2) );
+                
                 // value to pick a border node
                 pixelDistance = aux<IndexType, ValueType>::pixelL2Distance2D( maxDensityPixel, neighbours[j], sideLen);
                 toInsert.second = (1/pixelDistance)* geomSpread * (spreadFactor* (std::pow(localSumDens[neighbours[j]], 0.5)) + std::pow(localSumDens[maxDensityPixel], 0.5) );

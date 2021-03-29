@@ -15,7 +15,7 @@ The following software is needed to compile and use Geographer:
 - MPI
 - OpenMP
 - CMake (&gt;= 3.0.2)
-- The numerical library [Lama](https://github.com/kit-parco/lama) (&gt;= 3.0.0)
+- The numerical library [Lama](https://github.com/hu-macsy/lama) (&gt;= 3.0.0)
 - For Lama, an implementation of the BLAS linear algebra standard
 
 On a recent Ubuntu (&gt;= 16.04), most of the dependencies can be installed with the following command:
@@ -29,9 +29,8 @@ On a recent Ubuntu (&gt;= 16.04), most of the dependencies can be installed with
 Compile and install the Lama library.
 If its dependencies are installed, this can be done with the following commands:
 
-    git clone https://github.com/kit-parco/lama.git
-    mkdir lama/build && cd lama/build && cmake ../scai && cd ../..
-    cd lama/build && make && sudo make install && cd ../..
+    git clone https://github.com/hu-macsy/lama.git
+    mkdir lama/build && cd lama/build && cmake ../scai && make && sudo make install
 
 If root access is not available or not preferred, you can pass the argument `-DCMAKE_INSTALL_PREFIX=<path>`to cmake to specify an alternative install location.
 

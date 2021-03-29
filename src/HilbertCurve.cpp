@@ -10,6 +10,15 @@
 
 #include "HilbertCurve.h"
 
+#include <scai/dmemo/Distribution.hpp>
+#include <scai/dmemo/HaloExchangePlan.hpp>
+#include <scai/dmemo/Distribution.hpp>
+#include <scai/dmemo/BlockDistribution.hpp>
+#include <scai/dmemo/GenBlockDistribution.hpp>
+#include <scai/dmemo/GeneralDistribution.hpp>
+
+#include <scai/dmemo/mpi/MPICommunicator.hpp>
+
 
 namespace ITI {
 
@@ -89,7 +98,7 @@ DenseVector<IndexType> HilbertCurve<IndexType, ValueType>::computePartition(cons
      * now sort the global indices by where they are on the space-filling curve.
      */
 
-    std::vector<sort_pair> localPairs= getSortedHilbertIndices( coordinates, settings );
+    std::vector<sort_pair<ValueType>> localPairs= getSortedHilbertIndices( coordinates, settings );
 
     //copy indices into array
     const IndexType newLocalN = localPairs.size();
@@ -702,7 +711,7 @@ std::vector<std::vector<ValueType>> HilbertCurve<IndexType, ValueType>::Hilbert3
 //-------------------------------------------------------------------------------------------------
 
 template<typename IndexType, typename ValueType>
-std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates, Settings settings) {
+std::vector<sort_pair<ValueType>> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndices( const std::vector<DenseVector<ValueType>> &coordinates, Settings settings) {
 
     const scai::dmemo::DistributionPtr coordDist = coordinates[0].getDistributionPtr();
     const scai::dmemo::CommunicatorPtr comm = coordDist->getCommunicatorPtr();
@@ -717,7 +726,7 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
     *	create space filling curve indices.
     */
 
-    std::vector<sort_pair> localPairs(localN);
+    std::vector<sort_pair<ValueType>> localPairs(localN);
 
     {
         SCAI_REGION("HilbertCurve.getSortedHilbertIndices.spaceFillingCurve");
@@ -749,8 +758,15 @@ std::vector<sort_pair> HilbertCurve<IndexType, ValueType>::getSortedHilbertIndic
 
         //MPI_Comm mpi_comm, std::vector<value_type> &data, long long global_elements = -1, Compare comp = Compare()
         MPI_Comm mpi_comm = MPI_COMM_WORLD;
-        JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
-        //JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>());
+
+        // as MPI communicator might have been splitted, take the one used by comm
+        if ( comm->getType() == scai::dmemo::CommunicatorType::MPI ){
+            const auto& mpiComm = static_cast<const scai::dmemo::MPICommunicator&>( *comm );
+            mpi_comm = mpiComm.getMPIComm();
+        }
+
+        //JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
+        JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>());
 
         //copy hilbert indices into array
 
@@ -809,7 +825,7 @@ PRINT(comm->getRank());
 
     scai::hmemo::HArray<IndexType> myGlobalIndices(localN, IndexType(0) );
     inputDist->getOwnedIndexes(myGlobalIndices);
-    std::vector<sort_pair> localPairs(localN);
+    std::vector<sort_pair<ValueType>> localPairs(localN);
     {
         scai::hmemo::ReadAccess<IndexType> rIndices(myGlobalIndices);
         for (IndexType i = 0; i < localN; i++) {
@@ -818,18 +834,17 @@ PRINT(comm->getRank());
         }
     }
 
-PRINT(comm->getRank()<< ": " << localN );  
-    //MPI_Comm mpi_comm = MPI_COMM_WORLD; //TODO: cast the communicator ptr to a MPI communicator and get getMPIComm()?
-    //const scai::dmemo::MPICommunicator* mpi_comm = dynamic_cast<scai::dmemo::MPICommunicator*>(comm); //->getCommunicatorPtr(scai::dmemo::CommunicatorType::MPI);
+    MPI_Comm mpi_comm = MPI_COMM_WORLD; //TODO: cast the communicator ptr to a MPI communicator and get getMPIComm()?
 
-    //scai::dmemo::CommunicatorPtr comm2 = inputDist->getCommunicatorPtr();    
-    std::shared_ptr<const scai::dmemo::MPICommunicator> mpi_comm = std::dynamic_pointer_cast<const scai::dmemo::MPICommunicator>(comm);
+    // as MPI communicator might have been splitted, take the one used by comm
+    if ( comm->getType() == scai::dmemo::CommunicatorType::MPI ){
+        const auto& mpiComm = static_cast<const scai::dmemo::MPICommunicator&>( *comm );
+        mpi_comm = mpiComm.getMPIComm();
+    }
 
-    //MPI_Comm mpi_comm = commMPI.getMPIComm();
-    JanusSort::sort(mpi_comm->getMPIComm(), localPairs, MPI_DOUBLE_INT);
-    //JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>() );
-PRINT(comm->getRank() << ": " << localPairs.size() );    
-    
+    //JanusSort::sort(mpi_comm, localPairs, MPI_DOUBLE_INT);
+    JanusSort::sort(mpi_comm, localPairs, getMPITypePair<ValueType,IndexType>() );
+
     migrationCalculation = std::chrono::steady_clock::now() - beforeInitPart;
     metrics.MM["timeMigrationAlgo"] = migrationCalculation.count();
     std::chrono::time_point < std::chrono::steady_clock > beforeMigration = std::chrono::steady_clock::now();
@@ -837,15 +852,17 @@ PRINT(comm->getRank() << ": " << localPairs.size() );
 
     SCAI_REGION_END("HilbertCurve.redistribute.sort")
 
-    sort_pair minLocalIndex = localPairs[0];
+    sort_pair<ValueType> minLocalIndex = localPairs[0];
     std::vector<double> sendThresholds(comm->getSize(), minLocalIndex.value);
     std::vector<double> recvThresholds(comm->getSize());
 
     comm->all2all(recvThresholds.data(), sendThresholds.data());//TODO: maybe speed up with hypercube
     SCAI_ASSERT_LT_ERROR(recvThresholds[comm->getSize() - 1], 1, "invalid hilbert index");
+    SCAI_ASSERT_GE_ERROR(recvThresholds[comm->getSize() - 1], 0, "invalid hilbert index");
     // merge to get quantities //Problem: nodes are not sorted according to their hilbert indices, so accesses are not aligned.
     // Need to sort before and after communication
     assert(std::is_sorted(recvThresholds.begin(), recvThresholds.end()));
+
     std::vector<IndexType> permutation(localN);
     std::iota(permutation.begin(), permutation.end(), 0);
     std::sort(permutation.begin(), permutation.end(), [&](IndexType i, IndexType j) {
@@ -885,9 +902,16 @@ PRINT(comm->getRank() << ": new localN= " << newLocalN);
     SCAI_REGION_END("HilbertCurve.redistribute.communicationPlan")
 
     if (settings.verbose) {
-        PRINT0(std::to_string(localN) + " old local values "
-               + std::to_string(newLocalN) + " new ones.");
+        PRINT(comm->getRank()<<": " << localN << " old local values, " << newLocalN << " new ones.");
     }
+    
+    //in some rare cases it can happen that some PE(s) do not get
+    //any new local points; TODO: debug/investigate
+
+    if( newLocalN==0){
+        throw std::runtime_error( "PE " + std::to_string(comm->getRank()) + " has no points after redistribution of Hilbert indices. It may be that the curve resolution is too small. Current value is " + std::to_string(settings.sfcResolution) + ". Retry using a higher value through the --sfcResolution argument. Setting the --verbose option may also provide additional information" );
+     }
+
     //transmit indices, allowing for resorting of the received values
     std::vector<IndexType> sendIndices(localN);
     {
@@ -1019,7 +1043,6 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
     //so only the root PE allocates the array
     double allMinMax[arraySize];
 
-    //every PE sends its local min and max to root
     comm->gather(allMinMax, 2, root, sfcMinMax );
 
     if( settings.debugMode and comm->getRank()==root ) {
@@ -1042,7 +1065,7 @@ bool HilbertCurve<IndexType, ValueType>::confirmHilbertDistribution(
 //template function to get a MPI datatype. These are on purpose outside
 // the class because we cannot specialize them without specializing
 // the whole class. Maybe doing so it not a problem...
-/*
+
 template<>
 MPI_Datatype getMPIType<float>(){
  return MPI_FLOAT;
@@ -1060,10 +1083,9 @@ MPI_Datatype getMPITypePair<double,IndexType>(){
 
 template<>
 MPI_Datatype getMPITypePair<float,IndexType>(){
-    std::cout << __FILE__ << ", MPI_FLOAT_INT" << std::endl;
     return MPI_FLOAT_INT;
 }
-*/
+
 //-------------------------------------------------------------------------------------------------
 
 template class HilbertCurve<IndexType, double>;

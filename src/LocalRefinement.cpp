@@ -20,6 +20,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     std::vector<DenseVector<ValueType>> &coordinates,
     std::vector<ValueType> &distances,
     DenseVector<IndexType> &origin,
+    const CommTree<IndexType,ValueType> &commTree,
     const std::vector<DenseVector<IndexType>>& communicationScheme,
     Settings settings) {
 
@@ -53,13 +54,38 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     if (settings.numBlocks != comm->getSize()) {
         throw std::runtime_error("Called with " + std::to_string(comm->getSize()) + " processors, but " + std::to_string(settings.numBlocks) + " blocks.");
     }
-
-//TODO: turn to vectors, one for each vertex weight
-    const IndexType optSize =  nodeWeights.sum() / settings.numBlocks;
-    const IndexType maxAllowableBlockSize = optSize*(1+settings.epsilon);
-
+    
     //for now, we are assuming equal numbers of blocks and processes
     const IndexType localBlockID = comm->getRank();
+
+    //TODO: need vector<vector> for multiple node weights
+    //this works only when k=p
+    std::vector<ValueType> allMaxAllowableBlockSize( comm->getSize() );
+
+    //if the tree is empty, get a opt size around the average.
+    if( commTree.getNumNodes()==0 ){
+        const ValueType optSize =  nodeWeights.sum() / settings.numBlocks;
+        const ValueType maxAllowableBlockSize = optSize*(1+settings.epsilon);
+        //the allMaxAllowableBlockSize vector is not needed in this case but it simplifies things later, 
+        //when calculating the max size of the partner
+        for( int p=0; p<comm->getSize(); p++ ){
+            allMaxAllowableBlockSize[p] = maxAllowableBlockSize;
+        }
+    }else{
+        const std::vector<std::vector<ValueType>> targetBlockWeights = commTree.getBalanceVectors();
+        //SCAI_ASSERT_EQ_ERROR(targetBlockWeights.size(), nodeWeights.size(), "Wrong number of weights");
+        SCAI_ASSERT_EQ_ERROR(targetBlockWeights.size(), 1, "Local refinement does not accept multiple weights (yet).");
+        SCAI_ASSERT_EQ_ERROR(targetBlockWeights[0].size(), settings.numBlocks, "Wrong size of weights");
+        SCAI_ASSERT_EQ_ERROR(targetBlockWeights[0].size(), comm->getSize(), 
+            "More blocks than PEs; local refinement currently works only when number of PES= number of blocks.");
+
+        for( int p=0; p<targetBlockWeights[0].size(); p++ ){
+            allMaxAllowableBlockSize[p] = targetBlockWeights[0][p]*(1+settings.epsilon);
+        }
+    }
+
+    //calculate the maximum allowed block for this PE
+    const ValueType maxAllowableBlockSize = allMaxAllowableBlockSize[localBlockID];
 
     const bool nodesWeighted = nodeWeights.getDistributionPtr()->getGlobalSize() > 0;
     if (nodesWeighted && nodeWeights.getDistributionPtr()->getLocalSize() != input.getRowDistributionPtr()->getLocalSize()) {
@@ -83,14 +109,17 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
     }
 
     std::chrono::duration<double> beforeLoop = std::chrono::steady_clock::now() - startTime;
-    if(settings.verbose) {
-        //PRINT0("time elapsed before main loop: " << t1 );
+    if(settings.verbose or settings.debugMode) {
+        ValueType t1 = comm->max(beforeLoop.count());
+        PRINT0("time elapsed before main loop: " << t1 );
         PRINT0("number of rounds/loops: " << communicationScheme.size() );
     }
+
 
     //main loop, one iteration for each color of the graph coloring
     for (IndexType color = 0; color < communicationScheme.size(); color++) {
         SCAI_REGION( "LocalRefinement.distributedFMStep.loop" )
+        std::chrono::time_point<std::chrono::steady_clock> startColor =  std::chrono::steady_clock::now();
 
 SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.intro" )
         const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
@@ -112,6 +141,9 @@ SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.intro" )
             IndexType partnerOfPartner = commAccess[commDist->global2Local(partner)];
             if (partnerOfPartner != comm->getRank()) {
                 throw std::runtime_error("Process " + std::to_string(comm->getRank()) + ": Partner " + std::to_string(partner) + " has partner " + std::to_string(partnerOfPartner) + ".");
+            }
+            if(settings.debugMode){
+                std::cout<< "Comm round "<< color <<": PE " << comm->getRank() << " is paired with " << partner << std::endl;
             }
         }
 SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.intro" )
@@ -281,9 +313,13 @@ SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.intro" )
             //origin data, for redistribution in uncoarsening step
             scai::hmemo::HArray<IndexType> originData;
             graphHalo.updateHalo(originData, origin.getLocalValues(), *comm);
+
+            //the max allowed size of the partner PE
+            ValueType otherMaxAllowableBlockSize = allMaxAllowableBlockSize[partner];
+
             //block sizes and capacities
             std::pair<ValueType, ValueType> blockSizes = {blockWeightSum, otherBlockWeightSum};
-            std::pair<ValueType, ValueType> maxBlockSizes = {maxAllowableBlockSize, maxAllowableBlockSize};
+            std::pair<ValueType, ValueType> maxBlockSizes = {maxAllowableBlockSize, otherMaxAllowableBlockSize};
 
             //second round markers
             std::pair<IndexType, IndexType> secondRoundMarkers = {secondRoundMarker, otherSecondRoundMarker};
@@ -319,6 +355,7 @@ SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.intro" )
             of PEs involved is low so it makes sense to precompute the distances.
             Maybe distances can be computed here and given as an input
             */
+
             ValueType gain = twoWayLocalFM(input, haloMatrix, graphHalo, borderRegionIDs, borderNodeWeights, assignedToSecondBlock, maxBlockSizes, blockSizes, tieBreakingKeys, settings);
 
             {
@@ -460,7 +497,12 @@ SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.intro" )
                 }
             }
         } // if (partner != comm->getRank())
-    } //for (IndexType color = 0; color < communicationScheme.size();...
+        if(settings.debugMode){
+            std::chrono::duration<double> colorElapTime = std::chrono::steady_clock::now() - startColor;
+            std::cout << "PE " << comm->getRank() << " finished round " << color << " with gain " << gainThisRound \
+                << " in time " << colorElapTime.count() <<std::endl;
+        }
+    }//for color
 
     comm->synchronize();
 
@@ -513,7 +555,6 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
         magicStoppingAfterNoGainRounds = borderRegionIDs.size();
     }
 
-    assert(blockCapacities.first == blockCapacities.second);
     const bool nodesWeighted = (nodeWeights.size() != 0);
     //const bool edgesWeighted = nodesWeighted;//TODO: adapt this, change interface
     const bool edgesWeighted = ( scai::utilskernel::HArrayUtils::max(input.getLocalStorage().getValues()) !=1 );
@@ -541,9 +582,6 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
     if (nodesWeighted) {
         assert(nodeWeights.size() == veryLocalN);
     }
-
-    //TODO: not used variable
-    //const IndexType firstBlockSize = std::distance(assignedToSecondBlock.begin(), std::lower_bound(assignedToSecondBlock.begin(), assignedToSecondBlock.end(), 1));
 
     //this map provides an index from 0 to b-1 for each of the b indices in borderRegionIDs
     //globalToVeryLocal[borderRegionIDs[i]] = i
@@ -621,7 +659,7 @@ ValueType ITI::LocalRefinement<IndexType, ValueType>::twoWayLocalFM(
 
             if (gainOverBalance) {
                 firstComparisonPair = {-firstQueue.inspectMin().first.first, blockSizes.first};
-                firstComparisonPair = {-secondQueue.inspectMin().first.first, blockSizes.second};
+                secondComparisonPair = {-secondQueue.inspectMin().first.first, blockSizes.second};
             } else {
                 firstComparisonPair = {blockSizes.first, -firstQueue.inspectMin().first.first};
                 secondComparisonPair = {blockSizes.second, -secondQueue.inspectMin().first.first};
@@ -1095,7 +1133,6 @@ std::pair<std::vector<IndexType>, std::vector<IndexType>> ITI::LocalRefinement<I
     }
 
     scai::hmemo::HArray<IndexType> localData = part.getLocalValues();
-    scai::hmemo::ReadAccess<IndexType> partAccess(localData);
 
     const CSRStorage<ValueType>& localStorage = input.getLocalStorage();
     const scai::hmemo::ReadAccess<IndexType> ia(localStorage.getIA());

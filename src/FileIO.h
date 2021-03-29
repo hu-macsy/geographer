@@ -57,7 +57,11 @@ public:
      * @param[in] adjM The graph's adjacency matrix.
      * @param[in] filename The file's name to write to.
      */
-    static void writeGraph (const CSRSparseMatrix<ValueType> &adjM, const std::string filename, const bool edgeWeights = false);
+    static void writeGraph (
+        const CSRSparseMatrix<ValueType> &adjM,
+        const std::string filename,
+        const bool binary = false,
+        const bool edgeWeights = false);
 
     /** Given an adjacency matrix and a filename writes the local part of matrix in the file using the METIS format.
      * Every PE writes its local data in a separate file by adding its rank in the end of the file name.
@@ -65,6 +69,9 @@ public:
      * @param[in] filename The file's name to write to
      */
     static void writeGraphDistributed (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
+
+
+    static void writeGraphAsEdgeList (const CSRSparseMatrix<ValueType> &adjM, const std::string filename);
 
     /** @brief Write graph and partition into a .vtk file; this can be opened by paraview.
      *
@@ -93,7 +100,9 @@ public:
      * @param[in] coordinates The coordinates of the points.
      * @param[in] filename The file's name to write to
     */
-    static void writeCoordsParallel(const std::vector<DenseVector<ValueType>> &coords, const std::string filename);
+    static void writeCoordsParallel(
+        const std::vector<DenseVector<ValueType>> &coords,
+        const std::string filename);
 
     /** Each PE writes its own part of the coordinates in a separate file called filename_X.xyz where X is the rank of the PE,
      * i.e., a number from 0 until the total number of PEs-1.
@@ -101,7 +110,10 @@ public:
      * @param[in] dimensions Number of dimensions of coordinates.
      * @param[in] filename The file's name to write to.
      * */
-    static void writeCoordsDistributed (const std::vector<DenseVector<ValueType>> &coords,  const IndexType dimensions, const std::string filename);
+    static void writeCoordsDistributed (
+        const std::vector<DenseVector<ValueType>> &coords,
+        const IndexType dimensions,
+        const std::string filename);
 
     /** Given the vector of the coordinates and the nodeWeights, writes them both in a file in the form:
     *
@@ -129,12 +141,19 @@ public:
      */
     static void writeDenseVectorCentral(DenseVector<IndexType> &dv, const std::string filename);
 
+    /**
+     * Write a DenseVector in parallel in the filename. Each PE, one after another, write its own part.
+     */
+    template<typename T>    
+    static void writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename);
+
+
     /** Reads a graph from filename in a given format and returns the adjacency matrix. \sa ITI::Format
      * @param[in] filename The file to read from.
      * @param[in] fileFormat The type of file to read from.
      * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
      */
-    static CSRSparseMatrix<ValueType> readGraph(const std::string filename, const scai::dmemo::CommunicatorPtr comm, Format = Format::METIS);
+    static CSRSparseMatrix<ValueType> readGraph(const std::string filename, const scai::dmemo::CommunicatorPtr comm, Format = Format::AUTO);
 
     /** Reads a graph from filename in the given format and returns the adjacency matrix with the node weights. \sa ITI::Format
      * @param[in] filename The file to read from.
@@ -142,7 +161,7 @@ public:
      * @param[in] fileFormat The type of file to read from.
      * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
      */
-    static CSRSparseMatrix<ValueType> readGraph(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights, const scai::dmemo::CommunicatorPtr comm, Format = Format::METIS);
+    static CSRSparseMatrix<ValueType> readGraph(const std::string filename, std::vector<DenseVector<ValueType>>& nodeWeights, const scai::dmemo::CommunicatorPtr comm, Format = Format::AUTO);
 
     static CSRSparseMatrix<ValueType> readGraph(const std::string filename ){
         const scai::dmemo::CommunicatorPtr comm = scai::dmemo::Communicator::getCommunicatorPtr();
@@ -179,7 +198,11 @@ public:
      * @param[in] filename The prefix of the file to read from.
      * @return The adjacency matrix of the graph. The rows of the matrix are distributed with a BlockDistribution and NoDistribution for the columns.
      * */
-    static scai::lama::CSRSparseMatrix<ValueType> readEdgeListDistributed(const std::string filename, const scai::dmemo::CommunicatorPtr comm);
+    static scai::lama::CSRSparseMatrix<ValueType> readEdgeListDistributed(
+        const std::string filename,
+        const scai::dmemo::CommunicatorPtr comm,
+        const bool duplicateEdges = false,
+        const bool removeSelfLoops = true);
 
     /** @brief Reads the coordinates from file "filename" and returns then in a vector of DenseVector.
      *
@@ -319,6 +342,20 @@ public:
     //TODO: move to CommTree as, for example, importFromFile oder so?
     static CommTree<IndexType,ValueType> readPETree( const std::string& filename);
 
+    /* Read the file with the topology description; one line per compute node with 4 values: 
+        name (which is used as a key for the map), CPU speed, memory in MB  and number of cores
+
+    @param return key is the node name, vector as size 3 with the above attributes
+    */
+
+    static std::map<std::string, std::vector<ValueType>> readFlatTopology( const std::string& filename );
+
+    /* Creates the block sizes (likely to be used to create a commTree) from a topology file.
+        \sa readFlatTopology() and \sa commTree::createFlatHeterogeneous().
+        This function works on;y when numBlock==number of calling processors.
+    */
+    static std::vector<std::vector<ValueType>>createBlockSizesFromTopology(
+        const std::string filename, const std::string myName, const scai::dmemo::CommunicatorPtr comm);
 
     // taken from https://stackoverflow.com/questions/4316442/stdofstream-check-if-file-exists-before-writing
     /** Check if a file exists
@@ -343,12 +380,6 @@ private:
      * Reads the coordinates for the MatrixMarket file format.
      */
     static std::vector<DenseVector<ValueType>> readCoordsMatrixMarket ( const std::string filename, const scai::dmemo::CommunicatorPtr comm);
-
-    /**
-     * Write a DenseVector in parallel in the filename. Each PE, one after another, write its own part.
-     */
-    template<typename T>
-    static void writeDenseVectorParallel(const DenseVector<T> &dv, const std::string filename);
 
     static void ltrim(std::string &s);
 

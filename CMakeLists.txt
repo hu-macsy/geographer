@@ -82,7 +82,7 @@ set ( SCAI_PATH_HINTS "${SCAI_DIR}" "${SCAI_HOME}" "$ENV{SCAI_HOME}" )
 
 if ( ${CMAKE_VERSION} VERSION_GREATER 3.11)
     ## use new policy to configure with SCAI_ROOT, suppress warning
-    cmake_policy( SET CMP0074 NEW )
+    cmake_policy( SET CMP0072 NEW )
 else ()
     ## simulate new policy by adding SCAI_ROOT to hints
     set ( SCAI_PATH_HINTS ${SCAI_PATH_HINTS} "${SCAI_ROOT}" "$ENV{SCAI_ROOT}" )
@@ -109,8 +109,12 @@ endif()
 
 
 ### get git commit ###
-execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE GIT_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE)
+execute_process(COMMAND git rev-parse --short HEAD 
+    OUTPUT_VARIABLE GIT_COMMIT 
+    OUTPUT_STRIP_TRAILING_WHITESPACE 
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 add_definitions("-DBUILD_COMMIT=${GIT_COMMIT}")
+message("\n\tgit commit is " ${GIT_COMMIT} "\n")
 add_definitions("-Wall -Wno-sign-compare")
 
 ### define install directories ###
@@ -123,7 +127,9 @@ set(CMAKE_DEST "share/cmake/geographer")
 ### set runtime path ###
 cmake_policy(SET CMP0042 NEW) # using rpath also on Mac OS
 set ( CMAKE_SKIP_BUILD_RPATH FALSE )
-set ( CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${LIB_DEST} ${SCAI_ROOT}/lib/)
+set ( CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+#in case rpath is already initialized
+set ( CMAKE_INSTALL_RPATH ${CMAKE_INSTALL_PREFIX}/${LIB_DEST} ${SCAI_ROOT}/lib/ ${CMAKE_INSTALL_RPATH})
 set ( CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE )
 
 add_subdirectory(external/KaDiS EXCLUDE_FROM_ALL)
@@ -139,9 +145,8 @@ add_subdirectory(src)
 
 add_subdirectory(tools)
 
-
 if( TARGET wrappers )
-	set( WRAPPERS_FOUND TRUE)
+	set( WRAPPERS_FOUND TRUE CACHE INTERNAL "")
 	#set( EXTRA_LIBS "")
 endif()
 
