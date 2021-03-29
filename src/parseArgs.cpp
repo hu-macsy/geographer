@@ -80,7 +80,6 @@ Options populateOptions() {
     ("redistAndStore", "redistribute and store the graph after partitioning", value<bool>())
     //debug
     ("writeDebugCoordinates", "Write Coordinates of nodes in each block", value<bool>())
-    ("writePEgraph", "Write the processor graph to a file", value<bool>())
     ("verbose", "Increase output.")
     ("debugMode", "Increase output and more expensive checks")
     ("storeInfo", "Store timing and other metrics in file.")
