@@ -121,7 +121,7 @@ std::vector<ValueType> ITI::LocalRefinement<IndexType, ValueType>::distributedFM
         SCAI_REGION( "LocalRefinement.distributedFMStep.loop" )
         std::chrono::time_point<std::chrono::steady_clock> startColor =  std::chrono::steady_clock::now();
 
-SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.intro" )
+        SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.intro" )
         const scai::dmemo::DistributionPtr inputDist = input.getRowDistributionPtr();
         const scai::dmemo::DistributionPtr partDist = part.getDistributionPtr();
         const scai::dmemo::DistributionPtr commDist = communicationScheme[color].getDistributionPtr();
@@ -146,7 +146,7 @@ SCAI_REGION_START( "LocalRefinement.distributedFMStep.loop.intro" )
                 std::cout<< "Comm round "<< color <<": PE " << comm->getRank() << " is paired with " << partner << std::endl;
             }
         }
-SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.intro" )
+        SCAI_REGION_END( "LocalRefinement.distributedFMStep.loop.intro" )
         /*
          * check for validity of partition
          */

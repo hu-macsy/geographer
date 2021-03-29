@@ -22,6 +22,7 @@
 #include "Settings.h"
 #include "Metrics.h"
 
+#include <JanusSort.hpp>
 
 namespace ITI {
 
