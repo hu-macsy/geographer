@@ -16,7 +16,6 @@
 #include <scai/dmemo/BlockDistribution.hpp>
 #include <scai/dmemo/GenBlockDistribution.hpp>
 #include <scai/dmemo/GeneralDistribution.hpp>
-
 #include <scai/dmemo/mpi/MPICommunicator.hpp>
 
 
