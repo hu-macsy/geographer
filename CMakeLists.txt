@@ -29,12 +29,10 @@ if(CMAKE_COMPILER_IS_GNUCXX AND CODE_COVERAGE)
     set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/CmakeModules)
     include(CodeCoverage)
     APPEND_COVERAGE_COMPILER_FLAGS()
-    #setup_target_for_coverage(${PROJECT_NAME}_coverage ${PROJECT_TEST_NAME} coverage)
     setup_target_for_coverage_gcovr_html( 
         NAME ${PROJECT_NAME}_coverage 
         EXECUTABLE GeographerTest -j 4
         DEPANDENCIES GeographerTest)
-    #setup_target_for_coverage(${PROJECT_NAME}_coverage GeographerTest coverage)
 endif()
 
 
@@ -45,12 +43,10 @@ if(USE_NETWORKIT)
      message( FATAL_ERROR "Install Directory of NETWORKIT not defined, specify with -DNETWORKIT_DIR" )
   endif (NOT DEFINED NETWORKIT_DIR)
   add_definitions(-DUSE_NETWORKIT)
-#endif(USE_NETWORKIT)
 
   set(NETWORKIT_INCLUDE "${NETWORKIT_DIR}/include/") 
   set(NETWORKIT_LIB "${NETWORKIT_DIR}/lib/")
-# link_directories has to happen before target definitions
-#if (USE_NETWORKIT)
+  # link_directories has to happen before target definitions
   include_directories(${NETWORKIT_INCLUDE})
   link_directories(${NETWORKIT_LIB})
 endif (USE_NETWORKIT)
@@ -71,10 +67,12 @@ set(CMAKE_REQUIRED_FLAGS ${MPI_CXX_LINK_FLAGS})
 
 
 ### include GTest ###
-add_subdirectory("${PROJECT_SOURCE_DIR}/external/googletest" "googletest" EXCLUDE_FROM_ALL)
-set(GTEST_LIBRARIES gtest)
-enable_testing()
-set(GTEST_FOUND TRUE)
+if( COMPILE_TESTS )
+    add_subdirectory("${PROJECT_SOURCE_DIR}/external/googletest" "googletest" EXCLUDE_FROM_ALL)
+    set(GTEST_LIBRARIES gtest)
+    enable_testing()
+    set(GTEST_FOUND TRUE)
+endif()
 
 
 ### find SCAI ###
@@ -182,12 +180,12 @@ if (DOXYGEN_FOUND AND BUILD_DOC)
         COMMENT "Generating API documentation with Doxygen"
         VERBATIM )
 else (DOXYGEN_FOUND AND BUILD_DOC)
-	if(NOT DOXYGEN_FOUND AND BUILD_DOC)
-		message("Doxygen need to be installed to generate the doxygen documentation")
-	endif()
-	if(NOT BUILD_DOC)
-		message("Building the documentation is deactivated, use BUILD_DOC=ON to activate it, or make doxygendoc to build only the documentation")
-	endif()
+    if(NOT DOXYGEN_FOUND AND BUILD_DOC)
+        message("Doxygen need to be installed to generate the doxygen documentation")
+    endif()
+    if(NOT BUILD_DOC)
+        message("Building the documentation is deactivated, use BUILD_DOC=ON to activate it, or make doxygendoc to build only the documentation")
+    endif()
 endif (DOXYGEN_FOUND AND BUILD_DOC)
 
 
